@@ -54,6 +54,7 @@
   called on the main thread at frame boundaries
 * Revert the moveable OSD framecount and inputs
 * Remove the Dockerfile, the Xcode project and the AppVeyor config
+* Docs: link to the TASVideos lists of movies made with libTAS (#716)
 
 ### Fixed
 
