@@ -100,6 +100,8 @@
   (#765)
 * Find the lavapipe Vulkan driver for software rendering on any arch and
   in non-standard locations such as NixOS (#763)
+* Fix SDL text input events ignoring Shift/Caps Lock for letter keys
+  (#742)
 
 ## [1.4.8] - 2026-05-14
 ### Added
