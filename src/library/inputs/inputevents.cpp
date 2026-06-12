@@ -105,6 +105,9 @@ static void generateKeyEvent(int event_key, bool pressed)
                 /* SDL keycode is identical to its char number for common chars */
                 auto text = std::make_unique<char[]>(2);
                 text[0] = static_cast<char>(event3.key.key & 0xff);
+                /* Apply Shift/Caps Lock to produce uppercase letters */
+                if (text[0] >= 'a' && text[0] <= 'z' && (event3.key.mod & (sdl3::SDL_KMOD_SHIFT | sdl3::SDL_KMOD_CAPS)))
+                    text[0] &= ~0x20;
                 text[1] = '\0';
                 sdl3_text_input_strings.push_back(std::move(text));
 
@@ -143,7 +146,18 @@ static void generateKeyEvent(int event_key, bool pressed)
                 event2.text.windowID = 1;
                 event2.text.timestamp = timestamp;
                 /* SDL keycode is identical to its char number for common chars */
-                event2.text.text[0] = static_cast<char>(event2.key.keysym.sym & 0xff);
+                {
+                    char c = static_cast<char>(event2.key.keysym.sym & 0xff);
+                    /* Apply Shift/Caps Lock to produce uppercase letters,
+                     * matching what a real OS input method would generate
+                     * for SDL_TEXTINPUT.  Without this, Shift+letter always
+                     * produces a lowercase TEXTINPUT character, breaking any
+                     * game that reads character input from SDL_TEXTINPUT
+                     * (e.g. ScummVM's SCI engine verb hotkeys). */
+                    if (c >= 'a' && c <= 'z' && (event2.key.keysym.mod & (sdl2::KMOD_SHIFT | sdl2::KMOD_CAPS)))
+                        c &= ~0x20;
+                    event2.text.text[0] = c;
+                }
                 event2.text.text[1] = '\0';
                 
                 sdlEventQueue.insert(&event2);
