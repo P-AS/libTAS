@@ -189,8 +189,14 @@ int InputSerialization::readFrame(const std::string& line, AllInputs& inputs)
     if (d != '|')
         return -1;
 
-    d = input_string.peek();
-    while (d != std::char_traits<char>::eof()) {
+    /* Must hold the peek() result as an int (not char): on architectures
+     * where plain char is unsigned by default (e.g. aarch64), EOF (-1)
+     * would get truncated to 255 and never compare equal to
+     * std::char_traits<char>::eof(), so real end-of-line would never be
+     * detected here. */
+    int next = input_string.peek();
+    while (next != std::char_traits<char>::eof()) {
+        d = static_cast<char>(next);
         switch (d) {
             case 'E':
                 input_string >> d;
@@ -251,7 +257,7 @@ int InputSerialization::readFrame(const std::string& line, AllInputs& inputs)
         }
         if (ret < 0)
             return ret;
-        d = input_string.peek();
+        next = input_string.peek();
     }
 
     /* If we imported events, we need to fill the remaining state to the state
@@ -279,11 +285,12 @@ int InputSerialization::readEventFrame(std::istringstream& input_string, AllInpu
 int InputSerialization::readKeyboardFrame(std::istringstream& input_string, AllInputs& inputs)
 {
     input_string >> std::hex;
-    char d = input_string.peek();
-    if (d == '|') {
+    int next = input_string.peek();
+    if (next == '|') {
         input_string.get();
         return 0;
     }
+    char d;
     for (int k=0; (k<AllInputs::MAXKEYS) && input_string; k++) {
         input_string >> inputs.keyboard[k] >> d;
         if (d == '|') {
