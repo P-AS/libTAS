@@ -31,6 +31,12 @@ namespace Utils
     ssize_t writeAll(int fd, const void *buf, size_t count);
     ssize_t readAll(int fd, void *buf, size_t count);
     bool isZeroPage(void *addr);
+
+    /* Actual runtime page size (e.g. 4096 on x86, but 16384 on some aarch64
+     * systems such as Apple Silicon under Asahi Linux). Must be used instead
+     * of a hardcoded 4096 for anything that needs OS page alignment
+     * (mmap/mprotect/madvise) or that parses /proc/pid/pagemap. */
+    size_t getPageSize();
 }
 }
 

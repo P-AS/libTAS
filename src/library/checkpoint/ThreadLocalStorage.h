@@ -34,6 +34,8 @@ struct ThreadTLSInfo {
     struct user_desc gdtentrytls[1];
 #elif __x86_64__
     unsigned long int fs, gs;  // thread local storage pointers
+#elif __aarch64__
+    unsigned long int tpidr;  // thread pointer register (TPIDR_EL0)
 #else
 #error "Unsupported arch"
 #endif

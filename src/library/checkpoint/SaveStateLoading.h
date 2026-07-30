@@ -61,6 +61,11 @@ class SaveStateLoading
     char nextFlag();
     bool validateCompressedLength() const;
 
+    /* Actual runtime memory page size (see Utils::getPageSize()) */
+    size_t page_size;
+
+    /* Batch size (in flag bytes) for buffered reads from the pagemap
+     * metadata file. Unrelated to the actual OS page size. */
     char flags[4096];
     char current_flag;
     int flag_i;

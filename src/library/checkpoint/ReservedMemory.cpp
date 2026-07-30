@@ -22,6 +22,7 @@
 #include "ReservedMemory.h"
 
 #include "logging.h"
+#include "Utils.h"
 
 #include <string.h>
 #include <sys/mman.h>
@@ -38,15 +39,16 @@ void ReservedMemory::init()
      * the ProcSelfMaps object that need some space.
      */
     if (restoreAddr == 0) {
+        size_t page_size = Utils::getPageSize();
         restoreLength = RESTORE_TOTAL_SIZE;
 
         /* Take the next multiplier of page size */
-        restoreLength = ((restoreLength + 4095) / 4096) * 4096;
-        
-        void* addr = mmap(nullptr, restoreLength + (2 * 4096), PROT_NONE,
+        restoreLength = ((restoreLength + page_size - 1) / page_size) * page_size;
+
+        void* addr = mmap(nullptr, restoreLength + (2 * page_size), PROT_NONE,
             MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
         MYASSERT(addr != MAP_FAILED)
-        restoreAddr = reinterpret_cast<intptr_t>(addr) + 4096;
+        restoreAddr = reinterpret_cast<intptr_t>(addr) + page_size;
         MYASSERT(mprotect(reinterpret_cast<void*>(restoreAddr), restoreLength, PROT_READ | PROT_WRITE) == 0)
         memset(reinterpret_cast<void*>(restoreAddr), 0, restoreLength);
     }

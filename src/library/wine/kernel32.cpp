@@ -30,6 +30,10 @@
 
 namespace libtas {
 
+/* Wine's calling convention macros (__stdcall / ms_abi) are only defined for
+ * x86 and x86_64 in winehook.h, and wine itself only targets those archs. */
+#if defined(__i386__) || defined(__x86_64__)
+
 typedef union _LARGE_INTEGER {
     struct {
         unsigned int LowPart;
@@ -124,5 +128,12 @@ void hook_kernel32()
     HOOK_PATCH_ORIG(QueryPerformanceCounter, "kernel32.dll.so");
 }
 
+#else
+
+void hook_kernel32()
+{
+}
+
+#endif
 
 }

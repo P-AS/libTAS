@@ -61,9 +61,14 @@ private:
     void appendPagemapData(const void* data, size_t size);
 
     enum {
+        /* Batch size (in flag bytes) for buffered writes to the pagemap
+         * metadata file. Unrelated to the actual OS page size. */
         PAGEMAP_CHUNK = 4096,
         PAGEMAP_WRITEBUF = 65536
     };
+
+    /* Actual runtime memory page size (see Utils::getPageSize()) */
+    size_t page_size;
 
     /* Chunk of savestate pagemap values */
     char ss_pagemaps[PAGEMAP_CHUNK];

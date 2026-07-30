@@ -24,6 +24,10 @@
 
 namespace libtas {
 
+/* Wine's calling convention macros (__stdcall / ms_abi) are only defined for
+ * x86 and x86_64 in winehook.h, and wine itself only targets those archs. */
+#if defined(__i386__) || defined(__x86_64__)
+
 struct winstring {
     unsigned short Length;
     unsigned short MaximumLength;
@@ -51,5 +55,12 @@ void hook_ntdll()
     HOOK_PATCH_ORIG(LdrGetProcedureAddress, "ntdll.dll.so");
 }
 
+#else
+
+void hook_ntdll()
+{
+}
+
+#endif
 
 }

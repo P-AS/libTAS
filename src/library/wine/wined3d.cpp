@@ -27,6 +27,10 @@
 
 namespace libtas {
 
+/* Wine's calling convention macros (__stdcall / ms_abi) are only defined for
+ * x86 and x86_64 in winehook.h, and wine itself only targets those archs. */
+#if defined(__i386__) || defined(__x86_64__)
+
 namespace orig {
 
 static void* __stdcall __attribute__((noinline)) wined3d_texture_get_resource(void *texture)
@@ -86,5 +90,12 @@ void hook_wined3d()
     }
 }
 
+#else
+
+void hook_wined3d()
+{
+}
+
+#endif
 
 }

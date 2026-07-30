@@ -20,7 +20,6 @@
 #include "Signature.h"
 #include <sstream>
 #include <cstring>
-#include <immintrin.h>
 
 bool Signature::hasMask() const
 {
@@ -100,6 +99,8 @@ static int memcmp_mask(const uint8_t *buffer1, const uint8_t *buffer2, const uin
 }
 
 // Find signature pattern in memory
+#if defined(__i386__) || defined(__x86_64__)
+#include <immintrin.h>
 __attribute__((target("avx2"))) uint8_t* SigSearch::FindAVX2(uint8_t* data, size_t size, const Signature &sig, bool hasWildcards)
 {
     const uint8_t *pat = sig.bytes.data();
@@ -169,6 +170,7 @@ __attribute__((target("avx2"))) uint8_t* SigSearch::FindAVX2(uint8_t* data, size
     // Search the last bytes without AVX2
     return SigSearch::FindCommon(data + i, size - i, sig, hasWildcards);
 }
+#endif // defined(__i386__) || defined(__x86_64__)
 
 
 // ------------------------------------------------------------------------------------------------
@@ -265,6 +267,7 @@ int SigSearch::SearchCommon(uint8_t* input, size_t inputLen, const Signature &si
 }
 
 // Fast AVX2 based search
+#if defined(__i386__) || defined(__x86_64__)
 int SigSearch::SearchAVX2(uint8_t* input, size_t inputLen, const Signature &sig, ptrdiff_t* output_offset)
 {
     size_t sigSize = sig.bytes.size();
@@ -292,14 +295,19 @@ int SigSearch::SearchAVX2(uint8_t* input, size_t inputLen, const Signature &sig,
 
     return count;
 }
+#endif // defined(__i386__) || defined(__x86_64__)
 
 // Search for signature pattern, returning a status result
 int SigSearch::Search(uint8_t* input, size_t inputLen, const Signature &sig, ptrdiff_t* output_offset)
 {
+#if defined(__i386__) || defined(__x86_64__)
     static bool isAVX2Supported = __builtin_cpu_supports("avx2");
-    
+
     if (isAVX2Supported)
         return SearchAVX2(input, inputLen, sig, output_offset);
     else
         return SearchCommon(input, inputLen, sig, output_offset);
+#else
+    return SearchCommon(input, inputLen, sig, output_offset);
+#endif
 }

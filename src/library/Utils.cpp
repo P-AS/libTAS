@@ -86,9 +86,15 @@ ssize_t Utils::readAll(int fd, void *buf, size_t count)
  * TODO: One can use /proc/self/pagemap to detect if the page is backed by a
  * shared zero page.
  */
+size_t Utils::getPageSize()
+{
+    static const size_t page_size = static_cast<size_t>(sysconf(_SC_PAGESIZE));
+    return page_size;
+}
+
 bool Utils::isZeroPage(void *addr)
 {
-    static const size_t page_size = 4096;
+    size_t page_size = getPageSize();
     long long *buf = (long long *)addr;
     size_t end = page_size / sizeof(*buf);
     long long res = 0;

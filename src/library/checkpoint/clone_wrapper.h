@@ -150,4 +150,63 @@
     (void) args; \
     (void) clone_restore_fn;
 
+#elif __aarch64__
+
+/*
+ * The kernel expects (aarch64 syscall ABI, args in x0-x4, number in x8):
+ * x0: flags
+ * x1: child_stack (used directly as the child's SP, growing down)
+ * x2: TID field in parent
+ * x3: TID field in child
+ * x4: thread pointer (unused here, no CLONE_SETTLS)
+ * x8: 220 (__NR_clone)
+ *
+ * After a raw (non-libc) clone syscall, the child resumes right after the
+ * "svc #0" with sp == the child_stack value we passed in x1. We stash the
+ * restore function and its argument at the bottom of the new stack before
+ * the syscall, then pop and call them in the child.
+ */
+
+/* clang-format off */
+#define RUN_CLONE_RESTORE_FN(ret, clone_flags, new_sp, ptr_parent_tid, ptr_child_tid,   \
+                thread_args, clone_restore_fn)        \
+     asm volatile(                            \
+            "sub x1, %2, #16            \n"    \
+            "str %5, [x1]                \n"    \
+            "str %6, [x1, #8]            \n"    \
+            "mov x0, %1                \n"    \
+            "mov x2, %3                \n"    \
+            "mov x3, %4                \n"    \
+            "mov x8, #220 /* __NR_clone syscall */    \n"    \
+            "svc #0                    \n"    \
+                                     \
+            "cbnz x0, clone_parent            \n"    \
+                                     \
+            "mov x29, #0                \n"    \
+            "mov x30, #0                \n"    \
+            "ldr x9, [sp], #8            \n"    \
+            "ldr x0, [sp], #8            \n"    \
+            "blr x9                    \n"    \
+                                     \
+            "clone_parent:                \n"    \
+            "mov %0, x0                \n"    \
+            : "=r"(ret)                    \
+            : "r"(clone_flags),                \
+              "r"(new_sp),                    \
+              "r"(ptr_parent_tid),                \
+              "r"(ptr_child_tid),            \
+              "r"(clone_restore_fn),                \
+              "r"(thread_args)                \
+            : "x0", "x1", "x2", "x3", "x8", "x9", "x30", "memory")
+
+/* clone3 with set_tid is disabled for now, same as __i386__, until proper
+ * asm to use it can be written. */
+#define RUN_CLONE3_RESTORE_FN(ret, clone_args, size, args,        \
+                                 clone_restore_fn)                \
+    (void) ret; \
+    (void) clone_args; \
+    (void) size; \
+    (void) args; \
+    (void) clone_restore_fn;
+
 #endif

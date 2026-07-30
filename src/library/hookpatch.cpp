@@ -21,6 +21,7 @@
 #include "general/dlhook.h"
 #include "logging.h"
 #include "GlobalState.h"
+#include "Utils.h"
 #include "../shared/sockethelpers.h"
 #include "../shared/messages.h"
 
@@ -45,10 +46,19 @@ static const unsigned char JMP_INSTR[] = {0xff, 0x25};
  *     aa bb cc dd ee ff gg hh   64-bit target address
  */
 
-// jmp *(%rip) 
+// jmp *(%rip)
 static const unsigned char JMP_INSTR[] = {0xff, 0x25, 0x00, 0x00, 0x00, 0x00};
 #define JMP_INSTR_LEN 14
+# elif defined(__aarch64__)
+/*     50 00 00 58   ldr x16, #8    ; load the 64-bit target address below into x16
+ *     00 02 1f d6   br x16         ; branch to it
+ *     aa bb cc dd ee ff gg hh      64-bit target address
+ */
+static const unsigned char JMP_INSTR[] = {0x50, 0x00, 0x00, 0x58, 0x00, 0x02, 0x1f, 0xd6};
+#define JMP_INSTR_LEN 16
 # endif
+
+#if defined(__i386__) || defined(__x86_64__)
 
 struct instr_info {
     bool is_fpu;
@@ -434,6 +444,8 @@ static int instruction_length(const unsigned char *func, instr_info *instr)
 	return (int)(func - funcstart);
 }
 
+#endif // defined(__i386__) || defined(__x86_64__)
+
 /* To convert some instructions from the original function, we need to be at
  * 32-bit offset from the function location.
  * `current_tramp_segment` is the address of currently allocated segment, or null
@@ -450,24 +462,32 @@ static void* allocate_nearby_segment(void* current_tramp_segment, const void *or
         /* Check if it fits into signed 32-bit */
         if (offset >= INT32_MIN && offset <= INT32_MAX)
             return current_tramp_segment;
+# elif defined(__aarch64__)
+        ptrdiff_t offset = reinterpret_cast<ptrdiff_t>(orig_fun) - reinterpret_cast<ptrdiff_t>(current_tramp_segment);
+        /* Stay within the +-1MB range needed by relocated ADR / LDR (literal)
+         * instructions (the tightest constraint of the relocations we do) */
+        if (offset >= -0x100000 && offset <= 0x100000)
+            return current_tramp_segment;
 # endif
     }
 
     /* If we arrive here, we need to allocate a segment */
-    
+
     /* Usually the lowest mapped address is 4096, given by vm.mmap_min_addr.
      * We use a much larger lowest value. */
+    uintptr_t page_size = Utils::getPageSize();
+    uintptr_t page_mask = ~(page_size - 1);
     uintptr_t first_addr = 0x00100000;
     if (reinterpret_cast<uintptr_t>(orig_fun) > (0x70000000 + first_addr))
-        first_addr = (reinterpret_cast<uintptr_t>(orig_fun) - 0x70000000) & 0xFFFFFFFFFFFFF000;
+        first_addr = (reinterpret_cast<uintptr_t>(orig_fun) - 0x70000000) & page_mask;
 
     uintptr_t last_addr = reinterpret_cast<uintptr_t>(orig_fun) + 0x70000000;
-    
+
     /* Look for available segment by steps */
     void* obtained_addr = MAP_FAILED;
     for (uintptr_t addr = first_addr; addr < last_addr; addr += 0x00100000) {
         LOG(LL_DEBUG, LCF_HOOK, "  Try allocating a memory segment in address %llx", addr);
-        obtained_addr = mmap(reinterpret_cast<void*>(addr), 0x1000, PROT_EXEC | PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, 0, 0);
+        obtained_addr = mmap(reinterpret_cast<void*>(addr), page_size, PROT_EXEC | PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, 0, 0);
         if (obtained_addr != MAP_FAILED) break;
     }
     
@@ -478,6 +498,8 @@ static void* allocate_nearby_segment(void* current_tramp_segment, const void *or
     
     return obtained_addr;
 }
+
+#if defined(__i386__) || defined(__x86_64__)
 
 struct jmp_info {
     unsigned char* offset_addr; // where do we need to write the offset to the jmp address
@@ -687,6 +709,212 @@ static bool write_tramp_function(const void *orig_fun, void **pTramp)
     return true;
 }
 
+#elif defined(__aarch64__)
+
+/* Every aarch64 instruction is a fixed 4 bytes, so unlike x86 we don't need
+ * an instruction-length decoder: JMP_INSTR_LEN is always a whole number of
+ * instructions. We only need to detect and relocate the small set of
+ * PC-relative instructions that could appear in the first few instructions
+ * of a function:
+ *  - branches (B, BL, B.cond, CBZ, CBNZ) are redirected through an absolute
+ *    jump island appended to the trampoline, so no proximity to the
+ *    original function is required for those;
+ *  - ADR, ADRP and LDR (literal) compute a PC-relative value in place, so
+ *    their immediate is recomputed for the trampoline's address instead
+ *    (this is why allocate_nearby_segment() tries to stay close to the
+ *    original function: ADR/LDR only have a +-1MB reach).
+ * TBZ/TBNZ, LDRSW (literal) and SIMD/FP literal loads are not handled and
+ * make hooking abort rather than risk silently building a broken trampoline.
+ */
+
+struct jmp_info {
+    unsigned char* offset_addr; // trampoline address of the branch instruction to patch
+    const unsigned char* target_addr; // absolute address the branch originally targeted
+    uint32_t orig_word; // original instruction, to preserve its non-immediate bits
+    uint8_t imm_bits; // 26 for B/BL, 19 for B.cond/CBZ/CBNZ
+};
+
+/* Sign-extend the low `bits` bits of `value` to a 32-bit signed integer */
+static int32_t sign_extend(uint32_t value, int bits)
+{
+    uint32_t shift = 32 - bits;
+    return static_cast<int32_t>(value << shift) >> shift;
+}
+
+static bool write_tramp_function(const void *orig_fun, void **pTramp)
+{
+    static unsigned char* currentTrampAddr = nullptr;
+
+    currentTrampAddr = static_cast<unsigned char*>(allocate_nearby_segment(currentTrampAddr, orig_fun));
+
+    if (!currentTrampAddr) {
+        *pTramp = nullptr;
+        return false;
+    }
+
+    *pTramp = currentTrampAddr;
+
+    const unsigned char* pOrig = static_cast<const unsigned char*>(orig_fun);
+
+    LOG(LL_DEBUG, LCF_HOOK, "  Building our trampoline function in %p", currentTrampAddr);
+
+    int cur_offset = 0;
+    std::list<jmp_info> jmp_list;
+
+    while (cur_offset < JMP_INSTR_LEN) {
+        const unsigned char* instr_addr = pOrig + cur_offset;
+        uint32_t word;
+        memcpy(&word, instr_addr, 4);
+
+        bool is_b         = (word & 0xFC000000) == 0x14000000;
+        bool is_bl        = (word & 0xFC000000) == 0x94000000;
+        bool is_bcond     = (word & 0xFF000000) == 0x54000000;
+        bool is_cbz_cbnz  = (word & 0x7E000000) == 0x34000000;
+        bool is_tbz_tbnz  = (word & 0x7E000000) == 0x36000000;
+        bool is_adr_adrp  = (word & 0x1F000000) == 0x10000000;
+        bool is_ldr_lit   = (word & 0x3F000000) == 0x18000000;
+
+        if (is_tbz_tbnz) {
+            LOG(LL_ERROR, LCF_HOOK, "  Unsupported TBZ/TBNZ instruction %#x in function prologue, cannot build trampoline", word);
+            *pTramp = nullptr;
+            return false;
+        }
+        else if (is_b || is_bl || is_bcond || is_cbz_cbnz) {
+            /* Branch-like instruction: redirect it through a jump island
+             * that we append after the trampoline body, so it can reach
+             * the original (possibly far away) target regardless of where
+             * our trampoline was allocated. */
+            int imm_bits = (is_b || is_bl) ? 26 : 19;
+            uint32_t raw_imm = (is_b || is_bl) ? (word & 0x03FFFFFF) : ((word >> 5) & 0x7FFFF);
+            int32_t simm = sign_extend(raw_imm, imm_bits);
+            const unsigned char* target_addr = instr_addr + (static_cast<ptrdiff_t>(simm) * 4);
+
+            LOG(LL_DEBUG, LCF_HOOK, "  Found branch instruction %#x targeting %p", word, target_addr);
+
+            jmp_info info;
+            info.offset_addr = currentTrampAddr;
+            info.target_addr = target_addr;
+            info.orig_word = word;
+            info.imm_bits = static_cast<uint8_t>(imm_bits);
+            jmp_list.push_back(info);
+
+            /* Write the instruction as-is for now; its immediate gets
+             * patched below once the jump island's address is known. */
+            memcpy(currentTrampAddr, &word, 4);
+            currentTrampAddr += 4;
+        }
+        else if (is_adr_adrp) {
+            bool is_adrp = (word & 0x80000000) != 0;
+            uint32_t immlo = (word >> 29) & 0x3;
+            uint32_t immhi = (word >> 5) & 0x7FFFF;
+            int32_t simm = sign_extend((immhi << 2) | immlo, 21);
+
+            const unsigned char* new_instr_addr = currentTrampAddr;
+            ptrdiff_t new_imm;
+
+            if (is_adrp) {
+                uintptr_t orig_page = reinterpret_cast<uintptr_t>(instr_addr) & ~static_cast<uintptr_t>(0xFFF);
+                uintptr_t target_page = orig_page + (static_cast<ptrdiff_t>(simm) << 12);
+                uintptr_t new_page = reinterpret_cast<uintptr_t>(new_instr_addr) & ~static_cast<uintptr_t>(0xFFF);
+                new_imm = (static_cast<ptrdiff_t>(target_page) - static_cast<ptrdiff_t>(new_page)) >> 12;
+            }
+            else {
+                const unsigned char* target_addr = instr_addr + simm;
+                new_imm = target_addr - new_instr_addr;
+            }
+
+            if (new_imm < -(1 << 20) || new_imm > ((1 << 20) - 1)) {
+                LOG(LL_ERROR, LCF_HOOK, "  Could not modify ADR%s instruction, offset too large: %lld", is_adrp ? "P" : "", static_cast<long long>(new_imm));
+                *pTramp = nullptr;
+                return false;
+            }
+
+            LOG(LL_DEBUG, LCF_HOOK, "  Found ADR%s instruction %#x, rewriting immediate", is_adrp ? "P" : "", word);
+
+            uint32_t new_immlo = static_cast<uint32_t>(new_imm) & 0x3;
+            uint32_t new_immhi = (static_cast<uint32_t>(new_imm) >> 2) & 0x7FFFF;
+            uint32_t new_word = (word & ~((0x3u << 29) | (0x7FFFFu << 5))) | (new_immlo << 29) | (new_immhi << 5);
+
+            memcpy(currentTrampAddr, &new_word, 4);
+            currentTrampAddr += 4;
+        }
+        else if (is_ldr_lit) {
+            uint32_t opc = (word >> 30) & 0x3;
+
+            if (opc == 0x2) {
+                LOG(LL_ERROR, LCF_HOOK, "  Unsupported LDRSW (literal) instruction %#x in function prologue, cannot build trampoline", word);
+                *pTramp = nullptr;
+                return false;
+            }
+            else if (opc == 0x3) {
+                /* PRFM (literal): a cache hint, safe to copy unmodified even
+                 * though it will now prefetch a different address. */
+                memcpy(currentTrampAddr, &word, 4);
+                currentTrampAddr += 4;
+            }
+            else {
+                int32_t simm = sign_extend((word >> 5) & 0x7FFFF, 19);
+                const unsigned char* target_addr = instr_addr + (static_cast<ptrdiff_t>(simm) * 4);
+                ptrdiff_t new_imm = (target_addr - currentTrampAddr) / 4;
+
+                if (new_imm < -(1 << 18) || new_imm > ((1 << 18) - 1)) {
+                    LOG(LL_ERROR, LCF_HOOK, "  Could not modify LDR (literal) instruction, offset too large: %lld", static_cast<long long>(new_imm));
+                    *pTramp = nullptr;
+                    return false;
+                }
+
+                LOG(LL_DEBUG, LCF_HOOK, "  Found LDR (literal) instruction %#x, rewriting immediate", word);
+
+                uint32_t new_word = (word & ~0x00FFFFE0u) | ((static_cast<uint32_t>(new_imm) & 0x7FFFF) << 5);
+                memcpy(currentTrampAddr, &new_word, 4);
+                currentTrampAddr += 4;
+            }
+        }
+        else {
+            /* Write unmodified instruction */
+            memcpy(currentTrampAddr, instr_addr, 4);
+            currentTrampAddr += 4;
+        }
+
+        cur_offset += 4;
+    }
+
+    /* Write the jmp instruction to the original function */
+    memcpy(currentTrampAddr, JMP_INSTR, sizeof(JMP_INSTR));
+    currentTrampAddr += sizeof(JMP_INSTR);
+    uintptr_t targetAddr = reinterpret_cast<uintptr_t>(pOrig)+cur_offset;
+    memcpy(currentTrampAddr, &targetAddr, sizeof(uintptr_t));
+    currentTrampAddr += sizeof(uintptr_t);
+
+    /* Write all the jump islands, and patch the branch instructions to target them */
+    for (auto info = jmp_list.begin(); info != jmp_list.end(); info++) {
+        ptrdiff_t branch_disp = currentTrampAddr - info->offset_addr;
+        int32_t new_imm = static_cast<int32_t>(branch_disp / 4);
+
+        uint32_t new_word;
+        if (info->imm_bits == 26) {
+            new_word = (info->orig_word & ~0x03FFFFFFu) | (static_cast<uint32_t>(new_imm) & 0x03FFFFFF);
+        }
+        else {
+            new_word = (info->orig_word & ~0x00FFFFE0u) | ((static_cast<uint32_t>(new_imm) & 0x7FFFF) << 5);
+        }
+        memcpy(info->offset_addr, &new_word, 4);
+
+        /* Write JMP instruction */
+        memcpy(currentTrampAddr, JMP_INSTR, sizeof(JMP_INSTR));
+        currentTrampAddr += sizeof(JMP_INSTR);
+
+        /* Write called function absolute address */
+        const unsigned char *addr = info->target_addr;
+        memcpy(currentTrampAddr, &addr, sizeof(uintptr_t));
+        currentTrampAddr += sizeof(uintptr_t);
+    }
+
+    return true;
+}
+
+#endif // defined(__i386__) || defined(__x86_64__)
+
 void overwrite_orig_function(void *orig_fun, void* my_function)
 {
     /* Overwrite the original function */
@@ -694,9 +922,10 @@ void overwrite_orig_function(void *orig_fun, void* my_function)
 
     char *pTarget = reinterpret_cast<char *>(orig_fun);
     uintptr_t addrTarget = reinterpret_cast<uintptr_t>(pTarget);
-    uintptr_t alignedBeg = (addrTarget / 4096) * 4096;
-    uintptr_t alignedEnd = ((addrTarget+sizeof(JMP_INSTR)+sizeof(uintptr_t)) / 4096) * 4096;
-    size_t alignedSize = alignedEnd - alignedBeg + 4096;
+    uintptr_t page_size = Utils::getPageSize();
+    uintptr_t alignedBeg = (addrTarget / page_size) * page_size;
+    uintptr_t alignedEnd = ((addrTarget+sizeof(JMP_INSTR)+sizeof(uintptr_t)) / page_size) * page_size;
+    size_t alignedSize = alignedEnd - alignedBeg + page_size;
 
     MYASSERT(mprotect(reinterpret_cast<void*>(alignedBeg), alignedSize, PROT_EXEC | PROT_READ | PROT_WRITE) == 0)
 

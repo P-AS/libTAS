@@ -52,6 +52,8 @@ void ThreadLocalStorage::saveTLSState(ThreadTLSInfo *tlsInfo)
 #elif __x86_64__
     MYASSERT(syscall(SYS_arch_prctl, ARCH_GET_FS, &tlsInfo->fs) == 0)
     MYASSERT(syscall(SYS_arch_prctl, ARCH_GET_GS, &tlsInfo->gs) == 0)
+#elif __aarch64__
+    asm volatile ("mrs %0, tpidr_el0" : "=r" (tlsInfo->tpidr));
 #endif
 #endif
 }
@@ -78,6 +80,8 @@ void ThreadLocalStorage::restoreTLSState(ThreadTLSInfo *tlsInfo)
 #elif __x86_64__
     MYASSERT(syscall(SYS_arch_prctl, ARCH_SET_FS, tlsInfo->fs) == 0)
     MYASSERT(syscall(SYS_arch_prctl, ARCH_SET_GS, tlsInfo->gs) == 0)
+#elif __aarch64__
+    asm volatile ("msr tpidr_el0, %0" : : "r" (tlsInfo->tpidr));
 #endif
 #endif
 }

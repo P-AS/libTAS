@@ -145,8 +145,9 @@ bool Area::isUncommitted(int spmfd) const
      * the VM_ACCOUNT flag that is set when an area becomes writable, and the 
      * fact that two areas without matching VM_ACCOUNT flag cannot be merged. */
     
-    /* Seek at the beginning of the area pagemap */
-    lseek(spmfd, static_cast<off_t>(reinterpret_cast<uintptr_t>(addr) / (4096/8)), SEEK_SET);
+    /* Seek at the beginning of the area pagemap. Pagemap entries are 8 bytes
+     * per system page (not necessarily 4096 bytes). */
+    lseek(spmfd, static_cast<off_t>(reinterpret_cast<uintptr_t>(addr) / (Utils::getPageSize()/8)), SEEK_SET);
     uint64_t page;
     Utils::readAll(spmfd, &page, 8);
     bool page_present = page & (0x1ull << 63);
