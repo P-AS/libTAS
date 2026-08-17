@@ -45,6 +45,7 @@
 #ifndef IMGUI_DISABLE
 #include "imgui_impl_sdlrenderer2.h"
 #include <stdint.h>     // intptr_t
+#include <dlfcn.h>
 
 // Clang warnings with -Weverything
 #if defined(__clang__)
@@ -59,19 +60,44 @@
 
 #include "sdl/sdldynapi.h"
 
-#define SDL_RenderSetClipRect reinterpret_cast<decltype(&libtas::sdl2::SDL_RenderSetClipRect)>(*libtas::getOrigSDLFuncLoc(libtas::index_sdl2::SDL_RenderSetClipRect))
-#define SDL_RenderIsClipEnabled reinterpret_cast<decltype(&libtas::sdl2::SDL_RenderIsClipEnabled)>(*libtas::getOrigSDLFuncLoc(libtas::index_sdl2::SDL_RenderIsClipEnabled))
-#define SDL_RenderGetClipRect reinterpret_cast<decltype(&libtas::sdl2::SDL_RenderGetClipRect)>(*libtas::getOrigSDLFuncLoc(libtas::index_sdl2::SDL_RenderGetClipRect))
-#define SDL_RenderGeometryRaw reinterpret_cast<decltype(&libtas::sdl2::SDL_RenderGeometryRaw)>(*libtas::getOrigSDLFuncLoc(libtas::index_sdl2::SDL_RenderGeometryRaw))
-#define SDL_SetTextureScaleMode reinterpret_cast<decltype(&libtas::sdl2::SDL_SetTextureScaleMode)>(*libtas::getOrigSDLFuncLoc(libtas::index_sdl2::SDL_SetTextureScaleMode))
-#define SDL_RenderSetViewport reinterpret_cast<decltype(&libtas::sdl2::SDL_RenderSetViewport)>(*libtas::getOrigSDLFuncLoc(libtas::index_sdl2::SDL_RenderSetViewport))
-#define SDL_RenderGetScale reinterpret_cast<decltype(&libtas::sdl2::SDL_RenderGetScale)>(*libtas::getOrigSDLFuncLoc(libtas::index_sdl2::SDL_RenderGetScale))
-#define SDL_RenderGetViewport reinterpret_cast<decltype(&libtas::sdl2::SDL_RenderGetViewport)>(*libtas::getOrigSDLFuncLoc(libtas::index_sdl2::SDL_RenderGetViewport))
-#define SDL_CreateTexture reinterpret_cast<decltype(&libtas::sdl2::SDL_CreateTexture)>(*libtas::getOrigSDLFuncLoc(libtas::index_sdl2::SDL_CreateTexture))
-#define SDL_UpdateTexture reinterpret_cast<decltype(&libtas::sdl2::SDL_UpdateTexture)>(*libtas::getOrigSDLFuncLoc(libtas::index_sdl2::SDL_UpdateTexture))
-#define SDL_SetTextureBlendMode reinterpret_cast<decltype(&libtas::sdl2::SDL_SetTextureBlendMode)>(*libtas::getOrigSDLFuncLoc(libtas::index_sdl2::SDL_SetTextureBlendMode))
-#define SDL_DestroyTexture reinterpret_cast<decltype(&libtas::sdl2::SDL_DestroyTexture)>(*libtas::getOrigSDLFuncLoc(libtas::index_sdl2::SDL_DestroyTexture))
-#define SDL_Log reinterpret_cast<decltype(&libtas::sdl2::SDL_Log)>(*libtas::getOrigSDLFuncLoc(libtas::index_sdl2::SDL_Log))
+/* Resolve these functions directly from the SDL2 library via dlsym(), rather
+ * than going through getOrigSDLFuncLoc()'s dynapi table index.
+ *
+ * That table (orig_sdl_table) is a single global populated by whichever
+ * calling module last triggered our SDL_DYNAPI_entry override (the game
+ * binary, SDL2_mixer.so, etc. each get their own local dynapi jump table,
+ * and each triggers the override separately). By the time the renderer runs,
+ * the table can end up not corresponding to the renderer's calling context,
+ * so indexing into it here silently resolves to the wrong function -- e.g.
+ * SDL_RenderGeometryRaw() would call through to some other SDL function
+ * entirely, which then rejects our arguments and nothing gets drawn.
+ * A direct dlsym() lookup of the public symbol doesn't have this problem.
+ *
+ * Each use expands to its own immediately-invoked lambda, so the cache is
+ * keyed by call site rather than by function-pointer type -- several of
+ * these (e.g. SDL_RenderSetClipRect and SDL_RenderSetViewport) share the
+ * exact same signature, and a cache keyed purely on type would let them
+ * collide on one shared static and silently resolve to each other's
+ * address. */
+#define SDL_DIRECT_SYM(NAME) \
+    ([]() -> decltype(&libtas::sdl2::NAME) { \
+        static auto sym = reinterpret_cast<decltype(&libtas::sdl2::NAME)>(dlsym(RTLD_NEXT, #NAME)); \
+        return sym; \
+    }())
+
+#define SDL_RenderSetClipRect SDL_DIRECT_SYM(SDL_RenderSetClipRect)
+#define SDL_RenderIsClipEnabled SDL_DIRECT_SYM(SDL_RenderIsClipEnabled)
+#define SDL_RenderGetClipRect SDL_DIRECT_SYM(SDL_RenderGetClipRect)
+#define SDL_RenderGeometryRaw SDL_DIRECT_SYM(SDL_RenderGeometryRaw)
+#define SDL_SetTextureScaleMode SDL_DIRECT_SYM(SDL_SetTextureScaleMode)
+#define SDL_RenderSetViewport SDL_DIRECT_SYM(SDL_RenderSetViewport)
+#define SDL_RenderGetScale SDL_DIRECT_SYM(SDL_RenderGetScale)
+#define SDL_RenderGetViewport SDL_DIRECT_SYM(SDL_RenderGetViewport)
+#define SDL_CreateTexture SDL_DIRECT_SYM(SDL_CreateTexture)
+#define SDL_UpdateTexture SDL_DIRECT_SYM(SDL_UpdateTexture)
+#define SDL_SetTextureBlendMode SDL_DIRECT_SYM(SDL_SetTextureBlendMode)
+#define SDL_DestroyTexture SDL_DIRECT_SYM(SDL_DestroyTexture)
+#define SDL_Log SDL_DIRECT_SYM(SDL_Log)
 #define SDL_Rect libtas::sdl2::SDL_Rect
 #define SDL_Color libtas::sdl2::SDL_Color
 

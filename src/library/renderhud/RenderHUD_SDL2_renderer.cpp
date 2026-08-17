@@ -78,7 +78,7 @@ void RenderHUD_SDL2_renderer::render()
 {
     if (ImGui::GetCurrentContext()) {
         ImGui::Render();
-        ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);        
+        ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
     }
 }
 
