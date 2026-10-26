@@ -24,6 +24,7 @@ option(LIBTAS_BUILD_I386 "Build libTAS with support for 32-bit executables (also
 option(LIBTAS_I386_LIB_ONLY "Only build the 32-bit version of the libTAS library" OFF)
 option(LIBTAS_RELEASE_BUILD "Build a release (do not embed the git commit)" OFF)
 option(LIBTAS_BUILD_DATE "Embed the git commit date in the executable" ON)
+set(LIBTAS_QT_VERSION "" CACHE STRING "Qt major version to use (5 or 6), or empty to prefer Qt6")
 
 if(LIBTAS_I386_LIB_ONLY)
     set(LIBTAS_BUILD_I386 ON)

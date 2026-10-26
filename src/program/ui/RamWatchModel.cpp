@@ -23,6 +23,7 @@
 
 #include <QtWidgets/QMessageBox>
 #include <QtGui/QGuiApplication>
+#include <QtCore/QIODevice>
 #include <stdint.h>
 
 static const char mimeType[] = "application/x-libtas-rownumber";

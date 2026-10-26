@@ -32,7 +32,7 @@ If you don't have a Linux system beforehand, there are several options that you 
 You can download the latest stable version of the software in the [Releases](https://github.com/clementgallet/libTAS/releases) page. The current dependencies are:
 
 * `libc6`, `libgcc1`, `libstdc++6`
-* `libqt5core5a`, `libqt5gui5`, `libqt5widgets5` with Qt version at least 5.6
+* `libqt6core6`, `libqt6gui6`, `libqt6widgets6`, `qt6-qpa-plugins`
 * `libx11-6`, `libxcb1`, `libxcb-keysyms1`, `libxcb-xkb1`
 * `liblua5.4-0`
 * `ffmpeg`
@@ -53,8 +53,8 @@ An PKGBUILD is available for Arch Linux on the [AUR](https://aur.archlinux.org/p
 
 You will need to download and install the following to build libTAS:
 
-* Deb: `apt-get install build-essential cmake pkg-config libx11-dev libx11-xcb-dev qtbase5-dev libxcb1-dev libxcb-keysyms1-dev libxcb-xkb-dev libxcb-randr0-dev libudev-dev liblua5.4-dev libasound2-dev libavutil-dev libswresample-dev libswscale-dev ffmpeg libcap-dev`
-* Arch: `pacman -S base-devel cmake pkgconf qt5-base xcb-util-cursor alsa-lib lua ffmpeg libcap`
+* Deb: `apt-get install build-essential cmake pkg-config libx11-dev libx11-xcb-dev qt6-base-dev libxcb1-dev libxcb-keysyms1-dev libxcb-xkb-dev libxcb-randr0-dev libudev-dev liblua5.4-dev libasound2-dev libavutil-dev libswresample-dev libswscale-dev ffmpeg libcap-dev`
+* Arch: `pacman -S base-devel cmake pkgconf qt6-base xcb-util-cursor alsa-lib lua ffmpeg libcap`
 
 ### Cloning
 
@@ -76,6 +76,7 @@ The following CMake options are available (the former `configure` flags are stil
 * `-DLIBTAS_I386_LIB_ONLY=ON` (`--enable-i386-lib`): only build the 32-bit library
 * `-DLIBTAS_RELEASE_BUILD=ON` (`--enable-release-build`): do not embed the git commit
 * `-DLIBTAS_BUILD_DATE=OFF` (`--disable-build-date`): do not embed the git commit date
+* `-DLIBTAS_QT_VERSION=5`: build the GUI with Qt5 (at least 5.6) instead of Qt6
 
 Be careful that you must compile your code in the same arch as the game. If you have an amd64 system and you only have access to a i386 game, you can cross-compile the code to i386 (see below).
 

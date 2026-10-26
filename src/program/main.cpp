@@ -115,8 +115,15 @@ int main(int argc, char **argv)
     std::cout << std::endl;
 #endif
 
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
     qRegisterMetaTypeStreamOperators<HotKey>("HotKey");
     qRegisterMetaTypeStreamOperators<SingleInput>("SingleInput");
+#else
+    /* Stream operators are registered automatically, but the types still
+     * need to be registered by name to be loaded from settings */
+    qRegisterMetaType<HotKey>("HotKey");
+    qRegisterMetaType<SingleInput>("SingleInput");
+#endif
 
     /* Parsing arguments */
     int c;

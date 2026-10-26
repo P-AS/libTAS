@@ -1,6 +1,22 @@
 #### Dependencies ####
 
-find_package(Qt5 5.6.0 REQUIRED COMPONENTS Core Widgets)
+# Qt6 is preferred, Qt5 is still supported as a fallback
+if(LIBTAS_QT_VERSION)
+    set(QT_VERSION_MAJOR ${LIBTAS_QT_VERSION})
+else()
+    find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core)
+endif()
+if(QT_VERSION_MAJOR EQUAL 5)
+    find_package(Qt5 5.6.0 REQUIRED COMPONENTS Core Widgets)
+elseif(QT_VERSION_MAJOR EQUAL 6)
+    find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
+else()
+    message(FATAL_ERROR "Unsupported Qt version ${QT_VERSION_MAJOR}, only 5 and 6 are supported")
+endif()
+message(STATUS "Using Qt ${Qt${QT_VERSION_MAJOR}_VERSION}")
+
+# Used by build.sh to bundle the right Qt version in the AppImage
+set(LIBTAS_QT_VERSION_USED ${QT_VERSION_MAJOR} CACHE INTERNAL "")
 
 pkg_check_modules(XCB REQUIRED IMPORTED_TARGET x11 xcb xcb-xkb xcb-keysyms)
 pkg_check_modules(LIBCAP REQUIRED IMPORTED_TARGET libcap)
@@ -232,8 +248,8 @@ target_include_directories(libTAS PRIVATE
     ${PROJECT_SOURCE_DIR}/src/external/qhexview/include)
 
 target_link_libraries(libTAS PRIVATE
-    Qt5::Core
-    Qt5::Widgets
+    Qt${QT_VERSION_MAJOR}::Core
+    Qt${QT_VERSION_MAJOR}::Widgets
     PkgConfig::LIBLUA
     PkgConfig::XCB
     PkgConfig::LIBCAP

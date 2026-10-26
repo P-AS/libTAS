@@ -28,8 +28,8 @@
 #include "Context.h"
 
 #include <QtWidgets/QMainWindow>
-#include <QtWidgets/QActionGroup>
-#include <QtWidgets/QAction>
+#include <QActionGroup>
+#include <QAction>
 #include <QtWidgets/QLineEdit>
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QRadioButton>

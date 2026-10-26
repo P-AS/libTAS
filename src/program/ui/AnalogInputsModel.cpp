@@ -31,6 +31,7 @@
 #include <QtGui/QPalette>
 #include <QtGui/QBrush>
 #include <QtGui/QGuiApplication>
+#include <QtCore/QIODevice>
 
 static const char mimeType[] = "application/x-libtas-analoginput";
 

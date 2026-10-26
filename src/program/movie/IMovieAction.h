@@ -22,7 +22,7 @@
 
 #include <cstdint>
 #include <string>
-#include <QtWidgets/QUndoCommand>
+#include <QUndoCommand>
 
 class MovieFileInputs;
 

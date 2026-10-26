@@ -111,8 +111,14 @@ void ControllerAxisWidget::mouseMoveEvent(QMouseEvent *event)
         return;
     }
 
-    int x_axis_unclamped = ((event->x() - x_offset) * UINT16_MAX / size) + INT16_MIN;
-    int y_axis_unclamped = ((event->y() - y_offset) * UINT16_MAX / size) + INT16_MIN;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    QPoint pos = event->position().toPoint();
+#else
+    QPoint pos = event->pos();
+#endif
+
+    int x_axis_unclamped = ((pos.x() - x_offset) * UINT16_MAX / size) + INT16_MIN;
+    int y_axis_unclamped = ((pos.y() - y_offset) * UINT16_MAX / size) + INT16_MIN;
 
     x_axis = clampToShort(x_axis_unclamped);
     y_axis = clampToShort(y_axis_unclamped);

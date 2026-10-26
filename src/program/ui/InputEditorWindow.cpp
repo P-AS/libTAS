@@ -83,26 +83,31 @@ InputEditorWindow::InputEditorWindow(Context* c, MovieFile *movie, QWidget *pare
     QMenu* optionMenu = menuBar()->addMenu(tr("Options"));
     
     scrollingAct = optionMenu->addAction(tr("Disable autoscrolling"), this,
-        [=, this](bool checked){context->config.editor_autoscroll = !checked;}, QKeySequence("Alt+D"));
+        [=, this](bool checked){context->config.editor_autoscroll = !checked;});
+    scrollingAct->setShortcut(QKeySequence("Alt+D"));
     scrollingAct->setCheckable(true);
 
     rewindAct = optionMenu->addAction(tr("Rewind seeks to current frame"), this,
-        [=, this](bool checked){context->config.editor_rewind_seek = checked;}, QKeySequence("Alt+R"));
+        [=, this](bool checked){context->config.editor_rewind_seek = checked;});
+    rewindAct->setShortcut(QKeySequence("Alt+R"));
 
     rewindAct->setCheckable(true);
 
     fastforwardAct = optionMenu->addAction(tr("Disable fastforward during rewind"), this,
-        [=, this](bool checked){context->config.editor_rewind_fastforward = !checked;}, QKeySequence("Alt+F"));
+        [=, this](bool checked){context->config.editor_rewind_fastforward = !checked;});
+    fastforwardAct->setShortcut(QKeySequence("Alt+F"));
 
     fastforwardAct->setCheckable(true);
 
     markerPauseAct = optionMenu->addAction(tr("Autopause on markers"), this,
-        [=, this](bool checked){context->config.editor_marker_pause = checked;}, QKeySequence("Alt+A"));
+        [=, this](bool checked){context->config.editor_marker_pause = checked;});
+    markerPauseAct->setShortcut(QKeySequence("Alt+A"));
 
     markerPauseAct->setCheckable(true);
 
     moveMarkerAct = optionMenu->addAction(tr("Move markers on frame addition or removal"), this,
-        [=, this](bool checked){context->config.editor_move_marker = checked;}, QKeySequence("Alt+M"));
+        [=, this](bool checked){context->config.editor_move_marker = checked;});
+    moveMarkerAct->setShortcut(QKeySequence("Alt+M"));
 
     moveMarkerAct->setCheckable(true);
 
