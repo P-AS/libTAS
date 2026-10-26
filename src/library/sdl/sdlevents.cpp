@@ -20,6 +20,7 @@
 #include "sdlevents.h"
 #include "sdlversion.h"
 #include "SDLEventQueue.h"
+#include "sdltimer.h"
 #include "sdldynapi.h"
 
 #include "logging.h"
@@ -425,13 +426,15 @@ void pushNativeSDLEvents(void)
 
     if (SDLver == 2) {
         while (! sdlEventQueue.pop(event, 1, sdl2::SDL_FIRSTEVENT, sdl2::SDL_LASTEVENT, true)) {
-            NATIVECALL(nanosleep(&mssleep, NULL)); // Wait 1 ms before trying again
+            if (!advanceSDLTimers())
+                NATIVECALL(nanosleep(&mssleep, NULL)); // Wait 1 ms before trying again
             pushNativeSDLEvents();
         }
     }
     if (SDLver == 3) {
         while (! sdlEventQueue.pop(reinterpret_cast<sdl3::SDL_Event*>(event), 1, sdl3::SDL_EVENT_FIRST, sdl3::SDL_EVENT_LAST, true)) {
-            NATIVECALL(nanosleep(&mssleep, NULL)); // Wait 1 ms before trying again
+            if (!advanceSDLTimers())
+                NATIVECALL(nanosleep(&mssleep, NULL)); // Wait 1 ms before trying again
             pushNativeSDLEvents();
         }
     }
@@ -460,7 +463,8 @@ void pushNativeSDLEvents(void)
         if (sdlEventQueue.pop(event, 1, sdl2::SDL_FIRSTEVENT, sdl2::SDL_LASTEVENT, true))
             return 1;
         for (t=0; t<timeout; t++) {
-            NATIVECALL(nanosleep(&mssleep, NULL)); // Wait 1 ms before trying again
+            if (!advanceSDLTimers())
+                NATIVECALL(nanosleep(&mssleep, NULL)); // Wait 1 ms before trying again
             pushNativeSDLEvents();
             if (sdlEventQueue.pop(event, 1, sdl2::SDL_FIRSTEVENT, sdl2::SDL_LASTEVENT, true))
                 break;
@@ -470,7 +474,8 @@ void pushNativeSDLEvents(void)
         if (sdlEventQueue.pop(reinterpret_cast<sdl3::SDL_Event*>(event), 1, sdl3::SDL_EVENT_FIRST, sdl3::SDL_EVENT_LAST, true))
             return 1;
         for (t=0; t<timeout; t++) {
-            NATIVECALL(nanosleep(&mssleep, NULL)); // Wait 1 ms before trying again
+            if (!advanceSDLTimers())
+                NATIVECALL(nanosleep(&mssleep, NULL)); // Wait 1 ms before trying again
             pushNativeSDLEvents();
             if (sdlEventQueue.pop(reinterpret_cast<sdl3::SDL_Event*>(event), 1, sdl3::SDL_EVENT_FIRST, sdl3::SDL_EVENT_LAST, true))
                 break;

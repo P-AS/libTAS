@@ -41,6 +41,7 @@
 #include "sdl/sdlwindows.h"
 #include "sdl/sdlevents.h"
 #include "sdl/SDLEventQueue.h"
+#include "sdl/sdltimer.h"
 #include "renderhud/FileDebug.h"
 #include "renderhud/FrameWindow.h"
 #include "renderhud/LuaDraw.h"
@@ -188,6 +189,10 @@ void frameBoundary(std::function<void()> draw, RenderHUD& hud)
     /* Update the deterministic timer, sleep if necessary */
     DeterministicTimer& detTimer = DeterministicTimer::get();
     TimeHolder timeIncrement = detTimer.enterFrameBoundary();
+
+    /* Run the SDL timers that expired during the frame */
+    if (!Global::is_exiting)
+        processSDLTimers();
 
     /* Mix audio, except if the game opened a loopback context */
     AudioContext& audiocontext = AudioContext::get();

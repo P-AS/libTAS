@@ -42,6 +42,17 @@ OVERRIDE sdl2::SDL_TimerID SDL_AddTimer(Uint32 interval, sdl2::SDL_NewTimerCallb
  */
 OVERRIDE SDL_bool SDL_RemoveTimer(sdl2::SDL_TimerID id);
 
+/* SDL1 and SDL2 timers are run by us on the deterministic time instead of by
+ * the SDL timer thread on the real time. This runs the callbacks of all timers
+ * that expired. Must be called from the main thread. */
+void processSDLTimers();
+
+/* Called by functions waiting for an event. If SDL timers are running, advance
+ * the deterministic time by 1 ms and run the timers that expired, so that
+ * games waiting for an event pushed by a timer don't wait forever. Returns
+ * false if the caller should do a regular wait instead. */
+bool advanceSDLTimers();
+
 }
 
 #endif
