@@ -238,7 +238,11 @@ set(LIBTAS_PROGRAM_SOURCES
 
 add_executable(libTAS ${LIBTAS_PROGRAM_SOURCES} ${LIBTAS_PROGRAM_QT_HEADERS})
 
-set_target_properties(libTAS PROPERTIES AUTOMOC ON)
+# Qt requires the program to be position independent, otherwise signals are
+# not found when Qt is linked with -Bsymbolic-functions (as in Ubuntu)
+include(CheckPIESupported)
+check_pie_supported()
+set_target_properties(libTAS PROPERTIES AUTOMOC ON POSITION_INDEPENDENT_CODE ON)
 
 target_compile_options(libTAS PRIVATE -fno-stack-protector -Wno-float-equal)
 
