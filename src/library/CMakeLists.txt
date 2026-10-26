@@ -230,7 +230,7 @@ set(LIBTAS_LIBRARY_SOURCES
     wine/winehook.cpp
     wine/wined3d.cpp
     wine/win32u.cpp
-    wine/kernel32.cpp
+    wine/ntdll.cpp
     xcb/XcbEventQueue.cpp
     xcb/XcbEventQueueList.cpp
     xcb/xcbconnection.cpp
