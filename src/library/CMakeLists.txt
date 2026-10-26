@@ -229,7 +229,7 @@ set(LIBTAS_LIBRARY_SOURCES
     steam/steamgameserver.cpp
     wine/winehook.cpp
     wine/wined3d.cpp
-    wine/user32.cpp
+    wine/win32u.cpp
     wine/kernel32.cpp
     xcb/XcbEventQueue.cpp
     xcb/XcbEventQueueList.cpp
