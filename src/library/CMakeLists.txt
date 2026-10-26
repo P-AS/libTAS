@@ -3,10 +3,14 @@
 pkg_check_modules(X11 REQUIRED IMPORTED_TARGET x11 x11-xcb)
 pkg_check_modules(ALSA REQUIRED IMPORTED_TARGET alsa)
 
-check_include_file_cxx(libudev.h LIBTAS_HAS_LIBUDEV_H)
-if(NOT LIBTAS_HAS_LIBUDEV_H)
-    message(FATAL_ERROR "The udev headers are required!")
-endif()
+# Headers of libraries that are hooked but not linked
+foreach(_header libudev.h xkbcommon/xkbcommon.h X11/extensions/XInput2.h GL/gl.h GL/glx.h EGL/egl.h)
+    string(MAKE_C_IDENTIFIER ${_header} _var)
+    check_include_file_cxx(${_header} LIBTAS_HAS_${_var})
+    if(NOT LIBTAS_HAS_${_var})
+        message(FATAL_ERROR "The header ${_header} is required!")
+    endif()
+endforeach()
 
 # swresample and swscale are loaded at runtime, so we only need their headers
 foreach(_lib swresample swscale)
