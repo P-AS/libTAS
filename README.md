@@ -53,8 +53,8 @@ An PKGBUILD is available for Arch Linux on the [AUR](https://aur.archlinux.org/p
 
 You will need to download and install the following to build libTAS:
 
-* Deb: `apt-get install build-essential automake pkg-config libx11-dev libx11-xcb-dev qtbase5-dev libxcb1-dev libxcb-keysyms1-dev libxcb-xkb-dev libxcb-randr0-dev libudev-dev liblua5.4-dev libasound2-dev libavutil-dev libswresample-dev libswscale-dev ffmpeg libcap-dev`
-* Arch: `pacman -S base-devel automake pkgconf qt5-base xcb-util-cursor alsa-lib lua ffmpeg libcap`
+* Deb: `apt-get install build-essential cmake pkg-config libx11-dev libx11-xcb-dev qtbase5-dev libxcb1-dev libxcb-keysyms1-dev libxcb-xkb-dev libxcb-randr0-dev libudev-dev liblua5.4-dev libasound2-dev libavutil-dev libswresample-dev libswscale-dev ffmpeg libcap-dev`
+* Arch: `pacman -S base-devel cmake pkgconf qt5-base xcb-util-cursor alsa-lib lua ffmpeg libcap`
 
 ### Cloning
 
@@ -65,8 +65,17 @@ You will need to download and install the following to build libTAS:
 
     ./build.sh
 
-autoconf will detect the presence of these libraries and disable the corresponding features if necessary.
-If you want to manually enable/disable a feature, you must add at the end of the `build.sh` command:
+This configures the project with CMake into the `build` directory, builds it and prepares an AppImage. Use `./build.sh --skip-appimage` to only build. Any extra argument is passed to CMake, and you can also use CMake directly:
+
+    cmake -S . -B build
+    cmake --build build
+
+The following CMake options are available (the former `configure` flags are still accepted by `build.sh`):
+
+* `-DLIBTAS_BUILD_I386=ON` (`--with-i386`): also build the 32-bit `libtas32.so` library (see Dual-arch)
+* `-DLIBTAS_I386_LIB_ONLY=ON` (`--enable-i386-lib`): only build the 32-bit library
+* `-DLIBTAS_RELEASE_BUILD=ON` (`--enable-release-build`): do not embed the git commit
+* `-DLIBTAS_BUILD_DATE=OFF` (`--disable-build-date`): do not embed the git commit date
 
 Be careful that you must compile your code in the same arch as the game. If you have an amd64 system and you only have access to a i386 game, you can cross-compile the code to i386 (see below).
 
