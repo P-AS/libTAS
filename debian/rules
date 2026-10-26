@@ -5,7 +5,9 @@ export DH_VERBOSE = 1
 
 
 # see FEATURE AREAS in dpkg-buildflags(1)
-export DEB_BUILD_MAINT_OPTIONS = hardening=-all optimize=-lto
+# Qt requires the program to be position independent, otherwise signals are
+# not found when Qt is linked with -Bsymbolic-functions (as in Ubuntu)
+export DEB_BUILD_MAINT_OPTIONS = hardening=-all,+pie optimize=-lto
 
 # see ENVIRONMENT in dpkg-buildflags(1)
 # package maintainers to append CFLAGS
