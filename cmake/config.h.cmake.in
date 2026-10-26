@@ -1,0 +1,15 @@
+/* config.h. Generated from cmake/config.h.cmake.in by CMake. */
+
+#ifndef LIBTAS_GENERATED_CONFIG_H_INCLUDED
+#define LIBTAS_GENERATED_CONFIG_H_INCLUDED
+
+/* Extension xcb randr is present */
+#cmakedefine LIBTAS_HAS_XCB_RANDR 1
+
+/* Git commit hash */
+#cmakedefine LIBTAS_INTERIM_COMMIT "@LIBTAS_INTERIM_COMMIT@"
+
+/* Git commit date */
+#cmakedefine LIBTAS_INTERIM_DATE "@LIBTAS_INTERIM_DATE@"
+
+#endif
