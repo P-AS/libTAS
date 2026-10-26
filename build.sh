@@ -46,5 +46,9 @@ APPDIR_PATH=$(readlink -f ./AppDir)
 
 DESTDIR=$APPDIR_PATH cmake --install . --prefix /usr
 if [ $SKIP_APPIMAGE -eq 0 ]; then
+    # Point the qt plugin to the qmake of the Qt version that was built against
+    if [ -z "$QMAKE" ] && grep -q '^LIBTAS_QT_VERSION_USED:INTERNAL=6$' CMakeCache.txt; then
+        export QMAKE=$(command -v qmake6 || command -v qmake-qt6 || echo qmake)
+    fi
     ./linuxdeploy-$ARCH.AppImage --appimage-extract-and-run --appdir AppDir/ --plugin qt --output appimage
 fi

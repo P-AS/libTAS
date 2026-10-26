@@ -148,7 +148,8 @@ void InputEditorView::fillMenu(QMenu* frameMenu)
 
     eventAct = menu->addAction(tr("Edit frame events"), this, &InputEditorView::editEvents);
 
-    insertAct = menu->addAction(tr("Insert"), this, &InputEditorView::insertInput, QKeySequence(int(Qt::CTRL) | int(Qt::Key_Plus)));
+    insertAct = menu->addAction(tr("Insert"), this, &InputEditorView::insertInput);
+    insertAct->setShortcut(QKeySequence(int(Qt::CTRL) | int(Qt::Key_Plus)));
 
     /* Shortcuts for context menus are special, they won't work by default
      * because the menu is hidden, so actions need to be added to the View as
@@ -165,70 +166,81 @@ void InputEditorView::fillMenu(QMenu* frameMenu)
 
     insertsAct = menu->addAction(tr("Insert # frames"), this, &InputEditorView::insertInputs);
 
-    markAct = menu->addAction(tr("Add marker"), this, &InputEditorView::addMarker, QKeySequence("Ctrl+M"));
+    markAct = menu->addAction(tr("Add marker"), this, &InputEditorView::addMarker);
+    markAct->setShortcut(QKeySequence("Ctrl+M"));
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 10, 0))
     markAct->setShortcutVisibleInContextMenu(true);
 #endif
     this->addAction(markAct);
 
-    unmarkAct = menu->addAction(tr("Remove marker"), this, &InputEditorView::removeMarker, QKeySequence("Ctrl+R"));
+    unmarkAct = menu->addAction(tr("Remove marker"), this, &InputEditorView::removeMarker);
+    unmarkAct->setShortcut(QKeySequence("Ctrl+R"));
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 10, 0))
     unmarkAct->setShortcutVisibleInContextMenu(true);
 #endif
     this->addAction(unmarkAct);
 
-    duplicateAct = menu->addAction(tr("Duplicate"), this, &InputEditorView::duplicateInput, QKeySequence("Ctrl+D"));
+    duplicateAct = menu->addAction(tr("Duplicate"), this, &InputEditorView::duplicateInput);
+    duplicateAct->setShortcut(QKeySequence("Ctrl+D"));
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 10, 0))
     duplicateAct->setShortcutVisibleInContextMenu(true);
 #endif
     this->addAction(duplicateAct);
 
-    deleteAct = menu->addAction(tr("Delete"), this, &InputEditorView::deleteInput, QKeySequence(int(Qt::CTRL) | int(Qt::Key_Minus)));
+    deleteAct = menu->addAction(tr("Delete"), this, &InputEditorView::deleteInput);
+    deleteAct->setShortcut(QKeySequence(int(Qt::CTRL) | int(Qt::Key_Minus)));
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 10, 0))
     deleteAct->setShortcutVisibleInContextMenu(true);
 #endif
     this->addAction(deleteAct);
 
     truncateAct = menu->addAction(tr("Truncate"), this, &InputEditorView::truncateInputs);
-    clearAct = menu->addAction(tr("Clear"), this, &InputEditorView::clearInputs, QKeySequence::Delete);
+    clearAct = menu->addAction(tr("Clear"), this, &InputEditorView::clearInputs);
+    clearAct->setShortcut(QKeySequence::Delete);
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 10, 0))
     clearAct->setShortcutVisibleInContextMenu(true);
 #endif
     this->addAction(clearAct);
 
     menu->addSeparator();
-    copyAct = menu->addAction(tr("Copy"), this, &InputEditorView::copyInputs, QKeySequence::Copy);
+    copyAct = menu->addAction(tr("Copy"), this, &InputEditorView::copyInputs);
+    copyAct->setShortcut(QKeySequence::Copy);
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 10, 0))
     copyAct->setShortcutVisibleInContextMenu(true);
 #endif
     this->addAction(copyAct);
 
-    cutAct = menu->addAction(tr("Cut"), this, &InputEditorView::cutInputs, QKeySequence::Cut);
+    cutAct = menu->addAction(tr("Cut"), this, &InputEditorView::cutInputs);
+    cutAct->setShortcut(QKeySequence::Cut);
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 10, 0))
     cutAct->setShortcutVisibleInContextMenu(true);
 #endif
     this->addAction(cutAct);
 
-    pasteAct = menu->addAction(tr("Paste"), this, &InputEditorView::pasteInputs, QKeySequence::Paste);
+    pasteAct = menu->addAction(tr("Paste"), this, &InputEditorView::pasteInputs);
+    pasteAct->setShortcut(QKeySequence::Paste);
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 10, 0))
     pasteAct->setShortcutVisibleInContextMenu(true);
 #endif
     this->addAction(pasteAct);
 
-    pasteInsertAct = menu->addAction(tr("Paste Insert"), this, &InputEditorView::pasteInsertInputs, QKeySequence("Ctrl+Shift+V"));
+    pasteInsertAct = menu->addAction(tr("Paste Insert"), this, &InputEditorView::pasteInsertInputs);
+    pasteInsertAct->setShortcut(QKeySequence("Ctrl+Shift+V"));
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 10, 0))
     pasteInsertAct->setShortcutVisibleInContextMenu(true);
 #endif
     this->addAction(pasteInsertAct);
 
     menu->addSeparator();
-    undoAct = menu->addAction(tr("Undo"), this, &InputEditorView::undoInputs, QKeySequence::Undo);
+    undoAct = menu->addAction(tr("Undo"), this, &InputEditorView::undoInputs);
+    undoAct->setShortcut(QKeySequence::Undo);
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 10, 0))
     undoAct->setShortcutVisibleInContextMenu(true);
 #endif
     this->addAction(undoAct);
 
-    redoAct = menu->addAction(tr("Redo"), this, &InputEditorView::redoInputs, QKeySequence::Redo);
+    redoAct = menu->addAction(tr("Redo"), this, &InputEditorView::redoInputs);
+    redoAct->setShortcut(QKeySequence::Redo);
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 10, 0))
     redoAct->setShortcutVisibleInContextMenu(true);
 #endif

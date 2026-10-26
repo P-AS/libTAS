@@ -25,7 +25,7 @@
 #include "IMovieAction.h"
 
 #include <QtCore/QObject>
-#include <QtWidgets/QUndoStack>
+#include <QUndoStack>
 #include <list>
 #include <vector>
 #include <cstdint>

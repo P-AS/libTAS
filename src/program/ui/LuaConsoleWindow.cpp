@@ -30,7 +30,7 @@
 #include <QtWidgets/QFileDialog>
 #include <QtWidgets/QMenuBar>
 #include <QtWidgets/QMenu>
-#include <QtWidgets/QAction>
+#include <QAction>
 #include <QtWidgets/QHeaderView>
 
 LuaConsoleWindow::LuaConsoleWindow(Context *c, QWidget *parent) : QMainWindow(parent), context(c)

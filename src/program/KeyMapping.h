@@ -23,6 +23,7 @@
 #include "../shared/inputs/SingleInput.h"
 
 #include <QtCore/QDataStream>
+#include <QtCore/QMetaType>
 #include <map>
 #include <vector>
 #include <array>

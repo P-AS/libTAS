@@ -633,7 +633,8 @@ void MainWindow::createMovieMenu()
 
     action = movieMenu->addAction(tr("Open Movie..."), this, &MainWindow::slotBrowseMoviePath);
     disabledActionsOnStart.append(action);
-    saveMovieAction = movieMenu->addAction(tr("Save Movie"), this, &MainWindow::slotSaveMovie, QKeySequence("Ctrl+S"));
+    saveMovieAction = movieMenu->addAction(tr("Save Movie"), this, &MainWindow::slotSaveMovie);
+    saveMovieAction->setShortcut(QKeySequence("Ctrl+S"));
     saveMovieAction->setEnabled(false);
     exportMovieAction = movieMenu->addAction(tr("Export Movie..."), this, &MainWindow::slotExportMovie);
     exportMovieAction->setEnabled(false);
