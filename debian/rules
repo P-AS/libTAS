@@ -19,5 +19,11 @@ export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
 
 # dh_make generated override targets
 
+# Build the 32-bit library on amd64, it is packaged separately in libtas32
+DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
+ifeq ($(DEB_HOST_ARCH),amd64)
+CONFIGURE_ARGS += -DLIBTAS_BUILD_I386=ON
+endif
+
 override_dh_auto_configure:
-	dh_auto_configure -- -DLIBTAS_BUILD_I386=ON
+	dh_auto_configure -- $(CONFIGURE_ARGS)

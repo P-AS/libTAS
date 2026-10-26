@@ -35,6 +35,7 @@ build_script:
 after_build:
 - sh: sudo mv ../libtas*deb ./
 - sh: for f in libtas*deb; do mv $f ${f/_amd/_${APPVEYOR_REPO_COMMIT:0:7}_amd}; done;
+- sh: sudo cp debian/libtas32/usr/bin/libtas32.so debian/libtas/usr/bin/
 - sh: sudo ARCH=x86_64 NO_CLEANUP=1 QMAKE=/usr/lib/qt6/bin/qmake ./linuxdeploy-x86_64.AppImage --appimage-extract-and-run --appdir debian/libtas/ --plugin qt --output appimage
 - sh: mv libTAS-x86_64.AppImage libtas_${APPVEYOR_REPO_COMMIT:0:7}_amd64.AppImage
 artifacts:
