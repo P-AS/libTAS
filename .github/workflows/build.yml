@@ -1,0 +1,80 @@
+name: Build
+
+on:
+  push:
+    branches: [next, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            deb_arch: amd64
+            runner: ubuntu-26.04
+          - arch: aarch64
+            deb_arch: arm64
+            runner: ubuntu-26.04-arm
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The git history is needed to embed the commit hash and date
+          fetch-depth: 0
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends devscripts equivs fakeroot file wget
+          sudo mk-build-deps --install --remove --tool "apt-get --yes --no-install-recommends" debian/control
+
+      - name: Install 32-bit build dependencies
+        if: matrix.arch == 'x86_64'
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends gcc-multilib g++-multilib libc6-dev-i386 \
+            libx11-dev:i386 libx11-xcb-dev:i386 libxcb-randr0-dev:i386 libasound2-dev:i386 \
+            libavutil-dev:i386 libswresample-dev:i386 libswscale-dev:i386
+
+      - name: Build deb package
+        run: DEB_BUILD_OPTIONS=nostrip dpkg-buildpackage --no-sign -b
+
+      - name: Build AppImage
+        env:
+          ARCH: ${{ matrix.arch }}
+          QMAKE: /usr/lib/qt6/bin/qmake
+          APPIMAGE_EXTRACT_AND_RUN: 1
+          NO_CLEANUP: 1
+        run: |
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-$ARCH.AppImage
+          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-$ARCH.AppImage
+          chmod +x linuxdeploy-$ARCH.AppImage linuxdeploy-plugin-qt-$ARCH.AppImage
+
+          # The AppImage bundles both the 64-bit and the 32-bit libraries
+          mkdir AppDir
+          cp -a debian/libtas/usr AppDir/
+          if [ -d debian/libtas32/usr ]; then
+            cp -a debian/libtas32/usr AppDir/
+          fi
+          ./linuxdeploy-$ARCH.AppImage --appimage-extract-and-run --appdir AppDir/ --plugin qt --output appimage
+
+      - name: Rename artifacts
+        run: |
+          sha=$(git rev-parse --short HEAD)
+          mkdir dist
+          for f in ../libtas*_${{ matrix.deb_arch }}.deb; do
+            mv "$f" "dist/$(basename "${f%_${{ matrix.deb_arch }}.deb}")_${sha}_${{ matrix.deb_arch }}.deb"
+          done
+          mv libTAS-${{ matrix.arch }}.AppImage dist/libtas_${sha}_${{ matrix.arch }}.AppImage
+          ls -l dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libtas-${{ matrix.arch }}
+          path: dist/

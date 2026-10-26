@@ -2,6 +2,8 @@ build/
 build32/
 obj*
 debian/libtas/
+debian/libtas32/
+debian/tmp/
 debian/.debhelper/
 debian/debhelper-build-stamp
 debian/files
