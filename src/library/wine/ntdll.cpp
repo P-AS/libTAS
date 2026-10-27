@@ -122,6 +122,15 @@ void update_wine_shared_data()
     if (!kusd_taken)
         return;
 
+    /* Wine resets the protection of the page to read-only from its own
+     * memory views, so make it writable again. If this fails, the page was
+     * mapped again by wine, so take it over again. */
+    if (mprotect(KUSD_ADDRESS, sysconf(_SC_PAGESIZE), PROT_READ | PROT_WRITE) != 0) {
+        kusd_taken = false;
+        takeover_wine_shared_data();
+        return;
+    }
+
     DeterministicTimer& detTimer = DeterministicTimer::get();
     struct timespec mono = detTimer.getTicks(SharedConfig::TIMETYPE_UNTRACKED_MONOTONIC);
     struct timespec real = detTimer.getTicks(SharedConfig::TIMETYPE_UNTRACKED_REALTIME);
