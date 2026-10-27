@@ -69,9 +69,14 @@ void XlibEventQueue::setMask(Window w, long event_mask)
 
 #define EVENTQUEUE_MAXLEN 1024
 
-int XlibEventQueue::insert(XEvent* event)
+int XlibEventQueue::insert(XEvent* game_event)
 {
     std::lock_guard<std::recursive_mutex> lock(mutex);
+
+    /* The same event is inserted in the queue of each display, so we must
+     * not modify it when looking for the window that receives it */
+    XEvent local_event = *game_event;
+    XEvent* event = &local_event;
 
     /* Redirect events to the currently focused keyboard window, mirroring
      * XSetInputFocus semantics for the emulated event queue. */
