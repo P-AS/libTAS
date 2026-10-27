@@ -85,6 +85,8 @@ uintptr_t ntdll_end = 0;
 uintptr_t x11drv_start = 0;
 uintptr_t x11drv_end = 0;
 
+bool wine_game = false;
+
 }
 
 bool wine_should_init(int argc, char** argv)
@@ -118,7 +120,13 @@ bool wine_should_init(int argc, char** argv)
         return false;
     }
 
+    wine_game = true;
     return true;
+}
+
+bool isWineGame()
+{
+    return wine_game;
 }
 
 void register_wine_ntdll(const char* path)

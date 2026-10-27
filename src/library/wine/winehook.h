@@ -33,6 +33,9 @@ void hook_wine_syscall(const char* library, const char* name, void** orig_functi
  * that wine starts, nor the 64-bit process that restarts a 32-bit game. */
 bool wine_should_init(int argc, char** argv);
 
+/* Returns if this process is a game launched through wine */
+bool isWineGame();
+
 /* Store the address range of wine unix ntdll library */
 void register_wine_ntdll(const char* path);
 
