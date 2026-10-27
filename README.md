@@ -24,7 +24,6 @@ There is also initial support for Windows games through wine. Details are given 
 
 If you don't have a Linux system beforehand, there are several options that you can choose:
 - Run libTAS using [WSL 2](https://clementgallet.github.io/libTAS/guides/wsl/) (Windows Subsystem for Linux) (preferred option)
-- Install a Linux container with Docker (described below)
 - Install Linux on a virtual machine. Grab a virtualization software (e.g. VirtualBox) and a Linux distribution (e.g. Ubuntu). If you have a 64-bit computer, install a 64-bit Linux distribution, which will allow you to run both 32-bit and 64-bit games. Note for Ubuntu users that you need a recent version (17.10 minimum).
 
 ## Install
@@ -129,53 +128,6 @@ There are still a lot of issues to fix:
 - Window focus/unfocus doesn't work sometimes and you cannot move the game window (#262). Try alt-tabbing until you get it back
 - "Virtual Steam client" does not work, because we don't hook the loading of the `steam_api.dll` file (#264)
 - Window repainting (Expose event) does not work, so if you pause the game and drag another window in front of it, it will overwrite what is displayed by the game
-
-## Run on Windows using Docker
-
-One option if you have a Windows system is to run a Linux distribution inside a Docker container. This has the advantage of automating package installation and libTAS compilation. On Windows there are currently two possibilities for using Docker: [Docker for Windows](https://docs.docker.com/docker-for-windows) and [Docker Toolbox](https://docs.docker.com/toolbox/toolbox_install_windows/). There are some requirements for the former (Windows 10 64-bit Pro, Enterprise, or Education), so I will describe the installation process for the later (both should be really close, but I can't test the former).
-
-### Install
-
-- install [Docker Toolbox](https://docs.docker.com/toolbox/toolbox_install_windows/)
-- download the [Dockerfile](https://github.com/clementgallet/libTAS/blob/master/Dockerfile) somewhere (don't rename the file!).
-- open Docker Quickstart Terminal, and run the command `docker build -t libtas /c/path/to/Dockerfile/directory`. The path points to the directory containing the Dockerfile, not to the Dockerfile itself. Also, this terminal takes paths in Unix syntax: `C:\foo\bar` becomes `/c/foo/bar`. The Docker container build should start.
-- prepare a directory that will contain your games. This directory must be somewhere inside `C:/Users/`, because it is shared by default by Virtualbox. If you want to share another folder, you can follow this [link](https://web.archive.org/web/20210301191513/https://support.divio.com/en/articles/646695-how-to-use-a-directory-outside-c-users-with-docker-toolbox-docker-for-windows)
-- you need a X11 server to be able to display applications from the Linux container. Install [vcxsrv](https://sourceforge.net/projects/vcxsrv/)
-
-### Run
-
-- launch Xlaunch, and check "Disable access control" in the Extra settings
-- for the Linux container to find your X11 server, you need your ip address. Type `ipconfig` in the Docker terminal, and search for ipv4 field.
-- to launch the container, run:
-
-```
-docker run -ti --rm -e DISPLAY="<ip>:0.0" -v /c/Users/path/to/shared/folder:/root/games libtas
-```
-
-You need to use the Unix syntax again for your shared folder path. Relative paths don't work here.
-
-This should open a terminal in your container. You can then enter `libTAS` to launch the program. If everything goes right, you should see the libtas window appear. If it complains about not been able to open the display, check again your ipv4 field. You can also access to your shared files located inside `/root/games` path. Because of how Docker works, everything that is modified outside of `/root/games` will not be preserved on later instances of the container, so be sure to install and save everything inside that directory.
-
-TODO: Figure out how to use Mesa OpenGL.
-
-## Run on Linux using Docker
-
-### Install
-
-- install docker through your usual package manager
-- you may want to use docker as a non-root user. To do that, create the docker group: `sudo groupadd docker` and add the user to the group: `sudo usermod -aG docker $USER` 
-- download the [Dockerfile](https://github.com/clementgallet/libTAS/blob/master/Dockerfile) somewhere (don't rename the file!).
-- run the command `docker build -t libtas /path/to/Dockerfile/directory`. The path points to the directory containing the Dockerfile, not to the Dockerfile itself. The Docker container build should start.
-
-### Run
-
-- to launch the container, run:
-
-```
-docker run --net=host -ti --rm -v /tmp/.X11-unix:/tmp/.X11-unix -v "$XAUTHORITY:/root/.Xauthority:rw" -e DISPLAY libtas
-```
-
-This should open a terminal in your container. You can then enter `libTAS` to launch the program. If everything goes right, you should see the libtas window appear. If you want to access to your local files, you can add `-v $HOME:/home` in the command options to map your $HOME directory to `/home`. Because of how Docker works, everything that is modified outside of this directory will not be preserved on later instances of the container.
 
 ## Logo
 
