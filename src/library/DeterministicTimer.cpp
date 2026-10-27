@@ -204,6 +204,11 @@ void DeterministicTimer::addDelay(struct timespec delayTicks)
     if (Global::is_exiting)
         return;
 
+    /* Like Hourglass, only count frames when the game draws, so that the
+     * delay is applied over the next frames instead */
+    if (Global::shared_config.game_specific_timing & SharedConfig::GC_TIMING_NO_NONDRAW)
+        return;
+
     /* We only allow the main thread to trigger a frame boundary! */
     bool mainT = ThreadManager::isMainThread();
 
