@@ -3,34 +3,28 @@
 	"tasks": [
 		{
 			"type": "shell",
-			"label": "autoreconf",
-			"command": "autoreconf",
+			"label": "cmake configure",
+			"command": "cmake",
 			"args": [
-				"--install"
+				"-S", ".",
+				"-B", "build",
+				"-DCMAKE_CXX_FLAGS=-Og -g -Wall -pedantic"
 			],
 			"problemMatcher": []
 		},
 		{
 			"type": "shell",
-			"label": "configure",
-			"command": "./configure",
+			"label": "configure and build",
+			"command": "cmake",
 			"args": [
-				"CXXFLAGS=\"-Og -g -Wall -pedantic\""
-			],
-			"problemMatcher": []
-		},
-		{
-			"type": "shell",
-			"label": "configure and make",
-			"command": "make",
-			"args": [
+				"--build", "build",
 				"-j4"
 			],
 			"problemMatcher": [
 				"$gcc"
 			],
 			"dependsOrder": "sequence",
-			"dependsOn": ["autoreconf", "configure"],
+			"dependsOn": ["cmake configure"],
             "group": {
                 "kind": "build",
                 "isDefault": false
@@ -38,9 +32,10 @@
 		},
 		{
 			"type": "shell",
-			"label": "make",
-			"command": "make",
+			"label": "build",
+			"command": "cmake",
 			"args": [
+				"--build", "build",
 				"-j4"
 			],
 			"problemMatcher": [
@@ -54,9 +49,10 @@
 		{
 			"type": "shell",
 			"label": "clean",
-			"command": "make",
+			"command": "cmake",
 			"args": [
-				"clean"
+				"--build", "build",
+				"--target", "clean"
 			],
 			"problemMatcher": []
 		}
