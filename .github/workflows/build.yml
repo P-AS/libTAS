@@ -68,13 +68,30 @@ jobs:
         run: |
           sha=$(git rev-parse --short HEAD)
           mkdir dist
-          for f in ../libtas*_${{ matrix.deb_arch }}.deb; do
-            mv "$f" "dist/$(basename "${f%_${{ matrix.deb_arch }}.deb}")_${sha}_${{ matrix.deb_arch }}.deb"
-          done
-          mv libTAS-${{ matrix.arch }}.AppImage dist/libtas_${sha}_${{ matrix.arch }}.AppImage
+          mv ../libtas_*_${{ matrix.deb_arch }}.deb dist/libtas-deb-${{ matrix.arch }}-${sha}.deb
+          if ls ../libtas32_*_${{ matrix.deb_arch }}.deb >/dev/null 2>&1; then
+            mv ../libtas32_*_${{ matrix.deb_arch }}.deb dist/libtas32-deb-${{ matrix.arch }}-${sha}.deb
+          fi
+          mv libTAS-${{ matrix.arch }}.AppImage dist/libtas-appimage-${{ matrix.arch }}-${sha}.AppImage
           ls -l dist
+          echo "SHA=${sha}" >> "$GITHUB_ENV"
 
-      - uses: actions/upload-artifact@v4
+      # Each file is uploaded on its own, without being zipped
+      - name: Upload deb package
+        uses: actions/upload-artifact@v7
         with:
-          name: libtas-${{ matrix.arch }}
-          path: dist/
+          path: dist/libtas-deb-${{ matrix.arch }}-${{ env.SHA }}.deb
+          archive: false
+
+      - name: Upload 32-bit deb package
+        if: matrix.arch == 'x86_64'
+        uses: actions/upload-artifact@v7
+        with:
+          path: dist/libtas32-deb-${{ matrix.arch }}-${{ env.SHA }}.deb
+          archive: false
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v7
+        with:
+          path: dist/libtas-appimage-${{ matrix.arch }}-${{ env.SHA }}.AppImage
+          archive: false
