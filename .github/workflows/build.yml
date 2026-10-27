@@ -30,7 +30,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends devscripts equivs fakeroot file wget
+          sudo apt-get install --yes --no-install-recommends devscripts equivs fakeroot file wget qt6-wayland
           sudo mk-build-deps --install --remove --tool "apt-get --yes --no-install-recommends" debian/control
 
       - name: Install 32-bit build dependencies
@@ -55,6 +55,11 @@ jobs:
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-$ARCH.AppImage
           wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-$ARCH.AppImage
           chmod +x linuxdeploy-$ARCH.AppImage linuxdeploy-plugin-qt-$ARCH.AppImage
+
+          # Only the xcb platform plugin is bundled by default, add the wayland one
+          EXTRA_PLATFORM_PLUGINS=$(cd "$($QMAKE -query QT_INSTALL_PLUGINS)/platforms" && ls libqwayland*.so | paste -sd ';')
+          test -n "$EXTRA_PLATFORM_PLUGINS"
+          export EXTRA_PLATFORM_PLUGINS
 
           # The AppImage bundles both the 64-bit and the 32-bit libraries
           mkdir AppDir
