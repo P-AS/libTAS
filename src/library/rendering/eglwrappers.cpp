@@ -28,9 +28,15 @@
 #include "screencapture/ScreenCapture.h"
 #include "frame.h"
 #include "xlib/XlibGameWindow.h"
+#include "xlib/xdisplay.h"
 #include "GlobalState.h"
+#ifdef __linux__
+#include "wine/winehook.h"
+#endif
 
 #include <string.h>
+#include <map>
+#include <X11/Xlib.h>
 
 #define RETURN_SYMBOL(str) \
     if (!strcmp(symbol, #str)) { \
@@ -52,6 +58,9 @@ DEFINE_ORIG_POINTER(eglSwapBuffers)
 DEFINE_ORIG_POINTER(eglSwapInterval)
 DEFINE_ORIG_POINTER(eglBindAPI)
 DEFINE_ORIG_POINTER(eglCreateContext)
+DEFINE_ORIG_POINTER(eglCreateWindowSurface)
+DEFINE_ORIG_POINTER(eglCreatePlatformWindowSurface)
+DEFINE_ORIG_POINTER(eglCreatePlatformWindowSurfaceEXT)
 
 /* If the game uses the eglGetProcAddress functions to access to a function
  * that we hook, we must return our function and store the original pointers
@@ -67,6 +76,14 @@ static void* store_orig_and_return_my_symbol(const char* symbol, void* real_poin
     RETURN_SYMBOL(eglSwapInterval)
     RETURN_SYMBOL(eglBindAPI)
     RETURN_SYMBOL(eglCreateContext)
+
+    /* Extension functions may only be available from here */
+    if (!strcmp(symbol, "eglCreatePlatformWindowSurfaceEXT")) {
+        orig::eglCreatePlatformWindowSurfaceEXT = reinterpret_cast<decltype(orig::eglCreatePlatformWindowSurfaceEXT)>(real_pointer);
+        return reinterpret_cast<void*>(libtas::eglCreatePlatformWindowSurfaceEXT);
+    }
+    RETURN_SYMBOL(eglCreateWindowSurface)
+    RETURN_SYMBOL(eglCreatePlatformWindowSurface)
 
     /* Store function pointers that are used in other files */
     RETURN_SYMBOL_CUSTOM(glBlitFramebuffer);
@@ -182,6 +199,114 @@ EGLBoolean eglBindAPI(EGLenum api)
     return orig::eglBindAPI(api);
 }
 
+/* X11 window of each window surface, and its top-level window */
+static std::map<EGLSurface, std::pair<Window, Window>> surfaceWindows;
+
+static void registerSurfaceWindow(EGLSurface surface, Window w)
+{
+    /* For other games, the native window may not be a X11 window, and a
+     * request on an invalid window would make Xlib exit the game. Wine sets
+     * its own X error handler. */
+#ifdef __linux__
+    if (!isWineGame())
+        return;
+#else
+    return;
+#endif
+
+    if ((surface == EGL_NO_SURFACE) || !w)
+        return;
+
+    surfaceWindows[surface] = std::make_pair(w, static_cast<Window>(0));
+}
+
+/* Returns the top-level window of the X11 window that the surface draws to */
+static Window getSurfaceTopLevelWindow(EGLSurface surface)
+{
+    auto it = surfaceWindows.find(surface);
+    if (it == surfaceWindows.end())
+        return 0;
+
+    if (it->second.second)
+        return it->second.second;
+
+    Display* display = nullptr;
+    for (int d=0; d<GAMEDISPLAYNUM; d++) {
+        if (x11::gameDisplays[d]) {
+            display = x11::gameDisplays[d];
+            break;
+        }
+    }
+    if (!display)
+        return 0;
+
+    GlobalNative gn;
+    Window w = it->second.first;
+    while (w) {
+        Window root, parent;
+        Window *children = nullptr;
+        unsigned int nchildren;
+        if (!XQueryTree(display, w, &root, &parent, &children, &nchildren))
+            return 0;
+        if (children)
+            XFree(children);
+        if (!parent || (parent == root))
+            break;
+        w = parent;
+    }
+
+    it->second.second = w;
+    return w;
+}
+
+EGLSurface eglCreateWindowSurface(EGLDisplay dpy, EGLConfig config, EGLNativeWindowType win, const EGLint *attrib_list)
+{
+    LINK_NAMESPACE(eglCreateWindowSurface, "EGL");
+
+    EGLSurface surface = orig::eglCreateWindowSurface(dpy, config, win, attrib_list);
+    if (GlobalState::isNative())
+        return surface;
+
+    LOGTRACE(LCF_WINDOW | LCF_OGL, "%s call with window %d", __func__, static_cast<Window>(win));
+    registerSurfaceWindow(surface, static_cast<Window>(win));
+    return surface;
+}
+
+EGLSurface eglCreatePlatformWindowSurface(EGLDisplay dpy, EGLConfig config, void *native_window, const EGLAttrib *attrib_list)
+{
+    LINK_NAMESPACE(eglCreatePlatformWindowSurface, "EGL");
+
+    EGLSurface surface = orig::eglCreatePlatformWindowSurface(dpy, config, native_window, attrib_list);
+    if (GlobalState::isNative() || !native_window)
+        return surface;
+
+    /* For the X11 platform, the native window is a pointer to the window */
+    Window w = *static_cast<Window*>(native_window);
+    LOGTRACE(LCF_WINDOW | LCF_OGL, "%s call with window %d", __func__, w);
+    registerSurfaceWindow(surface, w);
+    return surface;
+}
+
+EGLSurface eglCreatePlatformWindowSurfaceEXT(EGLDisplay dpy, EGLConfig config, void *native_window, const EGLint *attrib_list)
+{
+    if (!orig::eglCreatePlatformWindowSurfaceEXT) {
+        LINK_NAMESPACE(eglGetProcAddress, "EGL");
+        if (orig::eglGetProcAddress)
+            orig::eglCreatePlatformWindowSurfaceEXT = reinterpret_cast<decltype(orig::eglCreatePlatformWindowSurfaceEXT)>(orig::eglGetProcAddress("eglCreatePlatformWindowSurfaceEXT"));
+        if (!orig::eglCreatePlatformWindowSurfaceEXT)
+            return EGL_NO_SURFACE;
+    }
+
+    EGLSurface surface = orig::eglCreatePlatformWindowSurfaceEXT(dpy, config, native_window, attrib_list);
+    if (GlobalState::isNative() || !native_window)
+        return surface;
+
+    Window w = *static_cast<Window*>(native_window);
+    LOGTRACE(LCF_WINDOW | LCF_OGL, "%s call with window %d", __func__, w);
+    registerSurfaceWindow(surface, w);
+    return surface;
+}
+
 EGLBoolean eglSwapBuffers( EGLDisplay dpy, EGLSurface surface )
 {
     LINK_NAMESPACE(eglSwapBuffers, "EGL");
@@ -190,6 +315,12 @@ EGLBoolean eglSwapBuffers( EGLDisplay dpy, EGLSurface surface )
         return orig::eglSwapBuffers(dpy, surface);
 
     LOGTRACE_SIMPLE(LCF_WINDOW | LCF_OGL);
+
+    /* Games may map other windows after the one they draw to, so make sure
+     * that the window we draw to is the game window */
+    Window w = getSurfaceTopLevelWindow(surface);
+    if (w && (w != XlibGameWindow::get()))
+        XlibGameWindow::promote(w);
 
     /* Start the frame boundary and pass the function to draw */
     static RenderHUD_GL renderHUD;

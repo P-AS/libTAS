@@ -41,6 +41,11 @@ OVERRIDE EGLBoolean eglBindAPI(EGLenum api);
 
 OVERRIDE EGLContext eglCreateContext (EGLDisplay dpy, EGLConfig config, EGLContext share_context, const EGLint *attrib_list);
 
+/* Track the window that each surface draws to */
+OVERRIDE EGLSurface eglCreateWindowSurface(EGLDisplay dpy, EGLConfig config, EGLNativeWindowType win, const EGLint *attrib_list);
+OVERRIDE EGLSurface eglCreatePlatformWindowSurface(EGLDisplay dpy, EGLConfig config, void *native_window, const EGLAttrib *attrib_list);
+OVERRIDE EGLSurface eglCreatePlatformWindowSurfaceEXT(EGLDisplay dpy, EGLConfig config, void *native_window, const EGLint *attrib_list);
+
 }
 
 #endif
