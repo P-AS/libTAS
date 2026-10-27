@@ -990,6 +990,7 @@ void SaveStateManager::printError(int err)
         "Savestate does not exist",
         "Loading not allowed because new threads were created",
         "State still saving",
+        "Loading not allowed because a game thread has exited since the state was saved",
         0 };
 
     if (err < 0) {
