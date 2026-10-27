@@ -147,7 +147,9 @@ size_t writeSaveFiles(SaveStateSaving& state)
         if (savefile->fd >= FIRST_SAVEFILE_STREAM_FD)
             continue;
 
-        Area area;
+        /* Fields that we don't set, such as `skip` and `uncommitted`, must be
+         * zero, otherwise the loading would not read the page flags */
+        Area area = {};
         area.flags = Area::AREA_SAVEFILE;
         area.fd = savefile->fd;
         strncpy(area.name, savefile->filename.c_str(), Area::FILENAMESIZE-1);
