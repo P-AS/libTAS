@@ -168,6 +168,48 @@ static std::string utf16ToUtf8(const char16_t *str, size_t len)
     return out;
 }
 
+static std::string winePrefix()
+{
+    const char *prefix_env = getenv("WINEPREFIX");
+    if (prefix_env)
+        return prefix_env;
+
+    const char *home = getenv("HOME");
+    if (!home)
+        return "";
+    return std::string(home) + "/.wine";
+}
+
+/* Returns if the file is inside the temporary directory of a wine user.
+ * Games such as Clickteam ones extract files there and look for them by
+ * listing the directory, which does not show our savefiles, and these are not
+ * save data anyway. */
+static bool isWineTempFile(const std::string &file)
+{
+    static std::string usersdir;
+    if (usersdir.empty()) {
+        GlobalNative gn;
+        std::string users = winePrefix() + "/drive_c/users";
+        char *path = realpath(users.c_str(), nullptr);
+        if (!path)
+            return false;
+        usersdir = std::string(path) + "/";
+        free(path);
+    }
+
+    if (file.compare(0, usersdir.size(), usersdir) != 0)
+        return false;
+
+    /* Skip the user name */
+    size_t slash = file.find('/', usersdir.size());
+    if (slash == std::string::npos)
+        return false;
+    const char *rest = file.c_str() + slash + 1;
+
+    return (strncasecmp(rest, "Temp/", 5) == 0) ||
+           (strncasecmp(rest, "AppData/Local/Temp/", 19) == 0);
+}
+
 /* Convert a NT path of a file on a drive (\??\C:\dir\file) into a unix path,
  * looking up each component without case like wine does. Returns an empty
  * string if the path cannot be converted, or if a parent directory of the
@@ -190,17 +232,9 @@ static std::string ntToUnixPath(const OBJECT_ATTRIBUTES *attr)
 
     GlobalNative gn;
 
-    std::string prefix;
-    const char *prefix_env = getenv("WINEPREFIX");
-    if (prefix_env) {
-        prefix = prefix_env;
-    }
-    else {
-        const char *home = getenv("HOME");
-        if (!home)
-            return "";
-        prefix = std::string(home) + "/.wine";
-    }
+    std::string prefix = winePrefix();
+    if (prefix.empty())
+        return "";
 
     std::string dosdevice = prefix + "/dosdevices/" + drive + ":";
     char *root = realpath(dosdevice.c_str(), nullptr);
@@ -289,7 +323,7 @@ static bool openSaveFileHandle(void **handle, uint32_t access, OBJECT_ATTRIBUTES
         return false;
 
     std::string unixpath = ntToUnixPath(attr);
-    if (unixpath.empty())
+    if (unixpath.empty() || isWineTempFile(unixpath))
         return false;
     const char *file = unixpath.c_str();
 
