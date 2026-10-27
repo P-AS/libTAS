@@ -150,6 +150,11 @@ bool isSaveFile(const char *file)
     if (strstr(file, "/.cache/mesa_shader_cache"))
         return false;
 
+    /* Writing to procfs changes the process state, such as thread names
+     * that wine sets in /proc/self/task/<tid>/comm */
+    if (strncmp(file, "/proc/", 6) == 0)
+        return false;
+
     return true;
 }
 
