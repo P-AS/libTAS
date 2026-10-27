@@ -32,6 +32,9 @@
 #include "hook.h"
 #include "global.h"
 #include "GlobalState.h"
+#ifdef __linux__
+#include "wine/winehook.h"
+#endif
 
 #include <sstream>
 #include <utility>
@@ -104,6 +107,14 @@ void ThreadManager::setMainThread()
         main_pthread_id = pthread_id;
         return;
     }
+
+#ifdef __linux__
+    /* Wine games present their frames from the wined3d command stream thread
+     * while the game logic stays on the first thread, which must be kept as
+     * the main thread for time-tracking to work. */
+    if (isWineGame())
+        return;
+#endif
 
     if (main_pthread_id != pthread_id) {
         if (!(Global::shared_config.debug_state & SharedConfig::DEBUG_MAIN_FIRST_THREAD) &&
