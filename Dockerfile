@@ -64,7 +64,7 @@ FROM debian:12 AS libtas-builder
   # Dependencies
       RUN apt-get update && apt-get -y install \
     # build tools
-      git wget build-essential automake pkg-config \
+      git wget build-essential cmake pkg-config \
     # main
       libx11-dev libx11-xcb-dev qtbase5-dev libsdl2-dev libxcb1-dev libxcb-keysyms1-dev libxcb-xkb-dev libxcb-cursor-dev libxcb-randr0-dev libudev-dev libasound2-dev libavutil-dev libswresample-dev libswscale-dev ffmpeg liblua5.4-dev libcap-dev libxcb-xinput-dev \
     # HUD
@@ -81,7 +81,7 @@ FROM debian:12 AS libtas-builder
     WORKDIR /root/src/libTAS
     RUN git fetch --tags && git checkout $LIBTAS_VERSION
     RUN ./build.sh --with-i386
-    RUN cd ./build && make install
+    RUN cmake --install build
 
 
 FROM debian:12-slim

@@ -5,7 +5,7 @@ Ideas and planned work for this fork of libTAS.
 ## Build system
 
 - [x] Upgrade from Qt5 to Qt6
-- [ ] Replace autotools with CMake
+- [x] Replace autotools with CMake
 
 ## SDL
 
