@@ -43,7 +43,7 @@ You can download the latest stable version of the software in the [Releases](htt
 
 Installing with the debian package will install all the required packages as well.
 
-There is also an [automated build](https://ci.appveyor.com/project/clementgallet/libtas/build/artifacts) available for the last interim version, 64-bit with dual-arch.
+There are also [automated builds](https://github.com/P-AS/libTAS/actions/workflows/build.yml) (deb packages and AppImages, x86_64 and aarch64) available for the last interim version.
 
 ## Building
 
