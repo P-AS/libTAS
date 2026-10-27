@@ -43,6 +43,7 @@ enum Error {
     ESTATE_NOSTATE = -3, // No state in slot
     ESTATE_NOTSAMETHREADS = -4, // Thread list has changed
     ESTATE_NOTCOMPLETE = -5, // State still being saved
+    ESTATE_THREADEXITED = -6, // A thread of the state has exited, and cannot be recreated
 };
 
 

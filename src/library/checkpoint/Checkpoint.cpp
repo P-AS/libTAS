@@ -45,6 +45,9 @@
 #include "fileio/FileDescriptorManip.h"
 #include "renderhud/RenderHUD.h"
 #include "../shared/sockethelpers.h"
+#ifdef __linux__
+#include "wine/winehook.h"
+#endif
 #ifdef __unix__
 #include "../external/xcb/xcbint.h"
 #include <malloc.h> // malloc_usable_size
@@ -267,6 +270,34 @@ int Checkpoint::checkRestore()
     StateHeader sh;
     Utils::readAll(pmfd, &sh, sizeof(sh));
     close(pmfd);
+
+#ifdef __linux__
+    /* Wine threads also live in wineserver, which forgets them when they
+     * exit, so we cannot recreate a thread that has exited since the state
+     * was saved: it would fail to communicate with wineserver, and wine would
+     * abort the game. */
+    if (isWineGame()) {
+        ThreadManager::lockList();
+        for (int t = 0; t < sh.thread_count; t++) {
+            bool alive = false;
+            for (ThreadInfo *thread = ThreadManager::getThreadList(); thread != nullptr; thread = thread->next) {
+                if ((thread->translated_tid == sh.tids[t]) &&
+                    (thread->state != ThreadInfo::ST_ZOMBIE) &&
+                    (thread->state != ThreadInfo::ST_TERMINATING) &&
+                    (thread->state != ThreadInfo::ST_TERMINATED)) {
+                    alive = true;
+                    break;
+                }
+            }
+            if (!alive) {
+                ThreadManager::unlockList();
+                LOG(LL_WARN, LCF_CHECKPOINT | LCF_THREAD, "Thread %d of the savestate has exited", sh.tids[t]);
+                return SaveStateManager::ESTATE_THREADEXITED;
+            }
+        }
+        ThreadManager::unlockList();
+    }
+#endif
 
     return SaveStateManager::ESTATE_OK;
 }
