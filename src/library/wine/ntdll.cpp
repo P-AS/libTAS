@@ -22,6 +22,7 @@
  * time, which it needs to compute timeouts. */
 
 #include "ntdll.h"
+#include "ntdllfile.h"
 #include "winehook.h"
 
 #include "logging.h"
@@ -214,6 +215,8 @@ void hook_ntdll(const char* path)
     HOOK_WINE_SYSCALL(NtQueryPerformanceCounter);
     HOOK_WINE_SYSCALL(NtQuerySystemTime);
     HOOK_WINE_SYSCALL(NtDelayExecution);
+
+    hook_ntdll_file(path);
 }
 
 }
