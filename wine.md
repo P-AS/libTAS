@@ -1,0 +1,340 @@
+# Running Windows games through Wine
+
+This document records what was learned while making Windows games run under
+libTAS through Wine: problems found, how they were fixed, design choices, and
+what is still open. Keep it up to date when working on anything Wine related
+(see `AGENTS.md`).
+
+Tested setup: Wine 11.20 (WoW64, so 32-bit games run in a 64-bit unix
+process), libxcb 1.17, Mesa llvmpipe, Arch Linux, on a rootful Xwayland
+display. Games used for testing:
+
+- **I Wanna Be The Boshy** (Clickteam Fusion, 32-bit, Direct3D 9 through
+  wined3d, DirectSound audio, `.ini` save files, extracts extensions into the
+  Wine temporary directory). Also the Hourglass movie imported in
+  `utils/import/shar-iwannabetheboshy-darkboshy.ltm`.
+- **Sonic Robo Blast 2 v2.2.15** (`srb2win.exe`, 32-bit, SDL2 + OpenGL).
+- A pinball game tested by Randomno (commit `75ffe274`).
+- Small mingw test programs (file I/O, thread exit across savestates), see
+  [Testing](#testing-and-debugging).
+
+## How libTAS hooks a Wine game
+
+### Which process gets hooked
+
+`LD_PRELOAD` is inherited by every process Wine starts (wineserver, wineboot,
+explorer, ...). `GameThread` sets:
+
+- `LIBTAS_DELAY_INIT` so that libtas does not initialize too early;
+- `LIBTAS_WINE_GAME` to the executable name, and `wine_should_init()` only
+  initializes libtas in the process whose `argv[1]` is the game, and unsets
+  `LD_PRELOAD` for the others;
+- `LIBTAS_WINE_RESTART` on WoW64: a 32-bit game is started in a 64-bit process
+  which restarts itself, so libtas is kept loaded but not initialized in the
+  first process, and initializes in the restarted one (`79c46189`).
+
+`isWineGame()` (in `wine/winehook.cpp`) tells the rest of the library that it
+runs inside the Wine game process.
+
+Launching (`a148b183`): fall back to `wine` when `wine64` is missing (WoW64
+builds), choose `libtas.so` from the architecture of the Wine process rather
+than the game's, and look for Proton in its `files` directory.
+
+### Hooking the unix side of Wine
+
+Since Wine 5, Windows dlls are PE files that we cannot hook from `LD_PRELOAD`
+(the old `user32.dll.so`, `kernel32.dll.so` and `wined3d.dll.so` hooks are
+dead code on recent Wine). Instead we hook the **unix side** libraries:
+
+- `win32u.so`: user/gdi syscalls (input, message waits);
+- `ntdll.so`: time, sleeps, file opening;
+- libc/Xlib/EGL/ALSA calls made by `winex11.so`, `winealsa.so`, Mesa, etc. are
+  caught by the regular libTAS hooks.
+
+Two hooking methods are used:
+
+- `hook_wine_syscall(library, name, ...)` replaces the entry of a syscall in
+  the **syscall table** of the unix library. Only calls coming from the Windows
+  side are redirected; Wine's own internal calls keep using the original
+  function. Use this whenever Wine itself calls the function internally and
+  must keep real behaviour (for example Wine computes its internal timeouts
+  from the real time).
+- `HOOK_PATCH_ORIG(...)` patches the function itself (used for the input
+  getters in `win32u.cpp`), so internal calls are affected too.
+
+`dlopen()` notices when `ntdll.so`, `win32u.so` and `winex11.so` are loaded
+and installs the hooks / records their address ranges (`dlhook.cpp`).
+
+### Crashes inside unix calls abort frame boundaries
+
+When libtas code crashes (SIGSEGV) while running inside a Wine unix call (for
+example inside `eglSwapBuffers` called from `x11drv_egl_surface_swap`), Wine's
+`handle_syscall_fault` turns it into a Windows exception and **returns to the
+PE side**, abandoning everything on the unix stack. If this happens during a
+frame boundary, `frame_mutex` stays locked and the next frame deadlocks at
+frame 1 or 2. Two bugs looked exactly like this:
+
+- `FileDebug::update()` indexed `fd_history[-1]` for half-registered pipes
+  (`6f1fa3f7`);
+- writing to the shared user data page after Wine made it read-only
+  (`a0192386`).
+
+Symptom: the game stops at an early frame and the render thread is blocked in
+`DeterministicTimer::enterFrameBoundary()` while no thread is inside a frame
+boundary. Run with `WINEDEBUG=+seh` and look for `handle_syscall_fault`, then
+catch the fault with gdb (see [Testing](#testing-and-debugging)).
+
+## Time
+
+`f3e7bbe4` made Wine time deterministic:
+
+- `NtQueryPerformanceCounter`, `NtQuerySystemTime` and `NtDelayExecution` are
+  replaced in the `ntdll.so` syscall table, so that only the game sees fake
+  time.
+- `GetTickCount()` and friends read the **shared user data page**
+  (`KUSER_SHARED_DATA` at `0x7ffe0000`) directly, without any call. libtas
+  replaces that page with a private copy (`takeover_wine_shared_data()`) and
+  writes deterministic tick count, interrupt time and system time into it
+  (`update_wine_shared_data()`) at frame boundaries and when adding delay.
+- Wine resets the protection of that page from its own memory views, so the
+  page is made writable again before each update, and taken over again if Wine
+  mapped it anew (`a0192386`, found with SRB2).
+- `NtDelayExecution`: infinite sleeps, `Sleep(0)` yields and alertable sleeps
+  are left to Wine. `Sleep(0)` counts as a `GetTickCount` call for
+  time-tracking, because busy loops on the shared page usually yield this way.
+
+### Waiting on messages
+
+Wine computes the deadlines of its waits from the **real** clock, while the
+game computes its timeouts from our deterministic clock. Two consequences:
+
+- `MsgWaitForMultipleObjects(timeout)` slept in real time without advancing
+  our time, and time only advanced through time-tracking (1 ms per 100 QPC
+  calls), so Boshy ran at one frame every ~10 s in game. The hook on
+  `NtUserMsgWaitForMultipleObjectsEx` checks without waiting and transfers the
+  timeout as a deterministic sleep when nothing is signaled (`0a68fde2`).
+  Infinite and alertable waits are left to Wine.
+- `GetMessage()` with no message available blocks forever, while the message
+  comes from a timer thread (`timeSetEvent`) that waits until our time reaches
+  its deadline, which nothing advances. On the main thread, the
+  `NtUserGetMessage` hook advances time by 1 ms while no message is available,
+  and waits 1 ms of real time in between so that other threads can post their
+  message (`dc9c10e4`).
+
+### Time-tracking
+
+Boshy busy-waits on `QueryPerformanceCounter`, so QPC time-tracking (threshold
+100 on the main thread) must be enabled, otherwise it freezes around frame
+107. Time-tracking of secondary threads does not help, see the main thread
+section below.
+
+## Threads
+
+### Main thread
+
+wined3d presented frames from its command stream (CSMT) thread, so the frame
+boundary made it the main thread, and the game logic thread (which calls
+QPC) became a secondary thread without time-tracking. For Wine games, the main
+thread is never switched away from the first thread (`58152c07`).
+"Keep main first thread" in the debug settings does the same for any game.
+
+### CSMT
+
+With CSMT, the game thread queues a present to the wined3d thread and then
+sleeps, which advanced time before the present happened, triggering non-draw
+frames (321 out of 962 frames in Boshy) and irregular frame timings, and made
+the frame boundary (and thus the checkpoint thread) alternate between two
+threads, which broke savestates. `GameThread` sets `csmt=0x0` in
+`WINE_D3D_CONFIG` unless the user already set `csmt` (`50c98cd1`). Frames are
+then presented by the game thread.
+
+## Rendering and windows
+
+- On Wine 11, OpenGL/wined3d presents go through
+  `win32u_wglSwapBuffers -> x11drv_egl_surface_swap -> eglSwapBuffers`, which
+  our EGL hook turns into frame boundaries. The EGL surface is drawn on a
+  child window of the top-level game window, created on another X connection.
+- `XShmPutImage` from `winex11.so` (window surface flushes, used by GDI
+  rendering) can happen from any thread that waits for messages; flushes from
+  other threads than the main one are not frame boundaries (`75ffe274`).
+- **Game window selection**: the game window was the last mapped top-level
+  window. SRB2 maps its small startup window again after the window it draws
+  to, so the program listened for hotkeys on the wrong window and inputs went
+  there ("libTAS loses control after initialization"). For Wine games, we
+  track the X window of each EGL window surface and promote its top-level
+  window when swapping (`7424fbb3`). This is restricted to Wine games because
+  on other platforms the native window is not an X window, and an Xlib error
+  would kill the game (Wine installs its own X error handler).
+- Wine sets the title of SRB2's window to "FluidSynth...", cosmetic.
+- SRB2's default window is 2560x1415 (from its own config), larger than a small
+  test display.
+
+## Input
+
+- `03bdd579` hooks `NtUserGetAsyncKeyState`, `NtUserGetKeyState`,
+  `NtUserGetKeyboardState` and `NtUserGetCursorPos` in `win32u.so`, maps libTAS
+  inputs to virtual keys (`inputs/winekeyboardlayout.cpp`), fixes right/middle
+  mouse buttons (Xlib numbers them differently), and converts root-relative
+  pointer warps to game window coordinates. Games polling keys (Boshy) only
+  need these.
+- Games reading window messages (SRB2 through SDL2) get keys from X events
+  that libTAS generates for each X connection of the game. Wine opens several X
+  connections (one per thread), and `XlibEventQueue::insert()` modified the
+  event while looking for the receiving window, so when the first connection
+  did not know the game window, the next ones received the event with a null
+  window and dropped it (`23c55fd8`). This bug is not Wine specific.
+- Hourglass import: Hourglass records `VK_LBUTTON` as a held key, which the
+  importer converts into a pointer button (`95373926`).
+
+## Audio
+
+- libtas makes pulseaudio fail (`pa_mainloop_new()` returns NULL) so that games
+  use ALSA. `winepulse` does not check this and aborts
+  (`Assertion 'm' failed ... pa_mainloop_set_poll_func()`). The
+  `WINEDLLOVERRIDES=winepulse.drv=d` override is ignored by Wine 11, so we
+  block the `dlopen()` of `winepulse.so` instead, which makes `winepulse.drv`
+  fail to load and mmdevapi fall back to `winealsa` (`ab396f1c`).
+- `winealsa.so` uses `SND_PCM_FORMAT_FLOAT_LE`, interleaved, 48 kHz, which our
+  ALSA hooks support.
+- Boshy had no sound when preventing writing to disk: Clickteam extracts its
+  sound filters (`*.sft`) into the Wine temporary directory and finds them by
+  listing the directory, which does not show our in-memory savefiles. Files in
+  the temporary directories of Wine users are left to Wine (`364b37c8`). To
+  check whether a game plays sounds, `WINEDEBUG=+dsound` shows
+  `DSOUND_MixToPrimary ... for N buffers`.
+- `WARN: Unsupported stream direction 1` (capture streams) is harmless.
+
+## Files and "Prevent writing to disk"
+
+Wine opens and creates files from **wineserver**, which sends back the file
+descriptor, so our `open()` hooks never see the files of Windows games
+(`0dd54fac`). `wine/ntdllfile.cpp` hooks, in the `ntdll.so` syscall table:
+
+- `NtCreateFile` / `NtOpenFile`: convert the NT path (`\??\C:\...`) into a unix
+  path through `$WINEPREFIX/dosdevices`, resolving each component without case
+  like Wine (`wine_nt_to_unix_file_name` is not exported by `ntdll.so`). If the
+  file is a savefile, open it from our savefile list (a memfd holding a copy of
+  the original) and wrap it in a Wine handle with `wine_server_fd_to_handle()`.
+  Dispositions (create, open, overwrite, supersede, append) give the same
+  results as Windows. The savefile is considered closed right away, as
+  wineserver keeps its own duplicate of the descriptor.
+- Deletion (`FILE_DELETE_ON_CLOSE`, used by `DeleteFile()`): mark the savefile
+  as removed and hand out an anonymous file.
+- `NtQueryAttributesFile` / `NtQueryFullAttributesFile`: report savefiles that
+  only exist in memory, and removed ones as missing.
+
+Left to Wine: directories, open by file id, paths relative to a handle,
+non-drive paths, and files in the Wine temporary directories (see Audio).
+Writes to `/proc` (Wine sets thread names in `/proc/self/task/<tid>/comm`) are
+not savefiles (`621b5617`).
+
+Not handled yet:
+
+- renaming (`MoveFile`) goes through wineserver, so it acts on disk, or fails
+  for files only in memory;
+- directory listings don't show files that only exist in memory;
+- creating directories happens on disk;
+- the registry (`user.reg`, `system.reg`) is written by wineserver.
+
+## Savestates
+
+- Wine reserves tens of GB of address space, which made savestates take 15 s.
+  Non-present, non-swapped anonymous pages are zero, so they are skipped
+  (`82de0e07`).
+- Wine duplicates the std descriptors for its handles. Pipe ends were paired by
+  name, so duplicates were not registered and were closed when loading a state
+  (`3553ff3c`). Half-registered pipes then crashed `FileDebug` (`6f1fa3f7`).
+  Loading may still print `Recreate pipe fd was supposed to be (...) but is
+  instead (...)`.
+- Savefile areas in the savestate left `skip` and `uncommitted`
+  uninitialized, so loading sometimes skipped their page flags and read the
+  rest of the state at the wrong offsets, looping on garbage savefiles
+  (`Cound not truncate the savefile  with fd 0 and size 3386706920806023168`)
+  (`3994095b`). Not Wine specific, but only visible since Wine savefiles end
+  up in savestates.
+- The xcb connection struct is preserved across loads using our own
+  definition of it, which is smaller than libxcb 1.17's and missed the resource
+  id allocator at its end. Games then reused X resource ids after loading and
+  Xlib exited on `BadIDChoice` (`X_CreateGC`). We now copy the whole allocation
+  (`malloc_usable_size()`) (`8a5baa09`). Not Wine specific.
+- Recreating a thread that exited after the savestate uses `clone3()` with
+  `set_tid`, which requires the `CAP_CHECKPOINT_RESTORE` capability. Without
+  it, we fall back to `clone()`, whose x86_64 wrapper used the aarch64 syscall
+  number (220, `semtimedop` on x86_64) (`af25c80a`). Not Wine specific.
+- **Wine threads cannot be recreated**: they also live in wineserver, which
+  forgets them when they exit, and their request pipes are closed. A recreated
+  thread fails with `wine client error:<tid>: write: Bad file descriptor` and
+  Wine aborts the game. For Wine games, loading a state whose threads have
+  exited is refused with "Loading not allowed because a game thread has exited
+  since the state was saved" (`7f7461f7`). Boshy has such a thread exiting
+  around frames 1122-1192 of the imported movie. Keeping Wine threads from
+  exiting while libTAS runs would lift this limitation, but is not done.
+
+## Timing compatibility with Hourglass
+
+libTAS inserts a non-draw frame when the game sleeps or triggers time-tracking
+for longer than a frame without drawing. Hourglass only counts drawn frames, so
+imported Hourglass movies desync on these frames (frames 117, 935 and 958 of
+the imported Boshy movie, all from QPC time-tracking). The game-specific timing
+setting "No non-draw frames (Hourglass)" (`GC_TIMING_NO_NONDRAW`) applies the
+extra delay over the next drawn frames instead (`fa4764db`). It is stored in
+the game config, not in the movie.
+
+## Testing and debugging
+
+### Display and configuration
+
+- Run games in a dedicated rootful Xwayland, so that the compositor does not
+  resize the game window (resizes break wined3d, see `Something's still
+  holding back buffer`):
+  `Xwayland :42 -geometry 1600x1200 -decorate -noreset`. Run libTAS there too:
+  `env -u WAYLAND_DISPLAY QT_QPA_PLATFORM=xcb DISPLAY=:42 libTAS ...`
+  (otherwise Qt and possibly Wine use the Wayland session).
+- libTAS saves the game config on exit, so `-s` overrides and test paths end up
+  in the user's `~/.config/libTAS/<game>.ini`. Use a private copy with
+  `XDG_CONFIG_HOME`, and point `savestatedir`/`datadir` of the copied
+  `libTAS.ini` elsewhere. Per-game logging settings override `-s`; edit the
+  copy directly. `logging_status=2` logs to `<game>.log` next to the game,
+  which is not truncated between runs.
+- Run tests from a copy of the game directory, so that save files of the user
+  are not modified.
+- In `-n` (non-interactive) mode the game starts unpaused and fast-forwarded:
+  calling `runtime.playPause()` pauses it. Lua callbacks can drive inputs
+  (`input.setKey()` in `onInput`), and `runtime.saveState()` /
+  `runtime.loadState()` work, but Lua upvalues and globals behave strangely
+  after a savestate, so key the actions on frame numbers only.
+- Count non-draw frames by logging `LCF_SOCKET` and counting `Send socket
+  message 44` (`MSGB_NONDRAW_FRAME`).
+- Small Windows test programs can be built with `i686-w64-mingw32-gcc` (add
+  `-lopengl32 -lgdi32` for a GL window).
+- To check audio without playing on the speakers, use `PULSE_SERVER` pointing
+  nowhere and `ALSA_CONFIG_PATH` with `pcm.!default { type null }`, or dump with
+  `-d` and run `ffmpeg -af volumedetect` on the result.
+
+### Stacks and faults
+
+- `kernel.yama.ptrace_scope=1` prevents attaching to the game; set it to 0
+  temporarily.
+- gdb gets confused by Wine's loader (wrong architecture, no shared libraries).
+  `eu-stack -s -p <pid>` gives usable unix-side stacks. Stacks stop at
+  `__wine_syscall_dispatcher`.
+- To get the stack of a fault that Wine turns into an exception, attach gdb
+  early with `handle SIGSEGV stop nopass`, continue until the fault pc is in
+  `libtas.so` (Wine uses SIGSEGV internally), then `generate-core-file` and run
+  `eu-stack --core`. Attach to the process that has `winex11.so` mapped, not to
+  the WoW64 launcher process.
+- Useful `WINEDEBUG` channels: `+seh` (faults in unix calls), `+sync` (wait
+  timeouts per thread; absolute deadlines are real time), `+dsound`,
+  `+mmdevapi`, `+loaddll`.
+- Xlib's default error handler prints `X Error of failed request` and exits,
+  which looks like a freeze from libTAS.
+
+## Open problems
+
+- SRB2 video dumps are black after the first frame, while the game renders
+  correctly.
+- Directory listings, renames and directory creation for savefiles (see Files).
+- Savestates cannot be loaded across the exit of a Wine thread.
+- After loading a state, the stdout of the test program was not output anymore
+  (probably related to pipe recreation).
+- Clickteam games may also enumerate other directories for their own files.
