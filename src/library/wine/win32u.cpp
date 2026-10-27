@@ -33,6 +33,7 @@
 #include "xlib/XlibGameWindow.h"
 #include "general/sleepwrappers.h"
 #include "GlobalState.h"
+#include "checkpoint/ThreadManager.h"
 #include "../shared/inputs/SingleInput.h"
 
 #include <X11/keysym.h>
@@ -54,12 +55,15 @@ static short (*NtUserGetKeyState)(int vkey);
 static int (*NtUserGetKeyboardState)(unsigned char *state);
 static int (*NtUserGetCursorPos)(POINT *pt);
 static uint32_t (*NtUserMsgWaitForMultipleObjectsEx)(uint32_t count, void* const *handles, uint32_t timeout, uint32_t mask, uint32_t flags);
+static int (*NtUserGetMessage)(void *msg, void *hwnd, uint32_t first, uint32_t last);
 
 }
 
 static const uint32_t WAIT_TIMEOUT = 0x102;
 static const uint32_t INFINITE = 0xFFFFFFFF;
 static const uint32_t MWMO_ALERTABLE = 0x2;
+static const uint32_t MWMO_INPUTAVAILABLE = 0x4;
+static const uint32_t QS_ALLINPUT = 0x4FF;
 
 static bool isKeysymPressed(KeySym ks)
 {
@@ -175,6 +179,27 @@ static uint32_t NtUserMsgWaitForMultipleObjectsEx(uint32_t count, void* const *h
     return WAIT_TIMEOUT;
 }
 
+static int NtUserGetMessage(void *msg, void *hwnd, uint32_t first, uint32_t last)
+{
+    if (GlobalState::isNative() || !ThreadManager::isMainThread() || hwnd || first || last)
+        return orig::NtUserGetMessage(msg, hwnd, first, last);
+
+    LOGTRACE_SIMPLE(LCF_WINE | LCF_EVENTS);
+
+    /* The game may wait for a message posted from a timer thread, which
+     * waits until our deterministic time reaches its deadline. Advance time
+     * while no message is available, otherwise both threads wait forever. */
+    struct timespec mssleep = {0, 1000000};
+    while (orig::NtUserMsgWaitForMultipleObjectsEx(0, nullptr, 0, QS_ALLINPUT, MWMO_INPUTAVAILABLE) == WAIT_TIMEOUT) {
+        transfer_sleep(mssleep, nullptr);
+
+        /* Give other threads the chance to post their message */
+        orig::NtUserMsgWaitForMultipleObjectsEx(0, nullptr, 1, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+    }
+
+    return orig::NtUserGetMessage(msg, hwnd, first, last);
+}
+
 void hook_win32u()
 {
     /* Patching twice would make the trampoline call our own function */
@@ -196,6 +221,9 @@ void hook_win32u()
     hook_wine_syscall("win32u.so", "NtUserMsgWaitForMultipleObjectsEx",
         reinterpret_cast<void**>(&orig::NtUserMsgWaitForMultipleObjectsEx),
         reinterpret_cast<void*>(NtUserMsgWaitForMultipleObjectsEx));
+    hook_wine_syscall("win32u.so", "NtUserGetMessage",
+        reinterpret_cast<void**>(&orig::NtUserGetMessage),
+        reinterpret_cast<void*>(NtUserGetMessage));
 }
 
 #else
