@@ -29,6 +29,11 @@
 * Add GitHub Actions builds of deb packages and AppImages for x86_64
   and aarch64
 * Support Wayland in the AppImage and the deb package
+* Wine: support WoW64 wine and the newer Proton layout
+* Wine: hook the restarted process of 32-bit games on WoW64
+* Wine: prevent games from writing to disk
+* Add a timing option to never insert non-draw frames
+* Map hourglass left mouse button to libTAS mouse click
 
 ### Changed
 
@@ -52,6 +57,18 @@
   called on the main thread at frame boundaries
 * Revert the moveable OSD framecount and inputs
 * Remove the Dockerfile, the Xcode project and the AppVeyor config
+* Wine: make time deterministic through ntdll syscalls and shared user data
+* Wine: hook win32u.so input syscalls instead of user32.dll.so
+* Wine: block winepulse.so so that wine falls back to alsa
+* Wine: keep the first thread as main thread
+* Wine: transfer message wait timeouts to the deterministic timer
+* Wine: disable wined3d CSMT
+* Wine: advance time while games wait for messages
+* Wine: use the window drawn by EGL as the game window
+* Wine: refuse loading savestates whose threads have exited
+* Don't touch non-present anonymous pages when saving and loading states,
+  which makes savestates much faster for wine games
+* Don't consider procfs files as savefiles
 
 ### Fixed
 
@@ -80,6 +97,16 @@
 * Fix Xlib BadIDChoice errors after loading a savestate
 * Fix recreating threads when loading a savestate without the
   CAP_CHECKPOINT_RESTORE capability
+* Fix dangling library path in hook_patch()
+* Fix libTAS shutdown in non-interactive mode
+* Fix tracking of pipes with duplicated file descriptors
+* Fix crash on unregistered pipe ends in file debug
+* Wine: fix crash when wine resets the shared user data page protection
+* Fix key events dropped for games with several X connections
+* Wine: fix thread creation with wine >= 7 and window surfaces flushed
+  from other threads
+* Wine: don't redirect temporary files into savefiles, fixing missing
+  sound in Clickteam games
 
 ## [1.4.8] - 2026-05-14
 ### Added
