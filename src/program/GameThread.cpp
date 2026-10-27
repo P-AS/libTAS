@@ -136,6 +136,21 @@ void GameThread::set_env_variables(Context *context, int gameArch)
          * that must not be hooked, so tell libtas which one is the game */
         setenv("LIBTAS_WINE_GAME", context->gameexecutable.filename().c_str(), 1);
 
+        /* wined3d presents frames from its command stream thread, while
+         * the game thread keeps running and sleeping, which triggers
+         * non-draw frames. Disable it so that frames are presented by the
+         * game thread. */
+        std::string d3dconfig;
+        char* oldd3dconfig = getenv("WINE_D3D_CONFIG");
+        if (oldd3dconfig)
+            d3dconfig = oldd3dconfig;
+        if (d3dconfig.find("csmt") == std::string::npos) {
+            if (!d3dconfig.empty())
+                d3dconfig += ",";
+            d3dconfig += "csmt=0x0";
+            setenv("WINE_D3D_CONFIG", d3dconfig.c_str(), 1);
+        }
+
         /* WoW64 wine starts 32-bit games in a 64-bit process, which then
          * restarts itself into a new 32-bit process. Tell libtas to only hook
          * the restarted process. */
