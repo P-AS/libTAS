@@ -204,7 +204,7 @@ void XSetWMName(Display *display, Window w, XTextProperty *text_prop)
 int XSelectInput(Display *display, Window w, long event_mask)
 {
     RETURN_IF_NATIVE(XSelectInput, (display, w, event_mask), nullptr);
-    LOGTRACE(LCF_WINDOW, "%s called with window %d", __func__, w);
+    LOGTRACE(LCF_WINDOW, "%s called with window %d and mask %lx", __func__, w, event_mask);
 
     /* Add the mask in our event queue */
     std::shared_ptr<XlibEventQueue> queue = xlibEventQueueList.getQueue(display);
@@ -467,7 +467,9 @@ Status XGetWindowAttributes(Display* display, Window w, XWindowAttributes* windo
 int XChangeWindowAttributes(Display *display, Window w, unsigned long valuemask, XSetWindowAttributes *attributes)
 {
     RETURN_IF_NATIVE(XChangeWindowAttributes, (display, w, valuemask, attributes), nullptr);
-    LOGTRACE(LCF_WINDOW, "%s called with window %d", __func__, w);
+    LOGTRACE(LCF_WINDOW, "%s called with window %d and value mask %lx", __func__, w, valuemask);
+    if (valuemask & CWEventMask)
+        LOG(LL_DEBUG, LCF_WINDOW, "   event mask is %lx", attributes->event_mask);
 
     /* Add the mask in our event queue */
     if (valuemask & CWEventMask) {
