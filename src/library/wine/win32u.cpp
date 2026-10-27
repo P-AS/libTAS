@@ -24,16 +24,20 @@
 
 #include "win32u.h"
 #include "ntdll.h"
+#include "winehook.h"
 
 #include "hookpatch.h"
 #include "logging.h"
 #include "inputs/winekeyboardlayout.h"
 #include "inputs/inputs.h"
 #include "xlib/XlibGameWindow.h"
+#include "general/sleepwrappers.h"
+#include "GlobalState.h"
 #include "../shared/inputs/SingleInput.h"
 
 #include <X11/keysym.h>
 #include <cstdint>
+#include <ctime>
 
 namespace libtas {
 #if defined(__i386__) || defined(__x86_64__)
@@ -49,8 +53,13 @@ static short (*NtUserGetAsyncKeyState)(int key);
 static short (*NtUserGetKeyState)(int vkey);
 static int (*NtUserGetKeyboardState)(unsigned char *state);
 static int (*NtUserGetCursorPos)(POINT *pt);
+static uint32_t (*NtUserMsgWaitForMultipleObjectsEx)(uint32_t count, void* const *handles, uint32_t timeout, uint32_t mask, uint32_t flags);
 
 }
+
+static const uint32_t WAIT_TIMEOUT = 0x102;
+static const uint32_t INFINITE = 0xFFFFFFFF;
+static const uint32_t MWMO_ALERTABLE = 0x2;
 
 static bool isKeysymPressed(KeySym ks)
 {
@@ -140,6 +149,32 @@ int NtUserGetCursorPos(POINT *pt)
     return 1;
 }
 
+static uint32_t NtUserMsgWaitForMultipleObjectsEx(uint32_t count, void* const *handles, uint32_t timeout, uint32_t mask, uint32_t flags)
+{
+    if (GlobalState::isNative())
+        return orig::NtUserMsgWaitForMultipleObjectsEx(count, handles, timeout, mask, flags);
+
+    /* Infinite and alertable waits are left to wine */
+    if ((timeout == 0) || (timeout == INFINITE) || (flags & MWMO_ALERTABLE))
+        return orig::NtUserMsgWaitForMultipleObjectsEx(count, handles, timeout, mask, flags);
+
+    LOGTRACE(LCF_WINE | LCF_WAIT, "%s call with timeout %u ms", __func__, timeout);
+
+    /* Wine waits on the real time, while the timeout was computed by the game
+     * from our deterministic time, so the game would be stuck waiting
+     * without advancing time. Check without waiting, and transfer the
+     * timeout as a sleep if nothing was signaled. */
+    uint32_t ret = orig::NtUserMsgWaitForMultipleObjectsEx(count, handles, 0, mask, flags);
+    if (ret != WAIT_TIMEOUT)
+        return ret;
+
+    struct timespec ts;
+    ts.tv_sec = timeout / 1000;
+    ts.tv_nsec = (timeout % 1000) * 1000000;
+    transfer_sleep(ts, nullptr);
+    return WAIT_TIMEOUT;
+}
+
 void hook_win32u()
 {
     /* Patching twice would make the trampoline call our own function */
@@ -156,6 +191,11 @@ void hook_win32u()
     HOOK_PATCH_ORIG(NtUserGetKeyState, "win32u.so");
     HOOK_PATCH_ORIG(NtUserGetKeyboardState, "win32u.so");
     HOOK_PATCH_ORIG(NtUserGetCursorPos, "win32u.so");
+
+    /* Only redirect the waits coming from the Windows side */
+    hook_wine_syscall("win32u.so", "NtUserMsgWaitForMultipleObjectsEx",
+        reinterpret_cast<void**>(&orig::NtUserMsgWaitForMultipleObjectsEx),
+        reinterpret_cast<void*>(NtUserMsgWaitForMultipleObjectsEx));
 }
 
 #else
