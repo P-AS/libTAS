@@ -161,6 +161,16 @@ __attribute__((noipa)) void *dlopen(const char *file, int mode) __THROW {
         return nullptr;
     }
 
+#ifdef __linux__
+    /* Same for the unix side of wine pulseaudio driver, which aborts when
+     * pulseaudio fails. Without it, winepulse.drv fails to load and wine
+     * falls back to winealsa. */
+    if (file != nullptr && std::strstr(file, "/winepulse.so") != nullptr) {
+        LOG(LL_DEBUG, LCF_HOOK, "%s blocked access to library %s", __func__, file);
+        return nullptr;
+    }
+#endif
+
     if (file != nullptr && std::strstr(file, "ScreenSelector.so") != nullptr) {
         LOG(LL_DEBUG, LCF_HOOK, "%s blocked access to library %s", __func__, file);
         return nullptr;
