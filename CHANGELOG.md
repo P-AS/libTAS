@@ -23,6 +23,8 @@
 * Propagate xlib events to parent when not interested
 * Add SDL3 SDL_Un/LockAudioStream hooks
 * Implement XSetInputFocus()
+* lua function to trigger the game shutdown
+* Register threads whose creation was not intercepted
 
 ### Changed
 
@@ -54,6 +56,8 @@
 * Don't assume a 4K page size
 * Fix SDL_RenderSetLogicalSize being called with 0s
 * Set the mode for Xlib focus events (#156)
+* Feed the game window to ImGui on every frame, as it may have changed
+* Let ImGui manage the DescriptorPool creation, fixing a type error
 
 ## [1.4.8] - 2026-05-14
 ### Added
