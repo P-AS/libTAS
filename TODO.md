@@ -9,7 +9,7 @@ Ideas and planned work for this fork of libTAS.
 
 ## SDL
 
-- [ ] Implement SDL2 timers to fix music fades in Sonic Robo Blast 2's SDL2 mixer backend
+- [x] Implement SDL2 timers to fix music fades in Sonic Robo Blast 2's SDL2 mixer backend
 - [x] SDL2 OSD fix
 - [ ] More SDL3 testing
 
