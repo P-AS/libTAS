@@ -39,11 +39,13 @@ void GameSpecificPane::initLayout()
     /* Timing settings */
     timingCeleste = new ToolTipCheckBox("Celeste");
     timingArmaCwa = new ToolTipCheckBox("Arma Cold War Assault");
+    timingNoNondraw = new ToolTipCheckBox("No non-draw frames (Hourglass)");
 
     timingGroupBox = new QGroupBox(tr("Timing settings"));
     QVBoxLayout *timingLayout = new QVBoxLayout;
     timingLayout->addWidget(timingCeleste);
     timingLayout->addWidget(timingArmaCwa);
+    timingLayout->addWidget(timingNoNondraw);
     timingGroupBox->setLayout(timingLayout);
 
     /* Sync settings */
@@ -78,6 +80,7 @@ void GameSpecificPane::initSignals()
 {
     connect(timingCeleste, &QAbstractButton::clicked, this, &GameSpecificPane::saveConfig);
     connect(timingArmaCwa, &QAbstractButton::clicked, this, &GameSpecificPane::saveConfig);
+    connect(timingNoNondraw, &QAbstractButton::clicked, this, &GameSpecificPane::saveConfig);
     connect(syncCeleste, &QAbstractButton::clicked, this, &GameSpecificPane::saveConfig);
     connect(syncWitness, &QAbstractButton::clicked, this, &GameSpecificPane::saveConfig);
     connect(syncUnityJobs, &QAbstractButton::clicked, this, &GameSpecificPane::saveConfig);
@@ -95,6 +98,12 @@ void GameSpecificPane::initToolTips()
     timingArmaCwa->setTitle("Arma Cold War Assault Timing");
     timingArmaCwa->setDescription("Set the thread named \"G.Main\" as the main thread. "
     "This prevents a softlock as long as clock_gettime() monotonic time tracking is enabled.");
+
+    timingNoNondraw->setTitle("No non-draw frames");
+    timingNoNondraw->setDescription("Never insert a frame when the game sleeps or "
+    "triggers time-tracking for longer than a frame without drawing. The extra time "
+    "is applied over the next drawn frames instead, like Hourglass does. "
+    "Required to sync movies imported from Hourglass.");
 
     syncCeleste->setTitle("Celeste Sync");
     syncCeleste->setDescription("Pause the main thread, waiting for threads with "
@@ -135,6 +144,7 @@ void GameSpecificPane::loadConfig()
 {
     timingCeleste->setChecked(context->config.sc.game_specific_timing & SharedConfig::GC_TIMING_CELESTE);
     timingArmaCwa->setChecked(context->config.sc.game_specific_timing & SharedConfig::GC_TIMING_ARMA_CWA);
+    timingNoNondraw->setChecked(context->config.sc.game_specific_timing & SharedConfig::GC_TIMING_NO_NONDRAW);
     syncCeleste->setChecked(context->config.sc.game_specific_sync & SharedConfig::GC_SYNC_CELESTE);
     syncWitness->setChecked(context->config.sc.game_specific_sync & SharedConfig::GC_SYNC_WITNESS);
     syncUnityJobs->setChecked(context->config.sc.game_specific_sync & SharedConfig::GC_SYNC_UNITY_JOBS);
@@ -148,6 +158,7 @@ void GameSpecificPane::saveConfig()
     context->config.sc.game_specific_timing = 0;
     context->config.sc.game_specific_timing |= timingCeleste->isChecked()? SharedConfig::GC_TIMING_CELESTE : 0;
     context->config.sc.game_specific_timing |= timingArmaCwa->isChecked()? SharedConfig::GC_TIMING_ARMA_CWA : 0;
+    context->config.sc.game_specific_timing |= timingNoNondraw->isChecked()? SharedConfig::GC_TIMING_NO_NONDRAW : 0;
 
     context->config.sc.game_specific_sync = 0;
     context->config.sc.game_specific_sync |= syncCeleste->isChecked()? SharedConfig::GC_SYNC_CELESTE : 0;
