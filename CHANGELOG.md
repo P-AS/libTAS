@@ -25,6 +25,10 @@
 * Implement XSetInputFocus()
 * lua function to trigger the game shutdown
 * Register threads whose creation was not intercepted
+* Add an option to adjust the OSD font size
+* Add GitHub Actions builds of deb packages and AppImages for x86_64
+  and aarch64
+* Support Wayland in the AppImage and the deb package
 
 ### Changed
 
@@ -39,6 +43,15 @@
 * Xevent async options only wait for events pushed during the
   last frame, not all events
 * Use common top-window to detect when game window has focus
+* Port the Qt frontend to Qt6, Qt5 is still supported with
+  -DLIBTAS_QT_VERSION=5
+* Replace autotools with CMake
+* CMake checks the headers of hooked libraries at configure time
+* Package the 32-bit library in its own libtas32 deb
+* Run SDL1/SDL2 timers on the deterministic time, with callbacks
+  called on the main thread at frame boundaries
+* Revert the moveable OSD framecount and inputs
+* Remove the Dockerfile, the Xcode project and the AppVeyor config
 
 ### Fixed
 
@@ -58,6 +71,15 @@
 * Set the mode for Xlib focus events (#156)
 * Feed the game window to ImGui on every frame, as it may have changed
 * Let ImGui manage the DescriptorPool creation, fixing a type error
+* Fix missing OSD with the SDL2 renderer
+* Fix Qt signals failing to connect in the deb package and AppImage
+* Fix SDL3 timers being forwarded to the SDL2 function
+* Add missing build dependencies (libxi, xkbcommon, GL and EGL headers)
+* Fix build.sh on systems with wget2
+* Fix savestate loading looping forever on garbage savefiles
+* Fix Xlib BadIDChoice errors after loading a savestate
+* Fix recreating threads when loading a savestate without the
+  CAP_CHECKPOINT_RESTORE capability
 
 ## [1.4.8] - 2026-05-14
 ### Added
