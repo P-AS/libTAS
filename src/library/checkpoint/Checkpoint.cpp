@@ -47,6 +47,7 @@
 #include "../shared/sockethelpers.h"
 #ifdef __unix__
 #include "../external/xcb/xcbint.h"
+#include <malloc.h> // malloc_usable_size
 #include "xlib/xdisplay.h" // x11::gameDisplays
 #endif
 
@@ -295,7 +296,14 @@ void Checkpoint::handler(int signum, siginfo_t *info, void *ucontext)
          */
         uint64_t last_request_read[GAMEDISPLAYNUM];
         uint64_t request[GAMEDISPLAYNUM];
-        xcb_connection_t xcb_conn[GAMEDISPLAYNUM];
+
+        /* The layout of the xcb connection struct changes between libxcb
+         * versions, so copy its whole allocation instead of using our own
+         * definition, which would miss the resource id allocator at the end
+         * of the struct, and the game would reuse ids after loading. */
+        const size_t XCB_CONN_MAX_SIZE = 64 * 1024;
+        char xcb_conn[GAMEDISPLAYNUM][XCB_CONN_MAX_SIZE];
+        size_t xcb_conn_size[GAMEDISPLAYNUM];
 
         for (int i=0; i<GAMEDISPLAYNUM; i++) {
             if (x11::gameDisplays[i]) {
@@ -309,7 +317,14 @@ void Checkpoint::handler(int signum, siginfo_t *info, void *ucontext)
 
                 /* Copy the entire xcb connection struct */
                 xcb_connection_t *cur_xcb_conn = XGetXCBConnection(x11::gameDisplays[i]);
-                memcpy(&xcb_conn[i], cur_xcb_conn, sizeof(xcb_connection_t));
+                xcb_conn_size[i] = malloc_usable_size(cur_xcb_conn);
+                if (xcb_conn_size[i] < sizeof(xcb_connection_t))
+                    xcb_conn_size[i] = sizeof(xcb_connection_t);
+                if (xcb_conn_size[i] > XCB_CONN_MAX_SIZE) {
+                    LOG(LL_ERROR, LCF_CHECKPOINT, "X connection is larger than expected (%zu bytes)", xcb_conn_size[i]);
+                    xcb_conn_size[i] = XCB_CONN_MAX_SIZE;
+                }
+                memcpy(xcb_conn[i], cur_xcb_conn, xcb_conn_size[i]);
             }
         }
 #endif
@@ -337,7 +352,7 @@ void Checkpoint::handler(int signum, siginfo_t *info, void *ucontext)
 
                 /* Restore the entire xcb connection struct */
                 xcb_connection_t *cur_xcb_conn = XGetXCBConnection(x11::gameDisplays[i]);
-                memcpy(cur_xcb_conn, &xcb_conn[i], sizeof(xcb_connection_t));
+                memcpy(cur_xcb_conn, xcb_conn[i], xcb_conn_size[i]);
             }
         }
 #endif
