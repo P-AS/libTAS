@@ -55,6 +55,10 @@ void FileDebug::update(uint64_t framecount)
         for (int i = 0; i < ((fh.type == FileHandle::FILE_PIPE)?2:1); i++) {
             int fd = fh.fds[i];
 
+            /* Pipes may have only one of their ends registered */
+            if (fd < 0)
+                continue;
+
             if (fd >= FD_LIMIT) {
                 LOG(LL_WARN, LCF_FILEIO, "An opened file descriptor (%d) is high than our limit (%d) %s", fd, FD_LIMIT, fh.fileName);
                 continue;
