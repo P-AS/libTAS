@@ -896,7 +896,10 @@ void SaveStateManager::createNewThreads()
             /* Thread was not found, create one */
             LOG(LL_DEBUG, LCF_CHECKPOINT | LCF_THREAD, "Recreate thread %llx (%d) ", thread->pthread_id, thread->translated_tid);
 
+            bool created = false;
+
             if (has_clone3_set_tid) {
+                long clone3_flags = clone_flags;
                 struct clone_args cargs = {};
                 cargs.child_tid = reinterpret_cast<uintptr_t>(thread->ptid);
                 cargs.parent_tid = reinterpret_cast<uintptr_t>(thread->ptid);
@@ -906,30 +909,38 @@ void SaveStateManager::createNewThreads()
                 cargs.set_tid_size = 1;
 #if defined(__i386__)
                 cargs.tls = reinterpret_cast<uintptr_t>(&thread->tlsInfo.gdtentrytls[0]);
-                clone_flags |= CLONE_SETTLS;
+                clone3_flags |= CLONE_SETTLS;
 #elif defined(__x86_64__)
                 cargs.tls = reinterpret_cast<uintptr_t>(thread->tlsInfo.fs);
-                clone_flags |= CLONE_SETTLS;
+                clone3_flags |= CLONE_SETTLS;
 #elif defined(__aarch64__)
                 cargs.tls = thread->tlsInfo.tpidr_el0;
-                clone_flags |= CLONE_SETTLS;
+                clone3_flags |= CLONE_SETTLS;
 #endif
-                cargs.flags = clone_flags;
+                cargs.flags = clone3_flags;
                 cargs.exit_signal = 0;
                 
                 RUN_CLONE3_RESTORE_FN(returned_pid, cargs, sizeof(cargs), thread, startNewThread);
                 
                 if (returned_pid < 0) {
-                    LOG(LL_ERROR, LCF_CHECKPOINT | LCF_THREAD, "Could not recreate thread %llx (%d): %s", thread->pthread_id, thread->translated_tid, (errno == 0)?"None":strerror(errno));
+                    /* Setting the tid requires the CAP_CHECKPOINT_RESTORE
+                     * capability, so use regular clone() from now on. The raw
+                     * syscall returns the error instead of setting errno. */
+                    LOG(LL_WARN, LCF_CHECKPOINT | LCF_THREAD, "Could not recreate thread %llx (%d) with the same tid: %s", thread->pthread_id, thread->translated_tid, strerror(-returned_pid));
+                    has_clone3_set_tid = false;
                 }
-                else if (returned_pid == 0) {
-                    /* This is for child process, but it is supposed to have called
-                    * startNewThread(), not returned here! */
-                    LOG(LL_ERROR, LCF_CHECKPOINT | LCF_THREAD, "New thread %d resume failed", thread->translated_tid);
+                else {
+                    if (returned_pid == 0) {
+                        /* This is for child process, but it is supposed to have called
+                        * startNewThread(), not returned here! */
+                        LOG(LL_ERROR, LCF_CHECKPOINT | LCF_THREAD, "New thread %d resume failed", thread->translated_tid);
+                    }
+                    thread->real_tid = returned_pid;
+                    created = true;
                 }
-                thread->real_tid = returned_pid;
             }
-            else {
+
+            if (!created) {
                 /* Set last pid if possible */
                 if (fd != -1) {
                     char last_pid[16];
@@ -943,7 +954,7 @@ void SaveStateManager::createNewThreads()
                 RUN_CLONE_RESTORE_FN(returned_pid, clone_flags, reinterpret_cast<uintptr_t>(thread->saved_sp) - 128, thread->ptid, thread->ptid, thread, startNewThread);
 
                 if (returned_pid < 0) {
-                    LOG(LL_ERROR, LCF_CHECKPOINT | LCF_THREAD, "Could not recreate thread %llx (%d): %s", thread->pthread_id, thread->translated_tid, (errno == 0)?"None":strerror(errno));
+                    LOG(LL_ERROR, LCF_CHECKPOINT | LCF_THREAD, "Could not recreate thread %llx (%d): returned %ld, %s", thread->pthread_id, thread->translated_tid, returned_pid, strerror(-returned_pid));
                 }
             }
         }
