@@ -63,6 +63,7 @@
 * Revert the moveable OSD framecount and inputs
 * Remove the Dockerfile, the Xcode project and the AppVeyor config
 * Docs: link to the TASVideos lists of movies made with libTAS (#716)
+* Docs: add a page listing the sources of randomness used by games (#679)
 
 ### Fixed
 
