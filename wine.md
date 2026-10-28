@@ -305,7 +305,7 @@ and 32-bit PE code cannot call our 64-bit unix code anyway.
 
 - `src/steamdll` builds `libtas-steam_api.dll` and `libtas-steam_api64.dll`
   from the same `src/library/steam` sources with the mingw-w64 cross
-  compilers (optional, skipped when they are missing), with replacement
+  compilers (optional, skipped when they are missing) (`88d6b09a`), with replacement
   headers in `src/steamdll/compat` for `logging.h`, `hook.h`, `global.h`,
   etc. `RETURN_NATIVE` returns a default value, as there is no Steam client
   to fall back to. They are installed next to `libtas.so`.
@@ -335,7 +335,7 @@ and 32-bit PE code cannot call our 64-bit unix code anyway.
     after `this` and return it: `STEAMID_RET`, `STEAMID_RET_ARG...`,
     `STEAMID_RETURN`.
   - callback structs use 8-byte packing (`UserStatsReceived_t`).
-  These were checked by disassembling the flat wrappers of Valve's MSVC
+  (`1ba66efd`). These were checked by disassembling the flat wrappers of Valve's MSVC
   `steam_api.dll` (`SteamAPI_ISteamUserStats_GetStat0` uses vtable slot 1
   and loads a float, `GetStat` slot 2; `SteamAPI_ISteamUser_GetSteamID`
   pushes a return pointer), then by calling our interfaces through those
