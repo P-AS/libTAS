@@ -1031,6 +1031,8 @@ void MainWindow::updateMovieParams()
     updateMovieLoadedState(movieLoaded);
     windowManager->resetInputEditorWindow();
 
+    annotateMovieAction->setEnabled(context->config.sc.recording != SharedConfig::NO_RECORDING);
+
     movieFrameCount->setText(QString::number(context->config.sc.movie_framecount));
     rerecordCount->setText(QString::number(context->rerecord_count));
     authorField->setText(gameLoop->movie.header->authors.c_str());
@@ -1435,7 +1437,6 @@ void MainWindow::slotMovieEnable(bool checked)
     }
     updateMovieParams();
 
-    annotateMovieAction->setEnabled(checked);
     context->config.sc_modified = true;
 }
 
