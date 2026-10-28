@@ -12,10 +12,8 @@ namespace libtas {
 static const struct ISteamUserStats005Vtbl ISteamUserStats005_vtbl = {
     
     ISteamUserStats_RequestCurrentStats,
-    ISteamUserStats_GetStatInt32,
-    ISteamUserStats_GetStatFloat,
-    ISteamUserStats_SetStatInt32,
-    ISteamUserStats_SetStatFloat,
+    STEAM_OVERLOAD_PAIR(ISteamUserStats_GetStatInt32, ISteamUserStats_GetStatFloat),
+    STEAM_OVERLOAD_PAIR(ISteamUserStats_SetStatInt32, ISteamUserStats_SetStatFloat),
     ISteamUserStats_UpdateAvgRateStat,
     ISteamUserStats_GetAchievement,
     ISteamUserStats_SetAchievement,
@@ -25,8 +23,7 @@ static const struct ISteamUserStats005Vtbl ISteamUserStats005_vtbl = {
     ISteamUserStats_GetAchievementDisplayAttribute,
     ISteamUserStats_IndicateAchievementProgress,
     ISteamUserStats_RequestUserStats,
-    ISteamUserStats_GetUserStatInt32,
-    ISteamUserStats_GetUserStatFloat,
+    STEAM_OVERLOAD_PAIR(ISteamUserStats_GetUserStatInt32, ISteamUserStats_GetUserStatFloat),
     ISteamUserStats_GetUserAchievement,
     ISteamUserStats_ResetAllStats,
     ISteamUserStats_FindOrCreateLeaderboard,

@@ -88,10 +88,10 @@ void ISteamMatchmaking::AddRequestLobbyListCompatibleMembersFilter( CSteamID ste
     LOGTRACE_SIMPLE(LCF_STEAM);
 }
 
-CSteamID ISteamMatchmaking::GetLobbyByIndex( int iLobby )
+STEAMID_RET ISteamMatchmaking::GetLobbyByIndex( STEAMID_RET_ARG int iLobby )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
-    return 0;
+    STEAMID_RETURN(0);
 }
 
 SteamAPICall_t ISteamMatchmaking::CreateLobby( ELobbyType eLobbyType, int cMaxMembers )
@@ -123,10 +123,10 @@ int ISteamMatchmaking::GetNumLobbyMembers( CSteamID steamIDLobby )
     return 0;
 }
 
-CSteamID ISteamMatchmaking::GetLobbyMemberByIndex( CSteamID steamIDLobby, int iMember )
+STEAMID_RET ISteamMatchmaking::GetLobbyMemberByIndex( STEAMID_RET_ARG CSteamID steamIDLobby, int iMember )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
-    return 0;
+    STEAMID_RETURN(0);
 }
 
 const char *ISteamMatchmaking::GetLobbyData( CSteamID steamIDLobby, const char *pchKey )
@@ -223,10 +223,10 @@ bool ISteamMatchmaking::SetLobbyJoinable( CSteamID steamIDLobby, bool bLobbyJoin
     return true;
 }
 
-CSteamID ISteamMatchmaking::GetLobbyOwner( CSteamID steamIDLobby )
+STEAMID_RET ISteamMatchmaking::GetLobbyOwner( STEAMID_RET_ARG CSteamID steamIDLobby )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
-    return 0;
+    STEAMID_RETURN(0);
 }
 
 bool ISteamMatchmaking::SetLobbyOwner( CSteamID steamIDLobby, CSteamID steamIDNewOwner )

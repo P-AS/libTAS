@@ -117,6 +117,8 @@
   deactivate the game window
 * Wine: fix the game window not being repainted while paused, and showing the
   previous frame, for games drawing to a child window
+* Steam: fix the arguments of ISteamUser and ISteamUserStats methods being
+  shifted by one
 
 ## [1.4.8] - 2026-05-14
 ### Added

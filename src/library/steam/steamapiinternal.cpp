@@ -30,6 +30,7 @@
 #include "GlobalState.h"
 
 #include <dlfcn.h>
+#include <cstring>
 
 namespace libtas {
 

@@ -65,7 +65,7 @@ public:
 	virtual unsigned int GetAppInstallDir( AppId_t appID, char *pchFolder, unsigned int cchFolderBufferSize );
 	virtual bool BIsAppInstalled( AppId_t appID ); // returns true if that app is installed (not necessarily owned)
 
-	virtual CSteamID GetAppOwner(); // returns the SteamID of the original owner. If different from current user, it's borrowed
+	virtual STEAMID_RET GetAppOwner( STEAMID_RET_ARG_ONLY ); // returns the SteamID of the original owner. If different from current user, it's borrowed
 
 	// Returns the associated launch param if the game is run via steam://run/<appid>//?param1=value1;param2=value2;param3=value3 etc.
 	// Parameter names starting with the character '@' are reserved for internal use and will always return and empty string.

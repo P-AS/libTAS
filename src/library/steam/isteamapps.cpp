@@ -162,10 +162,10 @@ bool ISteamApps::BIsAppInstalled( AppId_t appID )
 	return true;
 }
 
-CSteamID ISteamApps::GetAppOwner()
+STEAMID_RET ISteamApps::GetAppOwner( STEAMID_RET_ARG_ONLY )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
-	return 1;
+	STEAMID_RETURN(1);
 }
 
 const char *ISteamApps::GetLaunchQueryParam( const char *pchKey )

@@ -11,6 +11,45 @@
 
 namespace libtas {
 
+/* Calling convention of the interface functions that we put in C vtables.
+ * Windows games (built with MSVC) call interface methods with `thiscall` on
+ * i386, where `this` is passed in ecx and the callee pops the arguments. */
+#if defined(_WIN32) && defined(__i386__)
+#define STEAM_CALL __attribute__((thiscall))
+#else
+#define STEAM_CALL
+#endif
+
+/* MSVC puts overloaded virtual functions in the vtable in the reverse order
+ * of their declaration, so swap them for Windows games. Both functions take
+ * the same arguments except for the type of the overloaded one. */
+#ifdef _WIN32
+#define STEAM_OVERLOAD_PAIR(A, B) reinterpret_cast<decltype(&A)>(&B), reinterpret_cast<decltype(&B)>(&A)
+#else
+#define STEAM_OVERLOAD_PAIR(A, B) A, B
+#endif
+
+/* MSVC member functions return class types (CSteamID is a class in the
+ * Steamworks SDK) through a hidden pointer passed right after `this`, and
+ * return that pointer. Functions returning a CSteamID are declared with
+ * STEAMID_RET as return type, take STEAMID_RET_ARG as first argument after
+ * `this` (or STEAMID_RET_ARG_ONLY if they have no other argument, or
+ * STEAMID_RET_ARG_LAST after the iface argument of C vtable functions), and
+ * return with STEAMID_RETURN(). */
+#ifdef _WIN32
+#define STEAMID_RET CSteamID*
+#define STEAMID_RET_ARG CSteamID *steamid_ret,
+#define STEAMID_RET_ARG_ONLY CSteamID *steamid_ret
+#define STEAMID_RET_ARG_LAST , CSteamID *steamid_ret
+#define STEAMID_RETURN(V) do { *steamid_ret = (V); return steamid_ret; } while (0)
+#else
+#define STEAMID_RET CSteamID
+#define STEAMID_RET_ARG
+#define STEAMID_RET_ARG_ONLY
+#define STEAMID_RET_ARG_LAST
+#define STEAMID_RETURN(V) return (V)
+#endif
+
 #define DUMMY_STEAM_IMPL(NAME, ARGS, RETTYPE, RET) \
 RETTYPE NAME ARGS {\
     LOGTRACE_SIMPLE(LCF_STEAM);\
@@ -166,12 +205,22 @@ typedef uint64_t SteamLeaderboard_t;
 typedef uint64_t SteamLeaderboardEntries_t;
 typedef uint64_t UGCHandle_t;
 
+#ifdef _WIN32
+/* Callback structs use 8-byte packing on Windows */
+struct UserStatsReceived_t
+{
+    uint64_t m_nGameID;
+    EResult m_eResult;
+    CSteamID m_steamIDUser;
+};
+#else
 struct __attribute__((packed, aligned(1))) UserStatsReceived_t
 {
     uint64_t m_nGameID __attribute__((aligned(4)));
     EResult m_eResult __attribute__((aligned(4)));
     CSteamID m_steamIDUser __attribute__((aligned(4)));
 };
+#endif
 
 }
 

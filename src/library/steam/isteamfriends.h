@@ -48,7 +48,7 @@ public:
 	// iFriend is a index of range [0, GetFriendCount())
 	// iFriendsFlags must be the same value as used in GetFriendCount()
 	// the returned CSteamID can then be used by all the functions below to access details about the user
-	virtual CSteamID GetFriendByIndex( int iFriend, int iFriendFlags );
+	virtual STEAMID_RET GetFriendByIndex( STEAMID_RET_ARG int iFriend, int iFriendFlags );
 
 	// returns a relationship to a user
 	virtual EFriendRelationship GetFriendRelationship( CSteamID steamIDFriend );

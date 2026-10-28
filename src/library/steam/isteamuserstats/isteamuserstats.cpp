@@ -135,7 +135,7 @@ struct ISteamUserStats *SteamAPI_SteamUserStats_v013(void)
     return cached_iface;
 }
 
-bool ISteamUserStats_RequestCurrentStats()
+bool STEAM_CALL ISteamUserStats_RequestCurrentStats( void* iface )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
 
@@ -149,7 +149,7 @@ bool ISteamUserStats_RequestCurrentStats()
     return true;
 }
 
-bool ISteamUserStats_GetStatInt32( const char *pchName, int *pData )
+bool STEAM_CALL ISteamUserStats_GetStatInt32( void* iface, const char *pchName, int *pData )
 {
     LOGTRACE(LCF_STEAM, "%s called with name %s", __func__, pchName);
     if (pData)
@@ -157,7 +157,7 @@ bool ISteamUserStats_GetStatInt32( const char *pchName, int *pData )
     return true;
 }
 
-bool ISteamUserStats_GetStatFloat( const char *pchName, float *pData )
+bool STEAM_CALL ISteamUserStats_GetStatFloat( void* iface, const char *pchName, float *pData )
 {
     LOGTRACE(LCF_STEAM, "%s called with name %s", __func__, pchName);
     if (pData)
@@ -165,25 +165,25 @@ bool ISteamUserStats_GetStatFloat( const char *pchName, float *pData )
     return true;
 }
 
-bool ISteamUserStats_SetStatInt32( const char *pchName, int nData )
+bool STEAM_CALL ISteamUserStats_SetStatInt32( void* iface, const char *pchName, int nData )
 {
     LOGTRACE(LCF_STEAM, "%s called with name %s and data %d", __func__, pchName, nData);
     return true;
 }
 
-bool ISteamUserStats_SetStatFloat( const char *pchName, float fData )
+bool STEAM_CALL ISteamUserStats_SetStatFloat( void* iface, const char *pchName, float fData )
 {
     LOGTRACE(LCF_STEAM, "%s called with name %s and data %f", __func__, pchName, fData);
     return true;
 }
 
-bool ISteamUserStats_UpdateAvgRateStat( const char *pchName, float flCountThisSession, double dSessionLength )
+bool STEAM_CALL ISteamUserStats_UpdateAvgRateStat( void* iface, const char *pchName, float flCountThisSession, double dSessionLength )
 {
     LOGTRACE(LCF_STEAM, "%s called with name %s", __func__, pchName);
     return true;
 }
 
-bool ISteamUserStats_GetAchievement( const char *pchName, bool *pbAchieved )
+bool STEAM_CALL ISteamUserStats_GetAchievement( void* iface, const char *pchName, bool *pbAchieved )
 {
     LOGTRACE(LCF_STEAM, "%s called with name %s", __func__, pchName);
     if (pbAchieved)
@@ -191,19 +191,19 @@ bool ISteamUserStats_GetAchievement( const char *pchName, bool *pbAchieved )
     return true;
 }
 
-bool ISteamUserStats_SetAchievement( const char *pchName )
+bool STEAM_CALL ISteamUserStats_SetAchievement( void* iface, const char *pchName )
 {
     LOGTRACE(LCF_STEAM, "%s called with name %s", __func__, pchName);
     return true;
 }
 
-bool ISteamUserStats_ClearAchievement( const char *pchName )
+bool STEAM_CALL ISteamUserStats_ClearAchievement( void* iface, const char *pchName )
 {
     LOGTRACE(LCF_STEAM, "%s called with name %s", __func__, pchName);
     return true;
 }
 
-bool ISteamUserStats_GetAchievementAndUnlockTime( const char *pchName, bool *pbAchieved, unsigned int *punUnlockTime )
+bool STEAM_CALL ISteamUserStats_GetAchievementAndUnlockTime( void* iface, const char *pchName, bool *pbAchieved, unsigned int *punUnlockTime )
 {
     LOGTRACE(LCF_STEAM, "%s called with name %s", __func__, pchName);
     if (pbAchieved)
@@ -213,19 +213,19 @@ bool ISteamUserStats_GetAchievementAndUnlockTime( const char *pchName, bool *pbA
     return true;
 }
 
-bool ISteamUserStats_StoreStats()
+bool STEAM_CALL ISteamUserStats_StoreStats( void* iface )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return true;
 }
 
-int ISteamUserStats_GetAchievementIcon( const char *pchName )
+int STEAM_CALL ISteamUserStats_GetAchievementIcon( void* iface, const char *pchName )
 {
     LOGTRACE(LCF_STEAM, "%s called with name %s", __func__, pchName);
     return 0;
 }
 
-const char *ISteamUserStats_GetAchievementDisplayAttribute( const char *pchName, const char *pchKey )
+const char *STEAM_CALL ISteamUserStats_GetAchievementDisplayAttribute( void* iface, const char *pchName, const char *pchKey )
 {
     LOGTRACE(LCF_STEAM, "%s called with name %s and key %s", __func__, pchName, pchKey);
     if (strcmp(pchKey, "hidden")) {
@@ -234,25 +234,25 @@ const char *ISteamUserStats_GetAchievementDisplayAttribute( const char *pchName,
     return "";
 }
 
-bool ISteamUserStats_IndicateAchievementProgress( const char *pchName, unsigned int nCurProgress, unsigned int nMaxProgress )
+bool STEAM_CALL ISteamUserStats_IndicateAchievementProgress( void* iface, const char *pchName, unsigned int nCurProgress, unsigned int nMaxProgress )
 {
     LOGTRACE(LCF_STEAM, "%s called with name %s", __func__, pchName);
     return true;
 }
 
-unsigned int ISteamUserStats_GetNumAchievements()
+unsigned int STEAM_CALL ISteamUserStats_GetNumAchievements( void* iface )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return 0;
 }
 
-const char *ISteamUserStats_GetAchievementName( unsigned int iAchievement )
+const char *STEAM_CALL ISteamUserStats_GetAchievementName( void* iface, unsigned int iAchievement )
 {
     LOGTRACE(LCF_STEAM, "%s called with iAchievement %d", __func__, iAchievement);
     return "";
 }
 
-SteamAPICall_t ISteamUserStats_RequestUserStats( CSteamID steamIDUser )
+SteamAPICall_t STEAM_CALL ISteamUserStats_RequestUserStats( void* iface, CSteamID steamIDUser )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
 
@@ -270,169 +270,169 @@ SteamAPICall_t ISteamUserStats_RequestUserStats( CSteamID steamIDUser )
     return api_call;
 }
 
-bool ISteamUserStats_GetUserStatInt32( CSteamID steamIDUser, const char *pchName, int *pData )
+bool STEAM_CALL ISteamUserStats_GetUserStatInt32( void* iface, CSteamID steamIDUser, const char *pchName, int *pData )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return true;
 }
 
-bool ISteamUserStats_GetUserStatFloat( CSteamID steamIDUser, const char *pchName, float *pData )
+bool STEAM_CALL ISteamUserStats_GetUserStatFloat( void* iface, CSteamID steamIDUser, const char *pchName, float *pData )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return true;
 }
 
-bool ISteamUserStats_GetUserAchievement( CSteamID steamIDUser, const char *pchName, bool *pbAchieved )
+bool STEAM_CALL ISteamUserStats_GetUserAchievement( void* iface, CSteamID steamIDUser, const char *pchName, bool *pbAchieved )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return true;
 }
 
-bool ISteamUserStats_GetUserAchievementAndUnlockTime( CSteamID steamIDUser, const char *pchName, bool *pbAchieved, unsigned int *punUnlockTime )
+bool STEAM_CALL ISteamUserStats_GetUserAchievementAndUnlockTime( void* iface, CSteamID steamIDUser, const char *pchName, bool *pbAchieved, unsigned int *punUnlockTime )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return true;
 }
 
-bool ISteamUserStats_ResetAllStats( bool bAchievementsToo )
+bool STEAM_CALL ISteamUserStats_ResetAllStats( void* iface, bool bAchievementsToo )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return true;
 }
 
-SteamAPICall_t ISteamUserStats_FindOrCreateLeaderboard( const char *pchLeaderboardName, ELeaderboardSortMethod eLeaderboardSortMethod, ELeaderboardDisplayType eLeaderboardDisplayType )
+SteamAPICall_t STEAM_CALL ISteamUserStats_FindOrCreateLeaderboard( void* iface, const char *pchLeaderboardName, ELeaderboardSortMethod eLeaderboardSortMethod, ELeaderboardDisplayType eLeaderboardDisplayType )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return 1;
 }
 
-SteamAPICall_t ISteamUserStats_FindLeaderboard( const char *pchLeaderboardName )
+SteamAPICall_t STEAM_CALL ISteamUserStats_FindLeaderboard( void* iface, const char *pchLeaderboardName )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return 1;
 }
 
-const char *ISteamUserStats_GetLeaderboardName( SteamLeaderboard_t hSteamLeaderboard )
+const char *STEAM_CALL ISteamUserStats_GetLeaderboardName( void* iface, SteamLeaderboard_t hSteamLeaderboard )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return "";
 }
 
-int ISteamUserStats_GetLeaderboardEntryCount( SteamLeaderboard_t hSteamLeaderboard )
+int STEAM_CALL ISteamUserStats_GetLeaderboardEntryCount( void* iface, SteamLeaderboard_t hSteamLeaderboard )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return 0;
 }
 
-ELeaderboardSortMethod ISteamUserStats_GetLeaderboardSortMethod( SteamLeaderboard_t hSteamLeaderboard )
+ELeaderboardSortMethod STEAM_CALL ISteamUserStats_GetLeaderboardSortMethod( void* iface, SteamLeaderboard_t hSteamLeaderboard )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return 0;
 }
 
-ELeaderboardDisplayType ISteamUserStats_GetLeaderboardDisplayType( SteamLeaderboard_t hSteamLeaderboard )
+ELeaderboardDisplayType STEAM_CALL ISteamUserStats_GetLeaderboardDisplayType( void* iface, SteamLeaderboard_t hSteamLeaderboard )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return 0;
 }
 
-SteamAPICall_t ISteamUserStats_DownloadLeaderboardEntries( SteamLeaderboard_t hSteamLeaderboard, ELeaderboardDataRequest eLeaderboardDataRequest, int nRangeStart, int nRangeEnd )
+SteamAPICall_t STEAM_CALL ISteamUserStats_DownloadLeaderboardEntries( void* iface, SteamLeaderboard_t hSteamLeaderboard, ELeaderboardDataRequest eLeaderboardDataRequest, int nRangeStart, int nRangeEnd )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return 1;
 }
 
-SteamAPICall_t ISteamUserStats_DownloadLeaderboardEntriesForUsers( SteamLeaderboard_t hSteamLeaderboard, CSteamID *prgUsers, int cUsers )
+SteamAPICall_t STEAM_CALL ISteamUserStats_DownloadLeaderboardEntriesForUsers( void* iface, SteamLeaderboard_t hSteamLeaderboard, CSteamID *prgUsers, int cUsers )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return 1;
 }
 
-bool ISteamUserStats_GetDownloadedLeaderboardEntry( SteamLeaderboardEntries_t hSteamLeaderboardEntries, int index, LeaderboardEntry_t *pLeaderboardEntry, int *pDetails, int cDetailsMax )
+bool STEAM_CALL ISteamUserStats_GetDownloadedLeaderboardEntry( void* iface, SteamLeaderboardEntries_t hSteamLeaderboardEntries, int index, LeaderboardEntry_t *pLeaderboardEntry, int *pDetails, int cDetailsMax )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return true;
 }
 
-SteamAPICall_t ISteamUserStats_UploadLeaderboardScore( SteamLeaderboard_t hSteamLeaderboard, ELeaderboardUploadScoreMethod eLeaderboardUploadScoreMethod, int nScore, const int *pScoreDetails, int cScoreDetailsCount )
+SteamAPICall_t STEAM_CALL ISteamUserStats_UploadLeaderboardScore( void* iface, SteamLeaderboard_t hSteamLeaderboard, ELeaderboardUploadScoreMethod eLeaderboardUploadScoreMethod, int nScore, const int *pScoreDetails, int cScoreDetailsCount )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return 1;
 }
 
-SteamAPICall_t ISteamUserStats_AttachLeaderboardUGC( SteamLeaderboard_t hSteamLeaderboard, UGCHandle_t hUGC )
+SteamAPICall_t STEAM_CALL ISteamUserStats_AttachLeaderboardUGC( void* iface, SteamLeaderboard_t hSteamLeaderboard, UGCHandle_t hUGC )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return 1;
 }
 
-SteamAPICall_t ISteamUserStats_GetNumberOfCurrentPlayers()
+SteamAPICall_t STEAM_CALL ISteamUserStats_GetNumberOfCurrentPlayers( void* iface )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return 1;
 }
 
-SteamAPICall_t ISteamUserStats_RequestGlobalAchievementPercentages()
+SteamAPICall_t STEAM_CALL ISteamUserStats_RequestGlobalAchievementPercentages( void* iface )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return 1;
 }
 
-int ISteamUserStats_GetMostAchievedAchievementInfo( char *pchName, unsigned int unNameBufLen, float *pflPercent, bool *pbAchieved )
+int STEAM_CALL ISteamUserStats_GetMostAchievedAchievementInfo( void* iface, char *pchName, unsigned int unNameBufLen, float *pflPercent, bool *pbAchieved )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return -1;
 }
 
-int ISteamUserStats_GetNextMostAchievedAchievementInfo( int iIteratorPrevious, char *pchName, unsigned int unNameBufLen, float *pflPercent, bool *pbAchieved )
+int STEAM_CALL ISteamUserStats_GetNextMostAchievedAchievementInfo( void* iface, int iIteratorPrevious, char *pchName, unsigned int unNameBufLen, float *pflPercent, bool *pbAchieved )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return -1;
 }
 
-bool ISteamUserStats_GetAchievementAchievedPercent( const char *pchName, float *pflPercent )
+bool STEAM_CALL ISteamUserStats_GetAchievementAchievedPercent( void* iface, const char *pchName, float *pflPercent )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return true;
 }
 
-SteamAPICall_t ISteamUserStats_RequestGlobalStats( int nHistoryDays )
+SteamAPICall_t STEAM_CALL ISteamUserStats_RequestGlobalStats( void* iface, int nHistoryDays )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return 1;
 }
 
-bool ISteamUserStats_GetGlobalStatInt64( const char *pchStatName, int64_t *pData )
+bool STEAM_CALL ISteamUserStats_GetGlobalStatInt64( void* iface, const char *pchStatName, int64_t *pData )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return true;
 }
 
-bool ISteamUserStats_GetGlobalStatDouble( const char *pchStatName, double *pData )
+bool STEAM_CALL ISteamUserStats_GetGlobalStatDouble( void* iface, const char *pchStatName, double *pData )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return true;
 }
 
-int ISteamUserStats_GetGlobalStatHistoryInt64( const char *pchStatName, int64_t *pData, unsigned int cubData )
+int STEAM_CALL ISteamUserStats_GetGlobalStatHistoryInt64( void* iface, const char *pchStatName, int64_t *pData, unsigned int cubData )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return 0;
 }
 
-int ISteamUserStats_GetGlobalStatHistoryDouble( const char *pchStatName, double *pData, unsigned int cubData )
+int STEAM_CALL ISteamUserStats_GetGlobalStatHistoryDouble( void* iface, const char *pchStatName, double *pData, unsigned int cubData )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return 0;
 }
 
-bool ISteamUserStats_GetAchievementProgressLimitsInt32( const char *pchName, int32_t *pnMinProgress, int32_t *pnMaxProgress )
+bool STEAM_CALL ISteamUserStats_GetAchievementProgressLimitsInt32( void* iface, const char *pchName, int32_t *pnMinProgress, int32_t *pnMaxProgress )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return true;
 }
 
-bool ISteamUserStats_GetAchievementProgressLimitsFloat( const char *pchName, float *pfMinProgress, float *pfMaxProgress )
+bool STEAM_CALL ISteamUserStats_GetAchievementProgressLimitsFloat( void* iface, const char *pchName, float *pfMinProgress, float *pfMaxProgress )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return true;

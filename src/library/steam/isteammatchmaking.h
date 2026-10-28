@@ -88,7 +88,7 @@ public:
 	// should only be called after a LobbyMatchList_t callback is received
 	// iLobby is of the range [0, LobbyMatchList_t::m_nLobbiesMatching)
 	// the returned CSteamID::IsValid() will be false if iLobby is out of range
-	virtual CSteamID GetLobbyByIndex( int iLobby );
+	virtual STEAMID_RET GetLobbyByIndex( STEAMID_RET_ARG int iLobby );
 
 	// Create a lobby on the Steam servers.
 	// If private, then the lobby will not be returned by any RequestLobbyList() call; the CSteamID
@@ -126,7 +126,7 @@ public:
 	// returns the CSteamID of a user in the lobby
 	// iMember is of range [0,GetNumLobbyMembers())
 	// note that the current user must be in a lobby to retrieve CSteamIDs of other users in that lobby
-	virtual CSteamID GetLobbyMemberByIndex( CSteamID steamIDLobby, int iMember );
+	virtual STEAMID_RET GetLobbyMemberByIndex( STEAMID_RET_ARG CSteamID steamIDLobby, int iMember );
 
 	// Get data associated with this lobby
 	// takes a simple key, and returns the string associated with it
@@ -199,7 +199,7 @@ public:
 	// you must be a member of the lobby to access this
 	// there always one lobby owner - if the current owner leaves, another user will become the owner
 	// it is possible (bur rare) to join a lobby just as the owner is leaving, thus entering a lobby with self as the owner
-	virtual CSteamID GetLobbyOwner( CSteamID steamIDLobby );
+	virtual STEAMID_RET GetLobbyOwner( STEAMID_RET_ARG CSteamID steamIDLobby );
 
 	// changes who the lobby owner is
 	// you must be the lobby owner for this to succeed, and steamIDNewOwner must be in the lobby
