@@ -92,6 +92,8 @@ signals:
     
     void getMarkerText(std::string &text);
 
+    void setMarker(int frame, QString text);
+
     void getTimeTrace(int type, unsigned long long hash, std::string stacktrace);
 };
 

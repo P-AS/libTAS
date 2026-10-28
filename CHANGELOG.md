@@ -37,6 +37,8 @@
   (#670)
 * Add hotkeys to select a savestate slot and to save/load the selected
   slot (#550)
+* Lua: add movie.getMarker(), movie.setMarker(), movie.insertFrame() and
+  movie.insertFrames() (#668)
 
 ### Changed
 

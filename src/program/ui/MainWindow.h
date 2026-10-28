@@ -242,6 +242,7 @@ private slots:
     void slotSyncInputEditorVisible(bool &visible);
     void slotFetchRamWatch(std::string &watch);
     void slotFetchMarkerText(std::string &text);
+    void slotSetMarker(int frame, QString text);
     void slotRegisterSavestate(int slot, unsigned long long frame);
     void slotAddTimeTrace(int type, unsigned long long hash, std::string stacktrace);
     void slotUpdateSettingsWindow(int status);

@@ -38,6 +38,7 @@
 #include "SaveStateList.h"
 #include "lua/Input.h"
 #include "lua/Callbacks.h"
+#include "lua/Movie.h"
 #include "lua/NamedLuaFunction.h"
 #include "ramsearch/MemAccess.h"
 #include "ramsearch/BaseAddresses.h"
@@ -69,6 +70,11 @@ GameLoop::GameLoop(Context* c) : movie(MovieFile(c)), context(c)
 #elif defined(__APPLE__) && defined(__MACH__)
     gameEvents = new GameEventsQuartz(c, &movie);
 #endif
+
+    /* Register the movie so that lua scripts can access it */
+    Lua::Movie::registerMovie(&movie, [this](int frame, const std::string& text) {
+        emit setMarker(frame, QString::fromStdString(text));
+    });
 }
 
 void GameLoop::start()
