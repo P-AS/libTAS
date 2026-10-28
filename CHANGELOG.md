@@ -115,6 +115,8 @@
   (#742)
 * Fix the annotations menu being disabled when a movie is loaded from the
   command line (#693)
+* Fix a crash when passing a non-numeric value such as true to the --set
+  command-line option
 
 ## [1.4.8] - 2026-05-14
 ### Added
