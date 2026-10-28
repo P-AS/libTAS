@@ -51,6 +51,10 @@ InputEditorModel::InputEditorModel(Context* c, MovieFile* m, QObject *parent) : 
     highlightTimeoutSec = 0;
     highlightTimer = new QTimer(this);
     connect(highlightTimer, &QTimer::timeout, this, &InputEditorModel::highlightUpdate);
+
+    /* The model can be created after the movie was loaded, so we missed the
+     * reset signal that builds the input columns */
+    buildInputSet();
 }
 
 unsigned int InputEditorModel::frameCount() const
