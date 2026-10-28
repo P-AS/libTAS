@@ -251,7 +251,9 @@ Not handled yet:
   rest of the state at the wrong offsets, looping on garbage savefiles
   (`Cound not truncate the savefile  with fd 0 and size 3386706920806023168`)
   (`3994095b`). Not Wine specific, but only visible since Wine savefiles end
-  up in savestates.
+  up in savestates. Reaching the end of the pagemap file without its end area
+  also made the loading loops keep the last area forever; a short read now
+  ends the loading (`507e8721`).
 - The xcb connection struct is preserved across loads using our own
   definition of it, which is smaller than libxcb 1.17's and missed the resource
   id allocator at its end. Games then reused X resource ids after loading and
@@ -269,6 +271,12 @@ Not handled yet:
   since the state was saved" (`7f7461f7`). Boshy has such a thread exiting
   around frames 1122-1192 of the imported movie. Keeping Wine threads from
   exiting while libTAS runs would lift this limitation, but is not done.
+  A later Boshy freeze was this case on a build made before `7f7461f7`:
+  loading at frame 1315 printed `Could not recreate thread ... with the same
+  tid: Operation not permitted`, then `wine client error:19c: write: Bad file
+  descriptor`, then Xlib exited on `BadIDChoice` (`X_CreateGC`). Whether
+  that `BadIDChoice` is only a consequence of the failed thread was not
+  checked.
 
 ## Timing compatibility with Hourglass
 
@@ -294,8 +302,13 @@ the game config, not in the movie.
   in the user's `~/.config/libTAS/<game>.ini`. Use a private copy with
   `XDG_CONFIG_HOME`, and point `savestatedir`/`datadir` of the copied
   `libTAS.ini` elsewhere. Per-game logging settings override `-s`; edit the
-  copy directly. `logging_status=2` logs to `<game>.log` next to the game,
-  which is not truncated between runs.
+  copy directly. `logging_status=2` logs to `<game>.log` next to the game.
+  Before `08788282` that file was overwritten from its start without being
+  truncated, so older logs hold several runs: the newest one is the start of
+  the file, up to the first line that begins mid-sentence.
+- Check that the running build has the fixes you expect: a libTAS UI started
+  before a rebuild keeps its old binary, and the game loads `libtas.so` as it
+  was when the game was started. Compare the build time with the commit times.
 - Run tests from a copy of the game directory, so that save files of the user
   are not modified.
 - In `-n` (non-interactive) mode the game starts unpaused and fast-forwarded:
