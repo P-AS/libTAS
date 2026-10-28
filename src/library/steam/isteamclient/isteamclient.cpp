@@ -287,7 +287,7 @@ ISteamController *STEAM_CALL ISteamClient_GetISteamController( void *iface, HSte
 ISteamUGC *STEAM_CALL ISteamClient_GetISteamUGC( void *iface, HSteamUser hSteamUser, HSteamPipe hSteamPipe, const char *pchVersion )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
-    return SteamUGC();
+    return SteamUGC_generic(pchVersion);
 }
 
 ISteamAppList *STEAM_CALL ISteamClient_GetISteamAppList( void *iface, HSteamUser hSteamUser, HSteamPipe hSteamPipe, const char *pchVersion )

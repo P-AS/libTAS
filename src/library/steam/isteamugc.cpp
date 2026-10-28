@@ -27,6 +27,31 @@
 
 namespace libtas {
 
+static const char *steamugc_version = nullptr;
+
+void SteamUGC_set_version(const char *version)
+{
+    LOG(LL_DEBUG, LCF_STEAM, "%s called with version %s", __func__, version);
+    if (!steamugc_version)
+        steamugc_version = version;
+}
+
+ISteamUGC *SteamUGC_generic(const char *version)
+{
+    if (!version)
+        version = steamugc_version;
+    LOG(LL_DEBUG, LCF_STEAM, "%s called with version %s", __func__, version ? version : "unknown");
+
+    if (version && strcmp(version, STEAMUGC_INTERFACE_VERSION_010) != 0) {
+        LOG(LL_WARN, LCF_STEAM, "ISteamUGC version %s is not implemented", version);
+        return nullptr;
+    }
+
+    static ISteamUGC steamugc;
+    return &steamugc;
+}
+
+
 namespace {
 
 std::mutex ugcMutex;
@@ -447,6 +472,95 @@ uint32_t ISteamUGC::GetSubscribedItems( PublishedFileId_t* pvecPublishedFileID, 
     if (pvecPublishedFileID && cMaxEntries > 0) {
         std::memset(pvecPublishedFileID, 0, sizeof(*pvecPublishedFileID) * cMaxEntries);
     }
+	return 0;
+}
+
+uint32_t ISteamUGC::GetItemState( PublishedFileId_t nPublishedFileID )
+{
+    LOGTRACE_SIMPLE(LCF_STEAM);
+	return 0;
+}
+
+bool ISteamUGC::GetItemInstallInfo( PublishedFileId_t nPublishedFileID, uint64_t *punSizeOnDisk, char *pchFolder, uint32_t cchFolderSize, uint32_t *punTimeStamp )
+{
+    LOGTRACE_SIMPLE(LCF_STEAM);
+	return false;
+}
+
+bool ISteamUGC::GetItemDownloadInfo( PublishedFileId_t nPublishedFileID, uint64_t *punBytesDownloaded, uint64_t *punBytesTotal )
+{
+    LOGTRACE_SIMPLE(LCF_STEAM);
+	return false;
+}
+
+bool ISteamUGC::DownloadItem( PublishedFileId_t nPublishedFileID, bool bHighPriority )
+{
+    LOGTRACE_SIMPLE(LCF_STEAM);
+	return false;
+}
+
+bool ISteamUGC::BInitWorkshopForGameServer( DepotId_t unWorkshopDepotID, const char *pszFolder )
+{
+    LOGTRACE_SIMPLE(LCF_STEAM);
+	return false;
+}
+
+void ISteamUGC::SuspendDownloads( bool bSuspend )
+{
+    LOGTRACE_SIMPLE(LCF_STEAM);
+}
+
+SteamAPICall_t ISteamUGC::StartPlaytimeTracking( PublishedFileId_t *pvecPublishedFileID, uint32_t unNumPublishedFileIDs )
+{
+    LOGTRACE_SIMPLE(LCF_STEAM);
+	return 0;
+}
+
+SteamAPICall_t ISteamUGC::StopPlaytimeTracking( PublishedFileId_t *pvecPublishedFileID, uint32_t unNumPublishedFileIDs )
+{
+    LOGTRACE_SIMPLE(LCF_STEAM);
+	return 0;
+}
+
+SteamAPICall_t ISteamUGC::StopPlaytimeTrackingForAllItems()
+{
+    LOGTRACE_SIMPLE(LCF_STEAM);
+	return 0;
+}
+
+SteamAPICall_t ISteamUGC::AddDependency( PublishedFileId_t nParentPublishedFileID, PublishedFileId_t nChildPublishedFileID )
+{
+    LOGTRACE_SIMPLE(LCF_STEAM);
+	return 0;
+}
+
+SteamAPICall_t ISteamUGC::RemoveDependency( PublishedFileId_t nParentPublishedFileID, PublishedFileId_t nChildPublishedFileID )
+{
+    LOGTRACE_SIMPLE(LCF_STEAM);
+	return 0;
+}
+
+SteamAPICall_t ISteamUGC::AddAppDependency( PublishedFileId_t nPublishedFileID, AppId_t nAppID )
+{
+    LOGTRACE_SIMPLE(LCF_STEAM);
+	return 0;
+}
+
+SteamAPICall_t ISteamUGC::RemoveAppDependency( PublishedFileId_t nPublishedFileID, AppId_t nAppID )
+{
+    LOGTRACE_SIMPLE(LCF_STEAM);
+	return 0;
+}
+
+SteamAPICall_t ISteamUGC::GetAppDependencies( PublishedFileId_t nPublishedFileID )
+{
+    LOGTRACE_SIMPLE(LCF_STEAM);
+	return 0;
+}
+
+SteamAPICall_t ISteamUGC::DeleteItem( PublishedFileId_t nPublishedFileID )
+{
+    LOGTRACE_SIMPLE(LCF_STEAM);
 	return 0;
 }
 
