@@ -45,9 +45,11 @@ static const char * const atom_names[NB_XATOMS] =
     "_NET_WM_PING",
     "_NET_CURRENT_DESKTOP",
     "_NET_WORKAREA",
+    "_NET_ACTIVE_WINDOW",
     "_MOTIF_WM_HINTS",
     "_NET_WM_NAME",
     "UTF8_STRING",
+    "_LIBTAS_WAKE_EVENTS",
 };
 
 Atom X11Atoms[NB_XATOMS];

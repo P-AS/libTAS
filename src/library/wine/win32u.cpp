@@ -31,6 +31,9 @@
 #include "inputs/winekeyboardlayout.h"
 #include "inputs/inputs.h"
 #include "xlib/XlibGameWindow.h"
+#include "xlib/XlibEventQueueList.h"
+#include "xlib/xdisplay.h"
+#include "xlib/xevents.h"
 #include "general/sleepwrappers.h"
 #include "GlobalState.h"
 #include "checkpoint/ThreadManager.h"
@@ -56,6 +59,7 @@ static int (*NtUserGetKeyboardState)(unsigned char *state);
 static int (*NtUserGetCursorPos)(POINT *pt);
 static uint32_t (*NtUserMsgWaitForMultipleObjectsEx)(uint32_t count, void* const *handles, uint32_t timeout, uint32_t mask, uint32_t flags);
 static int (*NtUserGetMessage)(void *msg, void *hwnd, uint32_t first, uint32_t last);
+static int (*NtUserPeekMessage)(void *msg, void *hwnd, uint32_t first, uint32_t last, uint32_t flags);
 
 }
 
@@ -153,10 +157,48 @@ int NtUserGetCursorPos(POINT *pt)
     return 1;
 }
 
+/* winex11 only reads X events when wineserver notices that the X connection
+ * of the thread is readable. The events that we insert in our Xlib event
+ * queue (inputs, and the native events that we pulled) don't make it
+ * readable, so they stayed there until an unrelated X event arrived, for
+ * example when the game window had the focus. Before the game looks at its
+ * messages, make the connection readable and wait for winex11 to process
+ * our queue, so that the game gets the events of the current frame. */
+static void processXlibEvents()
+{
+    Display *display = x11::threadDisplay;
+    if (!display)
+        return;
+
+    std::shared_ptr<XlibEventQueue> queue = xlibEventQueueList.getQueue(display);
+    if (!queue || queue->size() == 0)
+        return;
+
+    LOGTRACE(LCF_WINE | LCF_EVENTS, "%s with %d events", __func__, queue->size());
+
+    sendXlibWakeEvent(display);
+
+    /* Wine processes driver events inside the wait once wineserver has seen
+     * the connection readable. The wake event is pulled by the same
+     * X11DRV_ProcessEvents() call that empties our queue (or that leaves it
+     * alone, when called while handling an X event). The wait itself never
+     * returns early, because the processing clears the queue bit that would
+     * signal it. */
+    for (int i = 0; isXlibWakeEventPending(display); i++) {
+        if (i == 100) {
+            LOG(LL_DEBUG, LCF_WINE | LCF_EVENTS, "   timeout while waiting for wine to process X events");
+            break;
+        }
+        orig::NtUserMsgWaitForMultipleObjectsEx(0, nullptr, 1, 0, 0);
+    }
+}
+
 static uint32_t NtUserMsgWaitForMultipleObjectsEx(uint32_t count, void* const *handles, uint32_t timeout, uint32_t mask, uint32_t flags)
 {
     if (GlobalState::isNative())
         return orig::NtUserMsgWaitForMultipleObjectsEx(count, handles, timeout, mask, flags);
+
+    processXlibEvents();
 
     /* Infinite and alertable waits are left to wine */
     if ((timeout == 0) || (timeout == INFINITE) || (flags & MWMO_ALERTABLE))
@@ -179,8 +221,19 @@ static uint32_t NtUserMsgWaitForMultipleObjectsEx(uint32_t count, void* const *h
     return WAIT_TIMEOUT;
 }
 
+static int NtUserPeekMessage(void *msg, void *hwnd, uint32_t first, uint32_t last, uint32_t flags)
+{
+    if (!GlobalState::isNative())
+        processXlibEvents();
+
+    return orig::NtUserPeekMessage(msg, hwnd, first, last, flags);
+}
+
 static int NtUserGetMessage(void *msg, void *hwnd, uint32_t first, uint32_t last)
 {
+    if (!GlobalState::isNative())
+        processXlibEvents();
+
     if (GlobalState::isNative() || !ThreadManager::isMainThread() || hwnd || first || last)
         return orig::NtUserGetMessage(msg, hwnd, first, last);
 
@@ -224,6 +277,9 @@ void hook_win32u()
     hook_wine_syscall("win32u.so", "NtUserGetMessage",
         reinterpret_cast<void**>(&orig::NtUserGetMessage),
         reinterpret_cast<void*>(NtUserGetMessage));
+    hook_wine_syscall("win32u.so", "NtUserPeekMessage",
+        reinterpret_cast<void**>(&orig::NtUserPeekMessage),
+        reinterpret_cast<void*>(NtUserPeekMessage));
 }
 
 #else

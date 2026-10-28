@@ -111,6 +111,10 @@
 * Fix the game log file keeping the end of previous runs
 * Fix Xlib BadIDChoice errors after loading a savestate when X resources
   were created since the state was saved
+* Wine: fix window messages inputs being delivered late or never, which
+  desynced playback when the game window was not focused
+* Hide the activation of other windows from the game, so that Wine does not
+  deactivate the game window
 
 ## [1.4.8] - 2026-05-14
 ### Added

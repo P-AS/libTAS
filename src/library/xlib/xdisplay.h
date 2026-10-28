@@ -30,6 +30,9 @@ namespace libtas {
 namespace x11 {
     /* Xlib connections to the X server */
     extern Display* gameDisplays[GAMEDISPLAYNUM];
+
+    /* Last Xlib connection opened by the current thread */
+    extern thread_local Display* threadDisplay;
 }
 
 OVERRIDE Display *XOpenDisplay(const char *display_name);

@@ -39,6 +39,7 @@
 #include "../external/mwm.h"
 
 #include <vector>
+#include <X11/Xatom.h> // XA_WINDOW
 
 namespace libtas {
 
@@ -110,6 +111,9 @@ Window XCreateSimpleWindow(Display *display, Window parent, int x, int y, unsign
 {
     LOGTRACE(LCF_WINDOW, "%s call with dimensions %d x %d", __func__, width, height);
     LINK_NAMESPACE_GLOBAL(XCreateSimpleWindow);
+
+    if (GlobalState::isNative())
+        return orig::XCreateSimpleWindow(display, parent, x, y, width, height, border_width, border, background);
 
     Window w = orig::XCreateSimpleWindow(display, parent, x, y, width, height, border_width, border, background);
     LOG(LL_DEBUG, LCF_WINDOW, "   window id is %d", w);
@@ -301,6 +305,21 @@ int XGetWindowProperty(Display *display, Window w, Atom property, long long_offs
     int ret = orig::XGetWindowProperty(display, w, property, long_offset, long_length, del, req_type, actual_type_return, actual_format_return, nitems_return, bytes_after_return, prop_return);
     if (ret != Success) {
         return ret;
+    }
+
+    /* The game must not notice that another window was activated, for
+     * example the libTAS window. Wine reads this property to choose the
+     * foreground window, and deactivates the game window otherwise, so that
+     * it does not receive keyboard messages anymore. */
+    if ((property == x11_atom(_NET_ACTIVE_WINDOW)) && XlibGameWindow::get() &&
+        XlibGameWindow::isRootWindow(display, w) && actual_type_return &&
+        (*actual_type_return == XA_WINDOW) && nitems_return && (*nitems_return > 0) &&
+        prop_return && (*prop_return)) {
+        Window *active = reinterpret_cast<Window*>(*prop_return);
+        if (!XlibGameWindow::contains(*active)) {
+            LOG(LL_DEBUG, LCF_WINDOW, "   replacing active window %d with game window %d", *active, XlibGameWindow::get());
+            *active = XlibGameWindow::get();
+        }
     }
 
     if (Global::shared_config.screen_width) {
