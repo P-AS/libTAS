@@ -108,6 +108,7 @@ const uintptr_t FILE_OVERWRITTEN = 3;
 
 /* Create options */
 const uint32_t FILE_DIRECTORY_FILE = 0x00000001;
+const uint32_t FILE_NON_DIRECTORY_FILE = 0x00000040;
 const uint32_t FILE_DELETE_ON_CLOSE = 0x00001000;
 const uint32_t FILE_OPEN_BY_FILE_ID = 0x00002000;
 
@@ -123,6 +124,8 @@ const uint32_t FILE_WRITE_DATA = 0x00000002;
 const uint32_t FILE_APPEND_DATA = 0x00000004;
 const uint32_t GENERIC_ALL = 0x10000000;
 const uint32_t GENERIC_WRITE = 0x40000000;
+const uint32_t GENERIC_READ = 0x80000000;
+const uint32_t SYNCHRONIZE = 0x00100000;
 
 }
 
@@ -436,11 +439,73 @@ static uint32_t NtCreateFile(void **handle, uint32_t access, OBJECT_ATTRIBUTES *
     return orig::NtCreateFile(handle, access, attr, io, alloc_size, attributes, sharing, disposition, options, ea_buffer, ea_length);
 }
 
+/* The Steam API of a Windows game cannot be hooked from here, so when the
+ * virtual Steam client is enabled, the loader gets our own steam_api.dll
+ * (built from the sources of the virtual Steam client) instead of the one of
+ * the game. Returns false if the file must be opened by wine instead. */
+static bool openSteamApiReplacement(void **handle, uint32_t access, OBJECT_ATTRIBUTES *attr, IO_STATUS_BLOCK *io, uint32_t options, uint32_t *status)
+{
+    if (!Global::shared_config.virtual_steam)
+        return false;
+
+    /* This is how the loader opens dlls, while the dll itself reads the
+     * original file with CreateFile(), which calls NtCreateFile() */
+    if ((access != (GENERIC_READ | SYNCHRONIZE)) || !(options & FILE_NON_DIRECTORY_FILE))
+        return false;
+
+    if (!attr || !attr->ObjectName || !attr->ObjectName->Buffer)
+        return false;
+
+    std::string ntpath = utf16ToUtf8(attr->ObjectName->Buffer, attr->ObjectName->Length / sizeof(char16_t));
+    size_t sep = ntpath.find_last_of('\\');
+    const char *name = ntpath.c_str() + ((sep == std::string::npos) ? 0 : sep + 1);
+
+    const char *dll;
+    if (strcasecmp(name, "steam_api.dll") == 0)
+        dll = "libtas-steam_api.dll";
+    else if (strcasecmp(name, "steam_api64.dll") == 0)
+        dll = "libtas-steam_api64.dll";
+    else
+        return false;
+
+    GlobalNative gn;
+
+    /* Let the loader keep searching if the game has no dll there */
+    std::string unixpath = ntToUnixPath(attr);
+    struct stat st;
+    if (unixpath.empty() || (stat(unixpath.c_str(), &st) != 0))
+        return false;
+
+    /* Our dlls are installed next to libtas.so */
+    const char *libpath = getenv("LIBTAS_LIBRARY_PATH");
+    if (!libpath)
+        return false;
+    std::string replacement = libpath;
+    size_t slash = replacement.find_last_of('/');
+    replacement.resize((slash == std::string::npos) ? 0 : slash + 1);
+    replacement += dll;
+
+    int fd = open(replacement.c_str(), O_RDONLY | O_CLOEXEC);
+    if (fd < 0) {
+        LOG(LL_ERROR, LCF_STEAM | LCF_WINE, "Could not open %s, the virtual Steam client will not work", replacement.c_str());
+        return false;
+    }
+
+    LOG(LL_INFO, LCF_STEAM | LCF_WINE, "Loading %s instead of %s", replacement.c_str(), unixpath.c_str());
+    *status = orig::wine_server_fd_to_handle(fd, access, attr->Attributes, handle);
+    close(fd);
+    io->Status = *status;
+    io->Information = FILE_OPENED;
+    return true;
+}
+
 static uint32_t NtOpenFile(void **handle, uint32_t access, OBJECT_ATTRIBUTES *attr, IO_STATUS_BLOCK *io, uint32_t sharing, uint32_t options)
 {
     if (!GlobalState::isNative()) {
         LOGTRACE(LCF_FILEIO | LCF_WINE, "%s call with access %x", __func__, access);
         uint32_t status;
+        if (openSteamApiReplacement(handle, access, attr, io, options, &status))
+            return status;
         if (openSaveFileHandle(handle, access, attr, io, FILE_OPEN, options, &status))
             return status;
     }

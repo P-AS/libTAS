@@ -34,6 +34,8 @@
 * Wine: prevent games from writing to disk
 * Add a timing option to never insert non-draw frames
 * Map hourglass left mouse button to libTAS mouse click
+* Wine: support the virtual Steam client, with a replacement steam_api.dll
+  built with mingw-w64
 
 ### Changed
 
