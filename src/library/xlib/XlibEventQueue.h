@@ -37,7 +37,7 @@ class XlibEventQueue
         void setMask(Window w, long event_mask);
 
         /* Insert an event in the queue */
-        int insert(XEvent* event);
+        int insert(const XEvent* event);
 
         /* Copy the first event of the queue into `event`, and remove that
          * event from the queue if update is true. Returns if an event was pulled. */
