@@ -259,6 +259,16 @@ Not handled yet:
   id allocator at its end. Games then reused X resource ids after loading and
   Xlib exited on `BadIDChoice` (`X_CreateGC`). We now copy the whole allocation
   (`malloc_usable_size()`) (`8a5baa09`). Not Wine specific.
+- That was not enough: Xlib also caches the next resource id in its private
+  `dpy->xcb->next_xid`, which the load restored to an id given to a resource
+  created after the savestate. Boshy (winex11) creates GCs while running, so
+  loading still ended on `BadIDChoice` (`X_CreateGC`) around frame 1306. We
+  now keep the current `next_xid` across the load (`f00f281e`). Its struct
+  (`Xxcbint.h`) is not installed and gained a `next_response` field between
+  libX11 1.6 and 1.8, so `src/external/X11/Xxcbint.h` describes both layouts
+  and the one whose `connection` and `next_xid` match the xcb connection is
+  used. Reproduced natively with a GLX program creating one GC per frame.
+  Not Wine specific.
 - Recreating a thread that exited after the savestate uses `clone3()` with
   `set_tid`, which requires the `CAP_CHECKPOINT_RESTORE` capability. Without
   it, we fall back to `clone()`, whose x86_64 wrapper used the aarch64 syscall
@@ -274,9 +284,8 @@ Not handled yet:
   A later Boshy freeze was this case on a build made before `7f7461f7`:
   loading at frame 1315 printed `Could not recreate thread ... with the same
   tid: Operation not permitted`, then `wine client error:19c: write: Bad file
-  descriptor`, then Xlib exited on `BadIDChoice` (`X_CreateGC`). Whether
-  that `BadIDChoice` is only a consequence of the failed thread was not
-  checked.
+  descriptor`, then Xlib exited on `BadIDChoice` (`X_CreateGC`). That
+  `BadIDChoice` was the separate Xlib id bug above.
 
 ## Timing compatibility with Hourglass
 
@@ -309,6 +318,11 @@ the game config, not in the movie.
 - Check that the running build has the fixes you expect: a libTAS UI started
   before a rebuild keeps its old binary, and the game loads `libtas.so` as it
   was when the game was started. Compare the build time with the commit times.
+  The launcher injects the `libtas.so` next to its binary
+  (`build/src/program/libtas.so`), which `cmake --build` does not update: only
+  `build.sh` (through the AppDir) or a manual copy does. After a plain cmake
+  build, copy `build/src/library/libtas.so` there, or pass
+  `--libtas-so-path build/src/library/libtas.so`.
 - Run tests from a copy of the game directory, so that save files of the user
   are not modified.
 - In `-n` (non-interactive) mode the game starts unpaused and fast-forwarded:
