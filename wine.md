@@ -221,7 +221,7 @@ then presented by the game thread.
     and a Lua script focusing an xterm with `wmctrl -i -a` (xeyes does not
     accept the focus). Before: no `WM_KEYDOWN` at all even when focused, and
     the game deactivated after the xterm got the focus. After: every key
-    press arrives on its frame. Boshy (which polls keys) froze at frame 51
+    press arrives on its frame (`d3529335`). Boshy (which polls keys) froze at frame 51
     once the xterm took the focus, because Clickteam stops when its window
     is deactivated; it now plays on, and the imported movie gives the same
     image at frame 3000 as before the change, in the same time.
