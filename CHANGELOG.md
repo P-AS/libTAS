@@ -105,6 +105,8 @@
   in non-standard locations such as NixOS (#763)
 * Fix SDL text input events ignoring Shift/Caps Lock for letter keys
   (#742)
+* Fix the annotations menu being disabled when a movie is loaded from the
+  command line (#693)
 
 ## [1.4.8] - 2026-05-14
 ### Added
