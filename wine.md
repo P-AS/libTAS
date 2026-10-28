@@ -344,10 +344,29 @@ and 32-bit PE code cannot call our 64-bit unix code anyway.
   `UserStatsReceived_t` to a hand-made MSVC-like callback object.
 - The ISteamUser and ISteamUserStats functions did not take the interface
   pointer, so the arguments of native games were shifted too; fixed for both.
-- Tested with Kero Blaster (32-bit): the game loads our dll, calls
+- Tested first with Kero Blaster (32-bit): the game loads our dll, calls
   `SteamAPI_Init`, registers its user stats callbacks and runs normally.
   Touhou 10 from Steam does not use the Steam API at all (only thcrap
   ships a `steam_api.dll`).
+- Games crashed when calling methods missing at the end of our vtables:
+  ISteamFriends only had its first 12 methods, so Cave Story+ calling
+  `RequestUserInformation` jumped into the next vtable (it showed as a call
+  to ISteamGameServer `LogOn`, then a jump to 0). All 76 methods up to
+  ISteamFriends017 are now stubs. Our C++ interface classes have a single
+  layout, while some interfaces change in the middle between versions:
+  ISteamUGC matches `STEAMUGC_INTERFACE_VERSION010` only (Sonic Mania,
+  Shovel Knight), and Cave Story+ (version 020) crashed inside libstdc++ code.
+  Other versions now get a null interface with a warning (`7a6caf53`), which Cave Story+
+  handles.
+- To check the vtable layout of an interface version, disassemble the flat
+  wrappers `SteamAPI_<interface>_<method>` of a Valve `steam_api.dll` that
+  has that version: each one loads `this` and calls a fixed vtable offset.
+  Compare those slots with the declaration order of our class.
+- Tested with Kero Blaster, Sonic CD and Cave Story+ (32-bit). Without the
+  virtual Steam client, Sonic CD stops on "Steam client is not running".
+  Cave Story+ busy-waits on `QueryPerformanceCounter` at frame 1 with or
+  without Steam, and needs QPC time-tracking on the main thread (100), like
+  Boshy. Native VVVVVV and Shovel Knight still work.
 - The dll has no access to libtas inputs, so Steam controllers stay
   neutral.
 
