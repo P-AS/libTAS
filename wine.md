@@ -182,7 +182,7 @@ then presented by the game thread.
   does nothing. To reproduce: pause, raise another window over the game with
   `wmctrl -i -a` and move it away; `xwininfo -root -tree` shows the client
   window under a 1x1 window of another connection (`gdi_display`). Wine
-  ignores Expose events itself, since we filter them.
+  ignores Expose events itself, since we filter them (`00292664`).
 - Wine sets the title of SRB2's window to "FluidSynth...", cosmetic.
 - SRB2's default window is 2560x1415 (from its own config), larger than a small
   test display.
