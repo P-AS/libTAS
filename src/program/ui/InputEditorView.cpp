@@ -119,6 +119,8 @@ InputEditorView::InputEditorView(Context* c, MovieFile *m, QWidget *parent) : QT
 
     QShortcut* saveShortcut = new QShortcut(QKeySequence("Ctrl+S"), this);
     connect(saveShortcut, &QShortcut::activated, this, &InputEditorView::saveMovieRequested);
+
+    resizeAllColumns();
 }
 
 KeyPressedDialog *InputEditorView::ensureKeyDialog()

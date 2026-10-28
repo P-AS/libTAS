@@ -92,6 +92,8 @@
   implement, as games crashed when calling it
 * Input editor: Fix Qt warnings about invalid dataChanged() index ranges
 * Fix signed/unsigned comparison compiler warnings
+* Input editor: fix input columns missing when the editor is first opened
+  after the movie was loaded
 
 ## [1.4.8] - 2026-05-14
 ### Added
