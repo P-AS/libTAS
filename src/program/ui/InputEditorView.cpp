@@ -119,6 +119,8 @@ InputEditorView::InputEditorView(Context* c, MovieFile *m, QWidget *parent) : QT
 
     QShortcut* saveShortcut = new QShortcut(QKeySequence("Ctrl+S"), this);
     connect(saveShortcut, &QShortcut::activated, this, &InputEditorView::saveMovieRequested);
+
+    resizeAllColumns();
 }
 
 KeyPressedDialog *InputEditorView::ensureKeyDialog()
@@ -144,6 +146,9 @@ void InputEditorView::fillMenu(QMenu* frameMenu)
 {
     menu = frameMenu;
     setContextMenuPolicy(Qt::CustomContextMenu);
+
+    /* Frames may have changed without changing the selection */
+    connect(menu, &QMenu::aboutToShow, this, &InputEditorView::updateMenu);
     connect(this, &QWidget::customContextMenuRequested, this, &InputEditorView::mainMenu);
 
     eventAct = menu->addAction(tr("Edit frame events"), this, &InputEditorView::editEvents);
@@ -179,6 +184,8 @@ void InputEditorView::fillMenu(QMenu* frameMenu)
     unmarkAct->setShortcutVisibleInContextMenu(true);
 #endif
     this->addAction(unmarkAct);
+
+    noFastForwardAct = menu->addAction(tr("Disable fast-forward"), this, &InputEditorView::toggleNoFastForward);
 
     duplicateAct = menu->addAction(tr("Duplicate"), this, &InputEditorView::duplicateInput);
     duplicateAct->setShortcut(QKeySequence("Ctrl+D"));
@@ -342,7 +349,10 @@ void InputEditorView::updateMenu()
     const QModelIndexList indexes = selectionModel()->selectedRows();
 
     int markers_count = 0;
+    bool all_no_fastforward = !indexes.isEmpty();
     for (const QModelIndex index : indexes) {
+        if (!inputEditorModel->isNoFastForward(index.row()))
+            all_no_fastforward = false;
         if (inputEditorModel->hasMarker(index.row())) {
             markers_count++;
             currentMarkerText = inputEditorModel->getMarkerText(index.row());
@@ -354,6 +364,7 @@ void InputEditorView::updateMenu()
     markAct->setText(markers_count ? tr("Edit marker") : tr("Add marker"));
     unmarkAct->setText((markers_count > 1) ? tr("Remove markers") : tr("Remove marker"));
     unmarkAct->setEnabled(markers_count);
+    noFastForwardAct->setText(all_no_fastforward ? tr("Enable fast-forward") : tr("Disable fast-forward"));
 
     if (static_cast<uint32_t>(min_row) < context->framecount) {
         eventAct->setEnabled(false);
@@ -814,6 +825,28 @@ void InputEditorView::removeMarker()
     updateMenu();
 }
 
+void InputEditorView::toggleNoFastForward()
+{
+    const QModelIndexList indexes = selectionModel()->selectedRows();
+
+    /* If no row was selected, return */
+    if (indexes.count() == 0)
+        return;
+
+    /* Disable fast-forward on all selected frames, unless it is already
+     * disabled on all of them */
+    bool disable = false;
+    for (const QModelIndex index : indexes)
+        if (!inputEditorModel->isNoFastForward(index.row()))
+            disable = true;
+
+    applyToSelectedRanges([this, disable](int min, int max){
+        inputEditorModel->setNoFastForward(min, max, disable);
+    });
+
+    updateMenu();
+}
+
 void InputEditorView::editEvents()
 {
     const QModelIndexList indexes = selectionModel()->selectedRows();
@@ -838,6 +871,7 @@ void InputEditorView::duplicateInput()
     /* FIXME: Discontinuous selection is not handled */
     inputEditorModel->insertRows(indexes[0].row(), indexes.count(), true);
     inputEditorModel->shiftMarkers(indexes[0].row(), indexes.count());
+    inputEditorModel->shiftNoFastForward(indexes[0].row(), indexes.count());
 }
 
 void InputEditorView::insertInput()
@@ -850,6 +884,7 @@ void InputEditorView::insertInput()
 
     inputEditorModel->insertRows(indexes[0].row(), 1, false);
     inputEditorModel->shiftMarkers(indexes[0].row(), 1);
+    inputEditorModel->shiftNoFastForward(indexes[0].row(), 1);
 }
 
 void InputEditorView::insertInputs()
@@ -867,6 +902,7 @@ void InputEditorView::insertInputs()
         int insertRow = indexes[0].row();
         inputEditorModel->insertRows(insertRow, nbFrames, false);
         inputEditorModel->shiftMarkers(insertRow, nbFrames);
+        inputEditorModel->shiftNoFastForward(insertRow, nbFrames);
     }
 }
 
@@ -948,6 +984,7 @@ void InputEditorView::deleteInput()
     /* Removing rows must be done in reversed order so that row indices are valid */
     int min_row = applyToSelectedRangesReversed([this](int min, int max){
         inputEditorModel->removeMarkersInRange(min, max);
+        inputEditorModel->removeNoFastForwardInRange(min, max);
         inputEditorModel->removeRows(min, max - min + 1);
     });
 

@@ -27,6 +27,8 @@
 #include <unistd.h> // access
 #include <iostream>
 #include <filesystem>
+#include <limits>
+#include <stdexcept>
 
 QString Config::iniPath(const std::filesystem::path& gamepath) const {
     std::filesystem::path iniFile = configdir / gamepath.filename();
@@ -36,63 +38,93 @@ QString Config::iniPath(const std::filesystem::path& gamepath) const {
 
 bool Config::applyCliSetting(const std::string& key, const std::string& value)
 {
-    const int intValue = std::stoi(value);
-    const unsigned int uintValue = static_cast<unsigned int>(std::stoul(value));
-    const int64_t int64Value = std::stoll(value);
-    const float floatValue = std::stof(value);
-    const bool boolValue = (value == "true" || value == "1" || value == "yes");
+    /* Parse the value only as the type expected by the key, and throw
+     * std::invalid_argument if the whole value is not of that type */
+    auto invalid = [&](const char* type) {
+        return std::invalid_argument("Invalid value \"" + value + "\" for setting " + key + ", expected " + type);
+    };
+    auto parseNumber = [&](auto convert, const char* type) {
+        size_t pos = 0;
+        try {
+            auto v = convert(value, &pos);
+            if (pos == value.size())
+                return v;
+        }
+        catch (const std::logic_error&) {}
+        throw invalid(type);
+    };
+    auto intValue = [&] { return parseNumber([](const std::string& v, size_t* pos) { return std::stoi(v, pos); }, "an integer"); };
+    auto uintValue = [&] {
+        if (!value.empty() && value[0] == '-')
+            throw invalid("an unsigned integer");
+        unsigned long v = parseNumber([](const std::string& v, size_t* pos) { return std::stoul(v, pos); }, "an unsigned integer");
+        if (v > std::numeric_limits<unsigned int>::max())
+            throw invalid("an unsigned integer");
+        return static_cast<unsigned int>(v);
+    };
+    auto int64Value = [&] { return static_cast<int64_t>(parseNumber([](const std::string& v, size_t* pos) { return std::stoll(v, pos); }, "an integer")); };
+    auto floatValue = [&] { return parseNumber([](const std::string& v, size_t* pos) { return std::stof(v, pos); }, "a number"); };
+    auto boolValue = [&] {
+        if (value == "true" || value == "1" || value == "yes")
+            return true;
+        if (value == "false" || value == "0" || value == "no")
+            return false;
+        throw invalid("true or false");
+    };
 
     /* SharedConfig fields – key names match QSettings keys in save()/load() */
-    if      (key == "speed_divisor")            sc.speed_divisor = intValue;
-    else if (key == "fastforward_mode")         sc.fastforward_mode = intValue;
-    else if (key == "fastforward_render")       sc.fastforward_render = intValue;
-    else if (key == "logging_status")           sc.logging_status = intValue;
-    else if (key == "logging_level")            sc.logging_level = static_cast<LogLevel>(uintValue);
-    else if (key == "logging_include_flags")    sc.logging_include_flags = uintValue;
-    else if (key == "logging_exclude_flags")    sc.logging_exclude_flags = uintValue;
-    else if (key == "framerate_num")            sc.initial_framerate_num = uintValue;
-    else if (key == "framerate_den")            sc.initial_framerate_den = uintValue;
-    else if (key == "mouse_support")            sc.mouse_support = boolValue;
-    else if (key == "mouse_mode_relative")      sc.mouse_mode_relative = boolValue;
-    else if (key == "mouse_prevent_warp")       sc.mouse_prevent_warp = boolValue;
-    else if (key == "nb_controllers")           sc.nb_controllers = intValue;
-    else if (key == "screen_width")             sc.screen_width = intValue;
-    else if (key == "screen_height")            sc.screen_height = intValue;
-    else if (key == "osd")                      sc.osd = boolValue;
-    else if (key == "osd_encode")               sc.osd_encode = boolValue;
-    else if (key == "osd_font_size")            sc.osd_font_size = floatValue;
-    else if (key == "prevent_savefiles")        sc.prevent_savefiles = boolValue;
-    else if (key == "audio_bitdepth")           sc.audio_bitdepth = intValue;
-    else if (key == "audio_channels")           sc.audio_channels = intValue;
-    else if (key == "audio_frequency")          sc.audio_frequency = intValue;
-    else if (key == "audio_gain")               sc.audio_gain = floatValue;
-    else if (key == "audio_mute")               sc.audio_mute = boolValue;
-    else if (key == "audio_disabled")           sc.audio_disabled = boolValue;
-    else if (key == "openal_soft")              sc.openal_soft = boolValue;
-    else if (key == "locale")                   sc.locale = intValue;
-    else if (key == "virtual_steam")            sc.virtual_steam = boolValue;
-    else if (key == "opengl_soft")              sc.opengl_soft = boolValue;
-    else if (key == "opengl_quality")           sc.opengl_quality = intValue;
-    else if (key == "async_events")             sc.async_events = intValue;
-    else if (key == "wait_timeout")             sc.wait_timeout = intValue;
-    else if (key == "sleep_handling")           sc.sleep_handling = intValue;
-    else if (key == "game_specific_timing")     sc.game_specific_timing = intValue;
-    else if (key == "game_specific_sync")       sc.game_specific_sync = intValue;
-    else if (key == "video_codec")              sc.video_codec = intValue;
-    else if (key == "video_bitrate")            sc.video_bitrate = intValue;
-    else if (key == "video_framerate_num")      sc.video_framerate_num = intValue;
-    else if (key == "video_framerate_den")      sc.video_framerate_den = intValue;
-    else if (key == "video_width")              sc.video_width = intValue;
-    else if (key == "video_height")             sc.video_height = intValue;
-    else if (key == "video_filter")             sc.video_filter = intValue;
-    else if (key == "audio_codec")              sc.audio_codec = intValue;
-    else if (key == "audio_bitrate")            sc.audio_bitrate = intValue;
-    else if (key == "savestate_settings")       sc.savestate_settings = intValue;
+    if      (key == "speed_divisor")            sc.speed_divisor = intValue();
+    else if (key == "fastforward_mode")         sc.fastforward_mode = intValue();
+    else if (key == "fastforward_render")       sc.fastforward_render = intValue();
+    else if (key == "logging_status")           sc.logging_status = intValue();
+    else if (key == "logging_level")            sc.logging_level = static_cast<LogLevel>(uintValue());
+    else if (key == "logging_include_flags")    sc.logging_include_flags = uintValue();
+    else if (key == "logging_exclude_flags")    sc.logging_exclude_flags = uintValue();
+    else if (key == "framerate_num")            sc.initial_framerate_num = uintValue();
+    else if (key == "framerate_den")            sc.initial_framerate_den = uintValue();
+    else if (key == "mouse_support")            sc.mouse_support = boolValue();
+    else if (key == "mouse_mode_relative")      sc.mouse_mode_relative = boolValue();
+    else if (key == "mouse_prevent_warp")       sc.mouse_prevent_warp = boolValue();
+    else if (key == "mouse_ignore_window_coords") sc.mouse_ignore_window_coords = boolValue();
+    else if (key == "nb_controllers")           sc.nb_controllers = intValue();
+    else if (key == "screen_width")             sc.screen_width = intValue();
+    else if (key == "screen_height")            sc.screen_height = intValue();
+    else if (key == "osd")                      sc.osd = boolValue();
+    else if (key == "osd_encode")               sc.osd_encode = boolValue();
+    else if (key == "osd_lua")                  sc.osd_lua = boolValue();
+    else if (key == "osd_font_size")            sc.osd_font_size = floatValue();
+    else if (key == "prevent_savefiles")        sc.prevent_savefiles = boolValue();
+    else if (key == "audio_bitdepth")           sc.audio_bitdepth = intValue();
+    else if (key == "audio_channels")           sc.audio_channels = intValue();
+    else if (key == "audio_frequency")          sc.audio_frequency = intValue();
+    else if (key == "audio_gain")               sc.audio_gain = floatValue();
+    else if (key == "audio_mute")               sc.audio_mute = boolValue();
+    else if (key == "audio_disabled")           sc.audio_disabled = boolValue();
+    else if (key == "openal_soft")              sc.openal_soft = boolValue();
+    else if (key == "locale")                   sc.locale = intValue();
+    else if (key == "virtual_steam")            sc.virtual_steam = boolValue();
+    else if (key == "opengl_soft")              sc.opengl_soft = boolValue();
+    else if (key == "opengl_quality")           sc.opengl_quality = intValue();
+    else if (key == "async_events")             sc.async_events = intValue();
+    else if (key == "wait_timeout")             sc.wait_timeout = intValue();
+    else if (key == "sleep_handling")           sc.sleep_handling = intValue();
+    else if (key == "game_specific_timing")     sc.game_specific_timing = intValue();
+    else if (key == "game_specific_sync")       sc.game_specific_sync = intValue();
+    else if (key == "video_codec")              sc.video_codec = intValue();
+    else if (key == "video_bitrate")            sc.video_bitrate = intValue();
+    else if (key == "video_framerate_num")      sc.video_framerate_num = intValue();
+    else if (key == "video_framerate_den")      sc.video_framerate_den = intValue();
+    else if (key == "video_width")              sc.video_width = intValue();
+    else if (key == "video_height")             sc.video_height = intValue();
+    else if (key == "video_filter")             sc.video_filter = intValue();
+    else if (key == "audio_codec")              sc.audio_codec = intValue();
+    else if (key == "audio_bitrate")            sc.audio_bitrate = intValue();
+    else if (key == "savestate_settings")       sc.savestate_settings = intValue();
     /* Initial time fields (come from movie, not from ini, so no existing key) */
-    else if (key == "initial_time_sec")         sc.initial_time_sec = int64Value;
-    else if (key == "initial_time_nsec")        sc.initial_time_nsec = int64Value;
-    else if (key == "initial_monotonic_time_sec")  sc.initial_monotonic_time_sec = int64Value;
-    else if (key == "initial_monotonic_time_nsec") sc.initial_monotonic_time_nsec = int64Value;
+    else if (key == "initial_time_sec")         sc.initial_time_sec = int64Value();
+    else if (key == "initial_time_nsec")        sc.initial_time_nsec = int64Value();
+    else if (key == "initial_monotonic_time_sec")  sc.initial_monotonic_time_sec = int64Value();
+    else if (key == "initial_monotonic_time_nsec") sc.initial_monotonic_time_nsec = int64Value();
     else return false;
 
     cli_overridden_keys.insert(key);
@@ -227,11 +259,13 @@ void Config::save(const std::filesystem::path& gamepath) {
     settings.setValue("mouse_support", sc.mouse_support);
     settings.setValue("mouse_mode_relative", sc.mouse_mode_relative);
     settings.setValue("mouse_prevent_warp", sc.mouse_prevent_warp);
+    settings.setValue("mouse_ignore_window_coords", sc.mouse_ignore_window_coords);
     settings.setValue("nb_controllers", sc.nb_controllers);
     settings.setValue("screen_width", sc.screen_width);
     settings.setValue("screen_height", sc.screen_height);
     settings.setValue("osd", sc.osd);
     settings.setValue("osd_encode", sc.osd_encode);
+    settings.setValue("osd_lua", sc.osd_lua);
     settings.setValue("osd_font_size", sc.osd_font_size);
     settings.setValue("prevent_savefiles", sc.prevent_savefiles);
     settings.setValue("audio_bitdepth", sc.audio_bitdepth);
@@ -455,11 +489,13 @@ void Config::load(const std::filesystem::path& gamepath) {
     sc.mouse_support = settings.value("mouse_support", sc.mouse_support).toBool();
     sc.mouse_mode_relative = settings.value("mouse_mode_relative", sc.mouse_mode_relative).toBool();
     sc.mouse_prevent_warp = settings.value("mouse_prevent_warp", sc.mouse_prevent_warp).toBool();
+    sc.mouse_ignore_window_coords = settings.value("mouse_ignore_window_coords", sc.mouse_ignore_window_coords).toBool();
     sc.nb_controllers = settings.value("nb_controllers", sc.nb_controllers).toInt();
     sc.screen_width = settings.value("screen_width", sc.screen_width).toInt();
     sc.screen_height = settings.value("screen_height", sc.screen_height).toInt();
     sc.osd = settings.value("osd", sc.osd).toBool();
     sc.osd_encode = settings.value("osd_encode", sc.osd_encode).toBool();
+    sc.osd_lua = settings.value("osd_lua", sc.osd_lua).toBool();
     sc.osd_font_size = settings.value("osd_font_size", sc.osd_font_size).toDouble();
     sc.prevent_savefiles = settings.value("prevent_savefiles", sc.prevent_savefiles).toBool();
     sc.audio_bitdepth = settings.value("audio_bitdepth", sc.audio_bitdepth).toInt();

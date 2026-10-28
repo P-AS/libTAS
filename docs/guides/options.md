@@ -50,6 +50,12 @@ Opens a window showing the inputs of the playing movie. The first column shows t
 
 It is possible to change the label of an input, or to add an input column by right-clicking on a column header. Also, right-clicking on a cell provides several options to the user.
 
+Some games break when they are fast-forwarded through some sections, such as
+cutscenes. Selecting frames and choosing "Disable fast-forward" in the
+right-click menu prevents fast-forwarding on these frames: their frame number
+is highlighted, and fast-forward resumes automatically after them. This is
+saved in the movie file.
+
 When the input editor is opened, the savestates work a bit differently. When in recording mode, if you load a savestate, it will load the entire movie even past the current frame of the savestate.
 
 ## Video
@@ -71,6 +77,13 @@ When software rendering is on, you can check this to skip some steps in the rend
 ### On-screen Display (OSD)
 
 Displays some information on the game screen such as framecount, inputs, notifications and ram watches. The placement of these texts can be modified, and can be displayed in the encode video.
+
+### Lua on video encode
+
+Displays only the drawings from Lua scripts in the encode video, without the
+other OSD elements. The other OSD elements are hidden while encoding. This has
+no effect if "OSD on video encode" is checked, which already includes the Lua
+drawings.
 
 ## Runtime
 
@@ -150,3 +163,9 @@ not go past the game screen.
 
 If checked, libTAS will prevent games from warping the mouse cursor (but will still register
 the warp internally).
+
+### Ignore window coordinates
+
+If checked, libTAS always reports the game window position as (0,0) instead of
+the position requested by the game. This fixes the mouse position being offset
+in some engines such as Godot.

@@ -20,6 +20,7 @@
 #ifndef LIBTAS_WINDOWMANAGER_H_INCLUDED
 #define LIBTAS_WINDOWMANAGER_H_INCLUDED
 
+#include <QtCore/QString>
 #include <string>
 
 class QWidget;
@@ -77,6 +78,7 @@ public:
     void reloadConfigWindows();
     void getRamWatch(std::string &watch) const;
     void getMarkerText(std::string &text) const;
+    void setMarker(int frame, const QString &text);
     void registerSavestate(int slot, unsigned long long frame);
     void addTimeTrace(int type, unsigned long long hash, std::string stacktrace);
     void updateSettingsWindow(int status);

@@ -36,6 +36,18 @@
 * Map hourglass left mouse button to libTAS mouse click
 * Wine: support the virtual Steam client, with a replacement steam_api.dll
   built with mingw-w64
+* Encode: save and load named presets of encoding settings
+* Encode: add VP9 and AV1 (SVT-AV1) video codecs
+* Add an input option to always report the game window position as (0,0),
+  which fixes mouse offset in some Godot games (#750)
+* Add a video setting to include only the Lua drawings in the video encode
+  (#670)
+* Add hotkeys to select a savestate slot and to save/load the selected
+  slot (#550)
+* Lua: add movie.getMarker(), movie.setMarker(), movie.insertFrame() and
+  movie.insertFrames() (#668)
+* Input editor: mark frames where fast-forward is disabled, for game
+  sections that break when fast-forwarded (#729)
 
 ### Changed
 
@@ -71,6 +83,11 @@
 * Don't touch non-present anonymous pages when saving and loading states,
   which makes savestates much faster for wine games
 * Don't consider procfs files as savefiles
+* Docs: link to the TASVideos lists of movies made with libTAS (#716)
+* Docs: add a page listing the sources of randomness used by games (#679)
+* Docs: clarify the package installation step of the WSL guide (#506)
+* Save the game executable path and command-line arguments in the movie
+  file instead of the executable name (#557)
 
 ### Fixed
 
@@ -125,6 +142,22 @@
   implemented
 * Steam: don't give the ISteamUGC interface for versions that we don't
   implement, as games crashed when calling it
+* Input editor: Fix Qt warnings about invalid dataChanged() index ranges
+* Fix signed/unsigned comparison compiler warnings
+* Input editor: fix input columns missing when the editor is first opened
+  after the movie was loaded
+* Fix xlib key inputs being dropped when the game opens multiple displays
+  (#765)
+* Find the lavapipe Vulkan driver for software rendering on any arch and
+  in non-standard locations such as NixOS (#763)
+* Fix SDL text input events ignoring Shift/Caps Lock for letter keys
+  (#742)
+* Fix the annotations menu being disabled when a movie is loaded from the
+  command line (#693)
+* Fix a crash when passing a non-numeric value such as true to the --set
+  command-line option
+* Fix the movie not being saved and libTAS aborting when the game exits in
+  non-interactive mode
 
 ## [1.4.8] - 2026-05-14
 ### Added

@@ -72,7 +72,27 @@ void GameThread::set_env_variables(Context *context, int gameArch)
     if (context->config.sc.opengl_soft) {
         setenv("__GLX_VENDOR_LIBRARY_NAME", "mesa", 1);
         setenv("LIBGL_ALWAYS_SOFTWARE", "1", 1);
-        setenv("VK_DRIVER_FILES", "/usr/share/vulkan/icd.d/lvp_icd.i686.json:/usr/share/vulkan/icd.d/lvp_icd.x86_64.json:/usr/share/vulkan/icd.d/lvp_icd.json", 1);
+
+        /* Select the lavapipe Vulkan driver. Recent loaders can filter
+         * drivers by name wherever they are installed (e.g. NixOS). Older
+         * loaders ignore it, so also give them the driver files found at
+         * the standard locations, whatever the arch suffix. */
+        setenv("VK_LOADER_DRIVERS_SELECT", "lvp_icd*", 1);
+        std::string lvp_files;
+        for (const char* dir : {"/usr/share/vulkan/icd.d", "/usr/local/share/vulkan/icd.d", "/etc/vulkan/icd.d"}) {
+            std::error_code ec;
+            for (const auto& entry : std::filesystem::directory_iterator(dir, ec)) {
+                std::string filename = entry.path().filename().string();
+                if ((filename.rfind("lvp_icd", 0) == 0) && (entry.path().extension() == ".json")) {
+                    if (!lvp_files.empty())
+                        lvp_files += ":";
+                    lvp_files += entry.path().string();
+                }
+            }
+        }
+        if (!lvp_files.empty())
+            setenv("VK_DRIVER_FILES", lvp_files.c_str(), 1);
+
         setenv("VDPAU_DRIVER", "va_gl", 1);
         setenv("VDPAU_QUIRKS", "AvoidVA", 1);
     }

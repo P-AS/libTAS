@@ -38,6 +38,7 @@
 #include "SaveStateList.h"
 #include "lua/Input.h"
 #include "lua/Callbacks.h"
+#include "lua/Movie.h"
 #include "lua/NamedLuaFunction.h"
 #include "ramsearch/MemAccess.h"
 #include "ramsearch/BaseAddresses.h"
@@ -69,6 +70,11 @@ GameLoop::GameLoop(Context* c) : movie(MovieFile(c)), context(c)
 #elif defined(__APPLE__) && defined(__MACH__)
     gameEvents = new GameEventsQuartz(c, &movie);
 #endif
+
+    /* Register the movie so that lua scripts can access it */
+    Lua::Movie::registerMovie(&movie, [this](int frame, const std::string& text) {
+        emit setMarker(frame, QString::fromStdString(text));
+    });
 }
 
 void GameLoop::start()
@@ -184,6 +190,9 @@ void GameLoop::init()
     
     /* Unvalidate the game window id */
     context->game_window = 0;
+
+    /* The game starts with the unmodified shared config */
+    fastforward_blocked = false;
 
     /* Reset the frame count if not restarting */
     if (context->status != Context::RESTARTING)
@@ -845,11 +854,27 @@ void GameLoop::endFrameMessages(AllInputs &ai)
         context->config.sc_modified = true;
     }
 
+    /* Disable fast-forward on frames where the movie says so, without
+     * changing the fast-forward setting, so that it resumes after them */
+    bool block = (context->config.sc.recording != SharedConfig::NO_RECORDING) &&
+        !movie.editor->isFastForwardAllowed(context->framecount);
+    if (block != fastforward_blocked) {
+        fastforward_blocked = block;
+        context->config.sc_modified = true;
+    }
+
     /* Send shared config if modified */
     if (context->config.sc_modified) {
         /* Send config */
         sendMessage(MSGN_CONFIG);
-        sendData(&context->config.sc, sizeof(SharedConfig));
+        if (fastforward_blocked && context->config.sc.fastforward) {
+            SharedConfig sc = context->config.sc;
+            sc.fastforward = false;
+            sendData(&sc, sizeof(SharedConfig));
+        }
+        else {
+            sendData(&context->config.sc, sizeof(SharedConfig));
+        }
         context->config.sc_modified = false;
     }
 

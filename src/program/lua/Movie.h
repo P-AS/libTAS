@@ -24,7 +24,11 @@ extern "C" {
 #include <lua.h>
 }
 
+#include <functional>
+#include <string>
+
 struct Context;
+class MovieFile;
 
 namespace Lua {
 
@@ -32,6 +36,10 @@ namespace Movie {
 
     /* Register all functions */
     void registerFunctions(lua_State *L, Context* c);
+
+    /* Pass the current MovieFile object to be used by lua functions, and
+     * the function used to set a marker from the UI thread */
+    void registerMovie(MovieFile* m, std::function<void(int, const std::string&)> set_marker);
 
     /* Get the current framecount */
     int currentFrame(lua_State *L);
@@ -59,6 +67,18 @@ namespace Movie {
 
     /* Get elapsed time set at game start */
     int getInitialElapsedTime(lua_State *L);
+
+    /* Get the marker text at current frame, or nil if none */
+    int getMarker(lua_State *L);
+
+    /* Set the marker text at current frame */
+    int setMarker(lua_State *L);
+
+    /* Insert a frame at current position */
+    int insertFrame(lua_State *L);
+
+    /* Insert n frames at current position */
+    int insertFrames(lua_State *L);
 }
 }
 

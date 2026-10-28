@@ -147,6 +147,7 @@ MainWindow::MainWindow(Context* c) : QMainWindow(), context(c)
     connect(gameLoop->gameEvents, &GameEvents::isInputEditorVisible, this, &MainWindow::slotSyncInputEditorVisible, Qt::DirectConnection);
     connect(gameLoop, &GameLoop::getRamWatch, this, &MainWindow::slotFetchRamWatch, Qt::DirectConnection);
     connect(gameLoop, &GameLoop::getMarkerText, this, &MainWindow::slotFetchMarkerText, Qt::DirectConnection);
+    connect(gameLoop, &GameLoop::setMarker, this, &MainWindow::slotSetMarker, Qt::QueuedConnection);
     connect(gameLoop->gameEvents, &GameEvents::savestatePerformed, this, &MainWindow::slotRegisterSavestate, Qt::QueuedConnection);
     connect(gameLoop, &GameLoop::getTimeTrace, this, &MainWindow::slotAddTimeTrace, Qt::QueuedConnection);
     connect(gameLoop, &GameLoop::statusChanged, this, &MainWindow::slotUpdateSettingsWindow, Qt::QueuedConnection);
@@ -761,6 +762,11 @@ void MainWindow::slotFetchMarkerText(std::string &text)
     windowManager->getMarkerText(text);
 }
 
+void MainWindow::slotSetMarker(int frame, QString text)
+{
+    windowManager->setMarker(frame, text);
+}
+
 void MainWindow::slotRegisterSavestate(int slot, unsigned long long frame)
 {
     windowManager->registerSavestate(slot, frame);
@@ -824,10 +830,14 @@ void MainWindow::updateStatus(int status)
 
             updateMovieParams();
 
-            /* In non-interactive mode, quit when the game has exited */
-            if (!context->interactive)
+            /* Exit the program when the game has exited in non-interactive
+             * mode. The game thread has finished its exit procedure (which
+             * saved the movie), so we can wait for it and quit from here. */
+            if (!context->interactive) {
+                if (game_thread.joinable())
+                    game_thread.join();
                 QApplication::quit();
-
+            }
             break;
 
         case Context::STARTING:
@@ -1030,6 +1040,8 @@ void MainWindow::updateMovieParams()
 
     updateMovieLoadedState(movieLoaded);
     windowManager->resetInputEditorWindow();
+
+    annotateMovieAction->setEnabled(context->config.sc.recording != SharedConfig::NO_RECORDING);
 
     movieFrameCount->setText(QString::number(context->config.sc.movie_framecount));
     rerecordCount->setText(QString::number(context->rerecord_count));
@@ -1435,7 +1447,6 @@ void MainWindow::slotMovieEnable(bool checked)
     }
     updateMovieParams();
 
-    annotateMovieAction->setEnabled(checked);
     context->config.sc_modified = true;
 }
 

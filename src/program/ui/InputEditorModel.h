@@ -124,6 +124,10 @@ public:
     bool hasMarker(int frame);
     std::string getMarkerText(int frame);
 
+    /* Get and set if fast-forward is disabled on frames */
+    bool isNoFastForward(int frame) const;
+    void setNoFastForward(int minRow, int maxRow, bool disabled);
+
     /* Get lock status of a single input */
     bool isLockedUniqueInput(int column);
 
@@ -209,7 +213,16 @@ public slots:
     /* Remove markers within a specified range of rows */
     void removeMarkersInRange(int startRow, int endRow);
 
+    /* Shift frames with fast-forward disabled after a given row */
+    void shiftNoFastForward(int startRow, int offset);
+
+    /* Remove frames with fast-forward disabled within a range of rows, and
+     * shift the following ones */
+    void removeNoFastForwardInRange(int startRow, int endRow);
+
 private:
+    void notifyDataChanged(int minRow, int minCol, int maxRow, int maxCol, const QVector<int> &roles = QVector<int>());
+
     Context *context;
     MovieFile *movie;
 

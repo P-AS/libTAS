@@ -81,6 +81,10 @@ typedef int HotKeyType; enum
     HOTKEY_LOADBRANCH10,
     HOTKEY_TOGGLE_FASTFORWARD, // Toggle fastforward
     HOTKEY_SCREENSHOT,
+    HOTKEY_SAVESTATE_SELECTED, // Save the state of the selected slot
+    HOTKEY_LOADSTATE_SELECTED, // Load the state of the selected slot
+    HOTKEY_SELECTSTATE_NEXT, // Select the next savestate slot
+    HOTKEY_SELECTSTATE_PREVIOUS, // Select the previous savestate slot
     HOTKEY_LEN
 };
 

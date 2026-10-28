@@ -93,11 +93,11 @@ bool mySDL_GameControllerReportEvents(int index)
     bool enabled = false;
 
     if (Global::game_info.joystick & GameInfo::SDL2) {
-        for (int e=0; e<sizeof(gcevents)/sizeof(gcevents[0]); e++)
+        for (size_t e=0; e<sizeof(gcevents)/sizeof(gcevents[0]); e++)
             enabled = enabled || sdlEventQueue.isEnabled(gcevents[e]);
     }
     if (Global::game_info.joystick & GameInfo::SDL3) {
-        for (int e=0; e<sizeof(gpevents)/sizeof(gpevents[0]); e++)
+        for (size_t e=0; e<sizeof(gpevents)/sizeof(gpevents[0]); e++)
             enabled = enabled || sdlEventQueue.isEnabled(gpevents[e]);
     }
 

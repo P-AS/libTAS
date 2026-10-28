@@ -98,6 +98,8 @@ struct __attribute__((packed, aligned(8))) SharedConfig {
         VCODEC_FFV1,
         VCODEC_UT,
         VCODEC_RAW,
+        VCODEC_VP9,
+        VCODEC_AV1,
     };
 
     /* Video filtering */
@@ -294,11 +296,17 @@ struct __attribute__((packed, aligned(8))) SharedConfig {
     /* Are preventing the game from warping the cursor */
     bool mouse_prevent_warp = false;
 
+    /* Report window coordinates as (0,0) instead of the actual position */
+    bool mouse_ignore_window_coords = false;
+
     /* Display OSD main menu */
     bool osd = true;
 
     /* Display OSD in the video encode */
     bool osd_encode = false;
+
+    /* Display only Lua drawings in the video encode */
+    bool osd_lua = false;
 
     /* Font size for OSD */
     double osd_font_size = 16.0;

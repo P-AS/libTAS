@@ -111,13 +111,13 @@ bool mySDL_JoystickReportEvents(int index)
     int SDLver = get_sdlversion();
 
     if (SDLver == 1)
-        for (int e=0; e<sizeof(joyevents1)/sizeof(joyevents1[0]); e++)
+        for (size_t e=0; e<sizeof(joyevents1)/sizeof(joyevents1[0]); e++)
             enabled = enabled || sdlEventQueue.isEnabled(joyevents1[e]);
     if (SDLver == 2)
-        for (int e=0; e<sizeof(joyevents2)/sizeof(joyevents2[0]); e++)
+        for (size_t e=0; e<sizeof(joyevents2)/sizeof(joyevents2[0]); e++)
             enabled = enabled || sdlEventQueue.isEnabled(joyevents2[e]);
     if (SDLver == 3)
-        for (int e=0; e<sizeof(joyevents3)/sizeof(joyevents3[0]); e++)
+        for (size_t e=0; e<sizeof(joyevents3)/sizeof(joyevents3[0]); e++)
             enabled = enabled || sdlEventQueue.isEnabled(joyevents3[e]);
 
     return enabled;
