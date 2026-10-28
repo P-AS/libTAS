@@ -66,6 +66,9 @@ protected:
     int ar_delay;
     int ar_freq;
 
+    /* Savestate slot used by the selected savestate hotkeys */
+    int selectedSavestateId = 1;
+
     enum EventType {
         EVENT_TYPE_NONE = 0,
         EVENT_TYPE_PRESS,
