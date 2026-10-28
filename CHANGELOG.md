@@ -64,6 +64,7 @@
 * Remove the Dockerfile, the Xcode project and the AppVeyor config
 * Docs: link to the TASVideos lists of movies made with libTAS (#716)
 * Docs: add a page listing the sources of randomness used by games (#679)
+* Docs: clarify the package installation step of the WSL guide (#506)
 
 ### Fixed
 
