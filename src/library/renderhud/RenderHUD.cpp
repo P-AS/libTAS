@@ -187,7 +187,10 @@ void RenderHUD::drawAll(uint64_t framecount, uint64_t nondraw_framecount, const 
             LuaDraw::draw(ImGui::GetBackgroundDrawList(), ImVec2(0, 0), 1.0f);
     }
 
-    if (Global::shared_config.osd) {
+    /* When encoding with only the Lua drawings, hide every other OSD element */
+    bool lua_only = Global::shared_config.av_dumping && Global::shared_config.osd_lua && !Global::shared_config.osd_encode;
+
+    if (Global::shared_config.osd && !lua_only) {
         ImGui::PushStyleColor(ImGuiCol_MenuBarBg, ImVec4(0.14f, 0.14f, 0.14f, 0.50f));
         ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.14f, 0.14f, 0.14f, 0.50f));
 
@@ -238,6 +241,9 @@ void RenderHUD::drawAll(uint64_t framecount, uint64_t nondraw_framecount, const 
         }
     }
     old_show_game_window = show_game_window;
+
+    if (lua_only)
+        return;
 
     if (show_file)
         FileDebug::draw(framecount, &show_file);

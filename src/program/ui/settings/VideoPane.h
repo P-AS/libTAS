@@ -60,6 +60,7 @@ private:
 
     QCheckBox* osdMenuBox;
     QCheckBox* osdEncodeBox;
+    QCheckBox* osdLuaBox;
     QDoubleSpinBox* fontSize;
 
     ToolTipCheckBox* rendSoftBox;
