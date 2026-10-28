@@ -33,6 +33,13 @@ namespace libtas {
 void pushNativeXlibEvents(void);
 void pushNativeXlibEvents(Display *display);
 
+/* Make the X server send a dummy event to the connection, so that its socket
+ * becomes readable. The event is filtered when pulled. */
+void sendXlibWakeEvent(Display *display);
+
+/* Returns if the last wake event was not pulled yet */
+bool isXlibWakeEventPending(Display *display);
+
 OVERRIDE int XNextEvent(Display *display, XEvent *event_return);
 OVERRIDE int XPeekEvent(Display *display, XEvent *event_return);
 OVERRIDE int XWindowEvent(Display *display, Window w, long event_mask, XEvent *event_return);

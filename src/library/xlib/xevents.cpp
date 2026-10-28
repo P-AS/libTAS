@@ -36,6 +36,7 @@
 #include "screencapture/ScreenCapture.h"
 #include "../external/X11/XInput2.h"
 #include "../external/imgui/imgui_impl_xlib.h"
+#include <map>
 
 namespace libtas {
 
@@ -69,6 +70,14 @@ static std::shared_ptr<XlibEventQueue> getEventQueue(Display* display, const cha
     return queue;
 }
 
+/* Window created by each connection to receive our wake events, and if a
+ * wake event was sent and not received yet */
+struct WakeWindow {
+    Window w = 0;
+    bool pending = false;
+};
+static std::map<Display*, WakeWindow> wakeWindows;
+
 /* Function to indicate if an event is filtered */
 static Bool isEventFiltered (XEvent *event) {
     switch (event->type) {
@@ -96,6 +105,10 @@ static Bool isEventFiltered (XEvent *event) {
             }
             return False;
         case ClientMessage:
+            if (reinterpret_cast<XClientMessageEvent*>(event)->message_type == x11_atom(_LIBTAS_WAKE_EVENTS)) {
+                wakeWindows[event->xany.display].pending = false;
+                return True;
+            }
             if (static_cast<Atom>(reinterpret_cast<XClientMessageEvent*>(event)->data.l[0]) == x11_atom(WM_TAKE_FOCUS))
                 return True;
             return False;
@@ -162,6 +175,33 @@ void pushNativeXlibEvents(Display *display)
         n = XPending(display);
     }
     XUnlockDisplay(display);
+}
+
+void sendXlibWakeEvent(Display *display)
+{
+    GlobalNative gn;
+
+    WakeWindow &ww = wakeWindows[display];
+    if (!ww.w)
+        ww.w = XCreateSimpleWindow(display, DefaultRootWindow(display), 0, 0, 1, 1, 0, 0, 0);
+    Window w = ww.w;
+    ww.pending = true;
+
+    /* With an empty event mask, the event is sent to the client that created
+     * the window, which is us */
+    XEvent event = {};
+    event.xclient.type = ClientMessage;
+    event.xclient.window = w;
+    event.xclient.message_type = x11_atom(_LIBTAS_WAKE_EVENTS);
+    event.xclient.format = 32;
+    XSendEvent(display, w, False, 0, &event);
+    XFlush(display);
+}
+
+bool isXlibWakeEventPending(Display *display)
+{
+    auto it = wakeWindows.find(display);
+    return (it != wakeWindows.end()) && it->second.pending;
 }
 
 int XNextEvent(Display *display, XEvent *event_return)

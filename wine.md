@@ -183,6 +183,48 @@ then presented by the game thread.
   event while looking for the receiving window, so when the first connection
   did not know the game window, the next ones received the event with a null
   window and dropped it (`23c55fd8`). This bug is not Wine specific.
+- **Unfocused window, no inputs** ("if a window is not focused, it does not
+  receive any input, and playback desyncs"). Two separate causes:
+  - winex11 only reads X events when wineserver notices that the X
+    connection of the thread is readable (it then sets the `QS_DRIVER`
+    internal queue bit, and `process_driver_events()` calls
+    `X11DRV_ProcessEvents()`). Events that libTAS inserts in its emulated
+    Xlib queue don't touch the socket, so they waited for an unrelated real
+    X event (pointer motion, focus change, ...), which mostly happens while
+    the game window has the focus. Keys arrived late, in bursts, or never.
+    Now the `NtUserPeekMessage`, `NtUserGetMessage` and
+    `NtUserMsgWaitForMultipleObjectsEx` hooks first check the libTAS queue
+    of the thread's display (`x11::threadDisplay`, the last display opened
+    by the thread); if it has events, `sendXlibWakeEvent()` makes the X
+    server send a dummy `_LIBTAS_WAKE_EVENTS` ClientMessage to a 1x1 window
+    owned by that connection (filtered when pulled), and we call
+    `orig::NtUserMsgWaitForMultipleObjectsEx(0, NULL, 1, 0, 0)` until the
+    wake event has been pulled (at most 100 times). Wine processes driver
+    events inside that wait, and the same `X11DRV_ProcessEvents()` call pulls
+    the wake event and empties our queue (or processes nothing when nested in
+    an event handler, which also ends our wait). Don't wait for the queue
+    to be signaled: the processing clears `QS_DRIVER`, so with empty masks a
+    long wait always ran out its full timeout, which made Boshy 3x slower.
+    winex11.so and win32u.so are stripped, so `X11DRV_ProcessEvents` cannot
+    be called directly, and keeping `QS_DRIVER` always set would make
+    `GetMessage` busy-loop.
+  - Wine 11 picks the foreground window from the root `_NET_ACTIVE_WINDOW`
+    property (`net_active_window_notify()`, then
+    `X11DRV_GetWindowStateUpdates()`). A non-Wine active window (the libTAS
+    window, a terminal) maps to the desktop, so the game got `WM_ACTIVATE`
+    inactive and lost the keyboard focus. `XGetWindowProperty` now reports
+    the game window when the active window is not one of the game windows
+    (`XlibGameWindow::contains()`). Without a window manager the property
+    does not exist and Wine uses FocusIn/FocusOut, which we already filter.
+  - Reproduced with a mingw test program logging `GetForegroundWindow()`
+    and `WM_KEYDOWN` counts per frame, openbox running in the test Xwayland,
+    and a Lua script focusing an xterm with `wmctrl -i -a` (xeyes does not
+    accept the focus). Before: no `WM_KEYDOWN` at all even when focused, and
+    the game deactivated after the xterm got the focus. After: every key
+    press arrives on its frame. Boshy (which polls keys) froze at frame 51
+    once the xterm took the focus, because Clickteam stops when its window
+    is deactivated; it now plays on, and the imported movie gives the same
+    image at frame 3000 as before the change, in the same time.
 - Hourglass import: Hourglass records `VK_LBUTTON` as a held key, which the
   importer converts into a pointer button (`95373926`).
 

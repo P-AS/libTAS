@@ -31,6 +31,7 @@ namespace libtas {
 DEFINE_ORIG_POINTER(XOpenDisplay)
 
 Display* x11::gameDisplays[GAMEDISPLAYNUM] = {};
+thread_local Display* x11::threadDisplay = nullptr;
 
 Display *XOpenDisplay(const char *display_name)
 {
@@ -56,6 +57,8 @@ Display *XOpenDisplay(const char *display_name)
         LOG(LL_ERROR, LCF_WINDOW, "   Reached the limit of registered X connections");
     }
 
+    x11::threadDisplay = display;
+
     /* Initialize atoms */
     initX11Atoms(display);
 
@@ -75,6 +78,9 @@ int XCloseDisplay(Display *display)
             break;
         }
     }
+
+    if (x11::threadDisplay == display)
+        x11::threadDisplay = nullptr;
 
     /* Delete event queue */
     xlibEventQueueList.deleteQueue(display);
