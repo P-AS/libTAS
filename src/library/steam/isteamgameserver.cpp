@@ -76,10 +76,10 @@ bool ISteamGameServer::BSecure()
     return false;
 }
 
-CSteamID ISteamGameServer::GetSteamID()
+STEAMID_RET ISteamGameServer::GetSteamID( STEAMID_RET_ARG_ONLY )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
-    return 0;
+    STEAMID_RETURN(0);
 }
 
 bool ISteamGameServer::WasRestartRequested()
@@ -154,10 +154,10 @@ bool ISteamGameServer::SendUserConnectAndAuthenticate( uint32_t unIPClient, cons
     return true;
 }
 
-CSteamID ISteamGameServer::CreateUnauthenticatedUserConnection()
+STEAMID_RET ISteamGameServer::CreateUnauthenticatedUserConnection( STEAMID_RET_ARG_ONLY )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
-    return 0;
+    STEAMID_RETURN(0);
 }
 
 void ISteamGameServer::SendUserDisconnect( CSteamID steamIDUser )

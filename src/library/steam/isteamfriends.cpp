@@ -59,10 +59,10 @@ int ISteamFriends::GetFriendCount( int iFriendFlags )
 	return 0;
 }
 
-CSteamID ISteamFriends::GetFriendByIndex( int iFriend, int iFriendFlags )
+STEAMID_RET ISteamFriends::GetFriendByIndex( STEAMID_RET_ARG int iFriend, int iFriendFlags )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
-	return 0;
+	STEAMID_RETURN(0);
 }
 
 EFriendRelationship ISteamFriends::GetFriendRelationship( CSteamID steamIDFriend )

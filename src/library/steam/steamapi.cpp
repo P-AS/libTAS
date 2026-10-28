@@ -55,6 +55,7 @@
 #include <link.h>
 #endif
 #include <dlfcn.h>
+#include <cstring>
 
 namespace libtas {
 
@@ -169,6 +170,15 @@ const steam_interface* SteamGetAllInterfaces() {
 
 static bool SteamGetInterfaceVersion()
 {
+#ifdef _WIN32
+    /* Our dll replaces the one of the game, and can read the original one */
+    const char* steam_path = SteamGetOriginalLibraryPath();
+    if (!steam_path) {
+        LOG(LL_WARN, LCF_STEAM, "Could not find Steam library path");
+        return false;
+    }
+    int ret;
+#else
     GlobalNative gn;
 
     /* Load SteamAPI library */
@@ -217,6 +227,7 @@ static bool SteamGetInterfaceVersion()
 #endif
 
     dlclose(h);
+#endif
 
     /* Find Steam interface version from the library.
      * Taken from https://git.bitmycode.com/Booti386/DummySteamAPI */

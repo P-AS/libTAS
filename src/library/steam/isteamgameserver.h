@@ -69,7 +69,7 @@ public:
 	// status functions
 	virtual bool BLoggedOn();
 	virtual bool BSecure();
-	virtual CSteamID GetSteamID();
+	virtual STEAMID_RET GetSteamID( STEAMID_RET_ARG_ONLY );
 
 	/// Returns true if the master server has requested a restart.
 	/// Only returns true once per request.
@@ -149,7 +149,7 @@ public:
 	//
 	// Return Value: Returns a SteamID for the user to be tracked with, you should call HandleUserDisconnect()
 	// when this user leaves the server just like you would for a real user.
-	virtual CSteamID CreateUnauthenticatedUserConnection();
+	virtual STEAMID_RET CreateUnauthenticatedUserConnection( STEAMID_RET_ARG_ONLY );
 
 	// Should be called whenever a user leaves our game server, this lets Steam internally
 	// track which users are currently on which servers for the purposes of preventing a single
