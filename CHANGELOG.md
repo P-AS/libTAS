@@ -39,6 +39,8 @@
   slot (#550)
 * Lua: add movie.getMarker(), movie.setMarker(), movie.insertFrame() and
   movie.insertFrames() (#668)
+* Input editor: mark frames where fast-forward is disabled, for game
+  sections that break when fast-forwarded (#729)
 
 ### Changed
 

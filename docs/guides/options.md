@@ -50,6 +50,12 @@ Opens a window showing the inputs of the playing movie. The first column shows t
 
 It is possible to change the label of an input, or to add an input column by right-clicking on a column header. Also, right-clicking on a cell provides several options to the user.
 
+Some games break when they are fast-forwarded through some sections, such as
+cutscenes. Selecting frames and choosing "Disable fast-forward" in the
+right-click menu prevents fast-forwarding on these frames: their frame number
+is highlighted, and fast-forward resumes automatically after them. This is
+saved in the movie file.
+
 When the input editor is opened, the savestates work a bit differently. When in recording mode, if you load a savestate, it will load the entire movie even past the current frame of the savestate.
 
 ## Video

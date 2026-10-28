@@ -218,6 +218,10 @@ int SaveState::postLoad(Context* context, MovieFile& m, bool branch, bool inputE
         sendMessage(MSGN_CONFIG);
         sendData(&context->config.sc, sizeof(SharedConfig));
 
+        /* Send it again at the end of the frame, with the fast-forward
+         * override of the loaded frame applied */
+        context->config.sc_modified = true;
+
         if (!((!branch) && 
             (context->config.sc.recording == SharedConfig::RECORDING_READ ||
                 (context->config.sc.recording == SharedConfig::RECORDING_WRITE &&

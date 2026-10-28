@@ -54,6 +54,10 @@ private:
     /* Current encoding segment. Sent when game is restarted */
     int encoding_segment = 0;
 
+    /* Fast-forward is disabled because the current frame is marked as such
+     * in the movie */
+    bool fastforward_blocked = false;
+
     /* PID of the forked `sh` process which executes the game */
     pid_t fork_pid;
 
