@@ -90,9 +90,11 @@ void VideoPane::initLayout()
 
     osdMenuBox = new QCheckBox(tr("Main Menu"));
     osdEncodeBox = new QCheckBox(tr("OSD on video encode"));
+    osdLuaBox = new QCheckBox(tr("Lua on video encode"));
 
     osdLayout->addRow(osdMenuBox);
     osdLayout->addRow(osdEncodeBox);
+    osdLayout->addRow(osdLuaBox);
 
     fontSize = new QDoubleSpinBox();
     fontSize->setRange(0.1, 144.0);
@@ -145,6 +147,7 @@ void VideoPane::initSignals()
     });
     connect(osdMenuBox, &QAbstractButton::clicked, this, &VideoPane::saveConfig);
     connect(osdEncodeBox, &QAbstractButton::clicked, this, &VideoPane::saveConfig);
+    connect(osdLuaBox, &QAbstractButton::clicked, this, &VideoPane::saveConfig);
     connect(fontSize, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &VideoPane::saveConfig);
 
     connect(rendSoftBox, &QAbstractButton::clicked, this, &VideoPane::saveConfig);
@@ -199,6 +202,7 @@ void VideoPane::loadConfig()
 
     osdMenuBox->setChecked(context->config.sc.osd);
     osdEncodeBox->setChecked(context->config.sc.osd_encode);
+    osdLuaBox->setChecked(context->config.sc.osd_lua);
 
     fontSize->setValue(context->config.sc.osd_font_size);
 
@@ -224,6 +228,7 @@ void VideoPane::saveConfig()
 
     context->config.sc.osd = osdMenuBox->isChecked();
     context->config.sc.osd_encode = osdEncodeBox->isChecked();
+    context->config.sc.osd_lua = osdLuaBox->isChecked();
 
     context->config.sc.osd_font_size = fontSize->value();
 

@@ -33,6 +33,8 @@
 * Encode: add VP9 and AV1 (SVT-AV1) video codecs
 * Add an input option to always report the game window position as (0,0),
   which fixes mouse offset in some Godot games (#750)
+* Add a video setting to include only the Lua drawings in the video encode
+  (#670)
 
 ### Changed
 

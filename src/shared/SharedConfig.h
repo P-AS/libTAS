@@ -304,6 +304,9 @@ struct __attribute__((packed, aligned(8))) SharedConfig {
     /* Display OSD in the video encode */
     bool osd_encode = false;
 
+    /* Display only Lua drawings in the video encode */
+    bool osd_lua = false;
+
     /* Font size for OSD */
     double osd_font_size = 16.0;
 
