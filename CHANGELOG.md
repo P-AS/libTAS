@@ -90,6 +90,7 @@
   implemented
 * Steam: don't give the ISteamUGC interface for versions that we don't
   implement, as games crashed when calling it
+* Input editor: Fix Qt warnings about invalid dataChanged() index ranges
 
 ## [1.4.8] - 2026-05-14
 ### Added

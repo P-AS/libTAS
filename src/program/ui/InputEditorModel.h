@@ -210,6 +210,8 @@ public slots:
     void removeMarkersInRange(int startRow, int endRow);
 
 private:
+    void notifyDataChanged(int minRow, int minCol, int maxRow, int maxCol, const QVector<int> &roles = QVector<int>());
+
     Context *context;
     MovieFile *movie;
 
