@@ -165,6 +165,24 @@ then presented by the game thread.
   window when swapping (`7424fbb3`). This is restricted to Wine games because
   on other platforms the native window is not an X window, and an Xlib error
   would kill the game (Wine installs its own X error handler).
+- **Offscreen client surfaces**: when the GL (or Vulkan) window is a child
+  window, has DPI scaling or has child windows (`needs_offscreen_rendering()`
+  in winex11 `init.c`), Wine renders into a client window detached under a
+  dummy parent, and after the swap `client_surface_present()` (win32u)
+  blits it into the top-level window through GDI. Boshy draws into a
+  627x667 child window, so it is offscreen. Our frame boundary runs inside
+  `eglSwapBuffers`, before that blit, so while paused the window showed the
+  previous frame, and the redraws on Expose (window moved over the game)
+  only updated the offscreen window, leaving black holes. We patch
+  `client_surface_present` to remember the last presented surface (holding a
+  reference with `client_surface_add_ref`), and present it again after each
+  swap that libTAS performs in Wine games (EGL and GLX). Wine still presents
+  after the hook returns, which costs a second blit per frame but no
+  measurable time. Surfaces that are not offscreen get no DC, and the present
+  does nothing. To reproduce: pause, raise another window over the game with
+  `wmctrl -i -a` and move it away; `xwininfo -root -tree` shows the client
+  window under a 1x1 window of another connection (`gdi_display`). Wine
+  ignores Expose events itself, since we filter them.
 - Wine sets the title of SRB2's window to "FluidSynth...", cosmetic.
 - SRB2's default window is 2560x1415 (from its own config), larger than a small
   test display.

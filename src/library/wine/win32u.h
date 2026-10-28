@@ -24,6 +24,10 @@ namespace libtas {
 
 void hook_win32u();
 
+/* Present again the last OpenGL/Vulkan surface that wine presented, which
+ * wine only does after the swap */
+void present_wine_client_surface();
+
 }
 
 #endif

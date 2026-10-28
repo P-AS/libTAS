@@ -115,6 +115,8 @@
   desynced playback when the game window was not focused
 * Hide the activation of other windows from the game, so that Wine does not
   deactivate the game window
+* Wine: fix the game window not being repainted while paused, and showing the
+  previous frame, for games drawing to a child window
 
 ## [1.4.8] - 2026-05-14
 ### Added

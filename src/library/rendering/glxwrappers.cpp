@@ -30,6 +30,8 @@
 #include "UnityHacks.h"
 #include "global.h"
 #include "GlobalState.h"
+#include "wine/winehook.h"
+#include "wine/win32u.h"
 
 #define GLX_GLXEXT_PROTOTYPES
 #define GL_GLEXT_PROTOTYPES
@@ -315,7 +317,13 @@ void glXSwapBuffers( Display *dpy, XID drawable )
 
     /* Start the frame boundary and pass the function to draw */
     static RenderHUD_GL renderHUD;
-    frameBoundary([&] () {NATIVECALL(glProcs.XSwapBuffers(dpy, drawable));}, renderHUD);
+    frameBoundary([&] () {
+        NATIVECALL(glProcs.XSwapBuffers(dpy, drawable));
+        /* Wine copies offscreen surfaces into the game window only after
+         * this swap returns, so do it now for frames shown while paused */
+        if (isWineGame())
+            present_wine_client_surface();
+    }, renderHUD);
 }
 
 static int swapInterval = 0;
