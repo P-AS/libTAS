@@ -82,6 +82,8 @@
   CAP_CHECKPOINT_RESTORE capability
 * Fix savestate loading hanging forever on a truncated savestate
 * Fix the game log file keeping the end of previous runs
+* Fix Xlib BadIDChoice errors after loading a savestate when X resources
+  were created since the state was saved
 
 ## [1.4.8] - 2026-05-14
 ### Added
