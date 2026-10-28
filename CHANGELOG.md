@@ -31,6 +31,8 @@
 * Support Wayland in the AppImage and the deb package
 * Encode: save and load named presets of encoding settings
 * Encode: add VP9 and AV1 (SVT-AV1) video codecs
+* Add an input option to always report the game window position as (0,0),
+  which fixes mouse offset in some Godot games (#750)
 
 ### Changed
 
