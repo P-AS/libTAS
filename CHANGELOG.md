@@ -98,6 +98,8 @@
   after the movie was loaded
 * Fix xlib key inputs being dropped when the game opens multiple displays
   (#765)
+* Find the lavapipe Vulkan driver for software rendering on any arch and
+  in non-standard locations such as NixOS (#763)
 
 ## [1.4.8] - 2026-05-14
 ### Added
