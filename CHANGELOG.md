@@ -29,6 +29,7 @@
 * Add GitHub Actions builds of deb packages and AppImages for x86_64
   and aarch64
 * Support Wayland in the AppImage and the deb package
+* Encode: save and load named presets of encoding settings
 
 ### Changed
 

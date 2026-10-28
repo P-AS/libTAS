@@ -28,7 +28,58 @@
 #include <QtWidgets/QHBoxLayout>
 #include <QtWidgets/QVBoxLayout>
 #include <QtWidgets/QGridLayout>
+#include <QtWidgets/QInputDialog>
+#include <QtWidgets/QMessageBox>
+#include <QtCore/QSettings>
+#include <QtCore/QList>
+#include <QtCore/QVariantMap>
 #include <iostream>
+
+/* Encode presets are stored in the general preferences, so they are shared
+ * between games */
+static QList<QVariantMap> readPresets(const Context* context)
+{
+    std::filesystem::path generalPath = context->config.configdir / "libTAS.ini";
+    QSettings settings(QString(generalPath.c_str()), QSettings::IniFormat);
+    settings.setFallbacksEnabled(false);
+
+    QList<QVariantMap> presets;
+    int size = settings.beginReadArray("encode_presets");
+    for (int i = 0; i < size; ++i) {
+        settings.setArrayIndex(i);
+        QVariantMap preset;
+        for (const QString& key : settings.childKeys())
+            preset[key] = settings.value(key);
+        presets.append(preset);
+    }
+    settings.endArray();
+
+    return presets;
+}
+
+static void writePresets(const Context* context, const QList<QVariantMap>& presets)
+{
+    std::filesystem::path generalPath = context->config.configdir / "libTAS.ini";
+    QSettings settings(QString(generalPath.c_str()), QSettings::IniFormat);
+    settings.setFallbacksEnabled(false);
+
+    settings.remove("encode_presets");
+    settings.beginWriteArray("encode_presets");
+    for (int i = 0; i < presets.size(); ++i) {
+        settings.setArrayIndex(i);
+        for (auto it = presets[i].constBegin(); it != presets[i].constEnd(); ++it)
+            settings.setValue(it.key(), it.value());
+    }
+    settings.endArray();
+}
+
+static int findPreset(const QList<QVariantMap>& presets, const QString& name)
+{
+    for (int i = 0; i < presets.size(); ++i)
+        if (presets[i].value("name").toString() == name)
+            return i;
+    return -1;
+}
 
 EncodeWindow::EncodeWindow(Context* c, QWidget *parent) : QDialog(parent), context(c)
 {
@@ -45,6 +96,27 @@ EncodeWindow::EncodeWindow(Context* c, QWidget *parent) : QDialog(parent), conte
     encodeFileLayout->addWidget(encodePath);
     encodeFileLayout->addWidget(browseEncodePath);
     encodeFileGroupBox->setLayout(encodeFileLayout);
+
+    /* Presets */
+    presetChoice = new QComboBox();
+    presetChoice->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+
+    loadPresetButton = new QPushButton(tr("Load"));
+    connect(loadPresetButton, &QAbstractButton::clicked, this, &EncodeWindow::slotLoadPreset);
+
+    QPushButton *savePresetButton = new QPushButton(tr("Save..."));
+    connect(savePresetButton, &QAbstractButton::clicked, this, &EncodeWindow::slotSavePreset);
+
+    deletePresetButton = new QPushButton(tr("Delete"));
+    connect(deletePresetButton, &QAbstractButton::clicked, this, &EncodeWindow::slotDeletePreset);
+
+    QGroupBox *presetGroupBox = new QGroupBox(tr("Encode presets"));
+    QHBoxLayout *presetLayout = new QHBoxLayout;
+    presetLayout->addWidget(presetChoice, 1);
+    presetLayout->addWidget(loadPresetButton);
+    presetLayout->addWidget(savePresetButton);
+    presetLayout->addWidget(deletePresetButton);
+    presetGroupBox->setLayout(presetLayout);
 
     /* Video/Audio codecs */
 
@@ -166,6 +238,7 @@ EncodeWindow::EncodeWindow(Context* c, QWidget *parent) : QDialog(parent), conte
     /* Create the main layout */
     QVBoxLayout *mainLayout = new QVBoxLayout;
 
+    mainLayout->addWidget(presetGroupBox);
     mainLayout->addWidget(encodeFileGroupBox);
     mainLayout->addWidget(codecGroupBox);
     mainLayout->addWidget(framerateGroupBox);
@@ -225,6 +298,114 @@ void EncodeWindow::update_config()
     if (context->config.ffmpegoptions.empty()) {
         slotUpdate();
     }
+
+    updatePresetList();
+}
+
+void EncodeWindow::updatePresetList()
+{
+    QString current = presetChoice->currentText();
+
+    presetChoice->clear();
+    for (const QVariantMap& preset : readPresets(context))
+        presetChoice->addItem(preset.value("name").toString());
+
+    int index = presetChoice->findText(current);
+    if (index >= 0)
+        presetChoice->setCurrentIndex(index);
+
+    bool hasPresets = presetChoice->count() > 0;
+    presetChoice->setEnabled(hasPresets);
+    loadPresetButton->setEnabled(hasPresets);
+    deletePresetButton->setEnabled(hasPresets);
+}
+
+void EncodeWindow::slotLoadPreset()
+{
+    QList<QVariantMap> presets = readPresets(context);
+    int index = findPreset(presets, presetChoice->currentText());
+    if (index < 0)
+        return;
+
+    const QVariantMap& preset = presets[index];
+
+    videoChoice->setCurrentIndex(preset.value("video_codec").toInt());
+    videoBitrate->setValue(preset.value("video_bitrate").toInt());
+    audioChoice->setCurrentIndex(preset.value("audio_codec").toInt());
+    audioBitrate->setValue(preset.value("audio_bitrate").toInt());
+
+    framerateGroupBox->setChecked(preset.value("custom_framerate").toBool());
+    videoFramerateNum->setValue(preset.value("video_framerate_num").toInt());
+    videoFramerateDen->setValue(preset.value("video_framerate_den").toInt());
+
+    resizeGroupBox->setChecked(preset.value("custom_resolution").toBool());
+    videoWidth->setValue(preset.value("video_width").toInt());
+    videoHeight->setValue(preset.value("video_height").toInt());
+    videoFilter->setCurrentIndex(preset.value("video_filter").toInt());
+
+    /* Update the enabled widgets, then restore the ffmpeg options which were
+     * overwritten when setting the codecs and bitrates */
+    slotUpdate();
+    ffmpegOptions->setText(preset.value("ffmpegoptions").toString());
+}
+
+void EncodeWindow::slotSavePreset()
+{
+    bool ok;
+    QString name = QInputDialog::getText(this, tr("Save encode preset"), tr("Preset name:"), QLineEdit::Normal, presetChoice->currentText(), &ok).trimmed();
+    if (!ok || name.isEmpty())
+        return;
+
+    QList<QVariantMap> presets = readPresets(context);
+    int index = findPreset(presets, name);
+    if (index >= 0) {
+        QMessageBox::StandardButton btn = QMessageBox::question(this, tr("Overwrite preset"), tr("The preset %1 already exists. Do you want to overwrite it?").arg(name), QMessageBox::Ok | QMessageBox::Cancel);
+        if (btn != QMessageBox::Ok)
+            return;
+    }
+
+    QVariantMap preset;
+    preset["name"] = name;
+    preset["video_codec"] = videoChoice->currentIndex();
+    preset["video_bitrate"] = videoBitrate->value();
+    preset["audio_codec"] = audioChoice->currentIndex();
+    preset["audio_bitrate"] = audioBitrate->value();
+    preset["ffmpegoptions"] = ffmpegOptions->text();
+    preset["custom_framerate"] = framerateGroupBox->isChecked();
+    preset["video_framerate_num"] = videoFramerateNum->value();
+    preset["video_framerate_den"] = videoFramerateDen->value();
+    preset["custom_resolution"] = resizeGroupBox->isChecked();
+    preset["video_width"] = videoWidth->value();
+    preset["video_height"] = videoHeight->value();
+    preset["video_filter"] = videoFilter->currentIndex();
+
+    if (index >= 0)
+        presets[index] = preset;
+    else
+        presets.append(preset);
+
+    writePresets(context, presets);
+
+    updatePresetList();
+    presetChoice->setCurrentIndex(presetChoice->findText(name));
+}
+
+void EncodeWindow::slotDeletePreset()
+{
+    QString name = presetChoice->currentText();
+    QList<QVariantMap> presets = readPresets(context);
+    int index = findPreset(presets, name);
+    if (index < 0)
+        return;
+
+    QMessageBox::StandardButton btn = QMessageBox::question(this, tr("Delete preset"), tr("Do you want to delete the preset %1?").arg(name), QMessageBox::Ok | QMessageBox::Cancel);
+    if (btn != QMessageBox::Ok)
+        return;
+
+    presets.removeAt(index);
+    writePresets(context, presets);
+
+    updatePresetList();
 }
 
 void EncodeWindow::slotUpdate()
