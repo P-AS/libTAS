@@ -54,6 +54,15 @@ namespace libtas {
 
 void __attribute__((constructor)) init(int argc, char** argv)
 {
+#ifdef __linux__
+    /* Look for the game process first, so that the processes that lead to
+     * it (such as the Proton script) don't use the delays below */
+    if (!wine_should_init(argc, argv)) {
+        GlobalState::setNative(true);
+        return;
+    }
+#endif
+
     /* If LIBTAS_DELAY_INIT env variable is > 0, skip initialization and
      * decrease env variable value */
     char* delay_str;
@@ -71,7 +80,7 @@ void __attribute__((constructor)) init(int argc, char** argv)
     }
 
 #ifdef __linux__
-    if (!wine_should_init(argc, argv)) {
+    if (wine_restart_pending()) {
         GlobalState::setNative(true);
         return;
     }

@@ -28,6 +28,8 @@
 #include <sstream>
 #include <map>
 #include <filesystem>
+#include <iomanip>
+#include <fstream>
 #include <vector>
 
 void remove_savestates(Context* context)
@@ -120,6 +122,64 @@ std::filesystem::path protonDistPath(const std::filesystem::path& proton_path)
     return "";
 }
 
+std::filesystem::path protonScriptPath(const Context* context)
+{
+    if (!context->config.use_proton || context->config.proton_path.empty())
+        return "";
+
+    std::filesystem::path script = context->config.proton_path / "proton";
+    if (std::filesystem::exists(script))
+        return script;
+    return "";
+}
+
+std::string steamAppId(const std::filesystem::path& gamepath, std::filesystem::path* steamapps)
+{
+    /* Steam games are installed in <library>/steamapps/common/<installdir>,
+     * and the app manifest in the steamapps directory gives the app id */
+    std::filesystem::path path = gamepath.parent_path();
+    while (!path.empty() && (path != path.parent_path())) {
+        std::filesystem::path parent = path.parent_path();
+        if ((parent.filename() == "common") && (parent.parent_path().filename() == "steamapps")) {
+            std::filesystem::path apps = parent.parent_path();
+            std::string installdir = path.filename().string();
+            std::error_code ec;
+            for (const auto& entry : std::filesystem::directory_iterator(apps, ec)) {
+                std::string name = entry.path().filename().string();
+                if ((name.rfind("appmanifest_", 0) != 0) || (entry.path().extension() != ".acf"))
+                    continue;
+
+                std::ifstream manifest(entry.path());
+                std::string line, appid;
+                bool found = false;
+                while (std::getline(manifest, line)) {
+                    std::istringstream iss(line);
+                    std::string key, value;
+                    iss >> std::quoted(key) >> std::quoted(value);
+                    if (key == "appid")
+                        appid = value;
+                    else if ((key == "installdir") && (value == installdir))
+                        found = true;
+                }
+                if (found && !appid.empty()) {
+                    if (steamapps)
+                        *steamapps = apps;
+                    return appid;
+                }
+            }
+            break;
+        }
+        path = parent;
+    }
+
+    /* Some games also give their app id in this file */
+    std::ifstream appidfile(gamepath.parent_path() / "steam_appid.txt");
+    std::string appid;
+    if (appidfile >> appid)
+        return appid;
+    return "";
+}
+
 std::filesystem::path findWinePath(const Context* context, int gameArch)
 {
     /* WoW64 builds of wine (default since wine 10) only provide `wine`, which
@@ -133,6 +193,12 @@ std::filesystem::path findWinePath(const Context* context, int gameArch)
         std::filesystem::path distpath = protonDistPath(context->config.proton_path);
         if (distpath.empty())
             return "";
+
+        /* Proton >= 10 also provides a WoW64 build of wine, which runs
+         * 32-bit games with our 64-bit library */
+        std::filesystem::path wow64path = distpath / "bin-wow64" / "wine";
+        if (std::filesystem::exists(wow64path))
+            return wow64path;
 
         for (const auto& winename : winenames) {
             std::filesystem::path winepath = distpath / "bin" / winename;
