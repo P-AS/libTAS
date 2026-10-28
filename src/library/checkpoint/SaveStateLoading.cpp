@@ -118,7 +118,17 @@ Area& SaveStateLoading::nextArea()
 {
     if (flags_remaining > 0)
         lseek(pmfd, flags_remaining, SEEK_CUR);
-    Utils::readAll(pmfd, &area, sizeof(area));
+    ssize_t ret = Utils::readAll(pmfd, &area, sizeof(area));
+    if (ret != static_cast<ssize_t>(sizeof(area))) {
+        /* Reaching the end of file without the end area means that the
+         * savestate is truncated or was read at the wrong offsets. Make the
+         * end area like the saving code does, by only clearing the address
+         * and size of the last area, which stops the loading loops that
+         * would otherwise keep the previous area forever */
+        LOG(LL_ERROR, LCF_CHECKPOINT, "Savestate ended before its last area");
+        area.addr = nullptr;
+        area.size = 0;
+    }
     next_pfd_offset = area.page_offset;
     current_addr = static_cast<char*>(area.addr);
     flag_i = FLAGS_CHUNK;
