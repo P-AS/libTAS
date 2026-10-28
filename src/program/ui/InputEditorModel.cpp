@@ -687,7 +687,7 @@ void InputEditorModel::startPaint(int col, int minRow, int maxRow, int value, in
     paintValue = value;
     if (autofire >= 0)
         paintAutofire = autofire;
-    emit dataChanged(index(minRow, col), index(maxRow, col));
+    notifyDataChanged(minRow, col, maxRow, col);
 }
 
 void InputEditorModel::endPaint()
@@ -762,7 +762,7 @@ void InputEditorModel::renameLabel(int column, std::string label)
         return;
     
     movie->editor->input_set[column-COLUMN_SPECIAL_SIZE].description = label;
-    emit dataChanged(index(0, column), index(rowCount(), column));
+    notifyDataChanged(0, column, rowCount(), column);
     emit inputSetChanged();
 }
 
@@ -1130,7 +1130,7 @@ void InputEditorModel::lockUniqueInput(int column, bool locked)
     }
 
     /* Update the input column */
-    emit dataChanged(index(0,column), index(rowCount()-1,column));
+    notifyDataChanged(0, column, rowCount()-1, column);
 }
 
 
@@ -1197,7 +1197,7 @@ void InputEditorModel::beginEditInputs(int minRow, int maxRow)
 
 void InputEditorModel::endEditInputs(int minRow, int maxRow)
 {
-    emit dataChanged(index(minRow,0), index(maxRow,columnCount()-2));
+    notifyDataChanged(minRow, 0, maxRow, columnCount()-2);
 
     /* We have to check if new inputs were added */
     addUniqueInputs(minRow, maxRow);
@@ -1218,12 +1218,25 @@ void InputEditorModel::endRemoveInputs(int minRow, int maxRow)
     startHighlight(minRow, maxRow, 0, 1, true);
 }
 
+/* Emit dataChanged() with the range clamped to the existing cells, because
+ * Qt warns on out-of-range indexes. */
+void InputEditorModel::notifyDataChanged(int minRow, int minCol, int maxRow, int maxCol, const QVector<int> &roles)
+{
+    minRow = std::max(minRow, 0);
+    minCol = std::max(minCol, 0);
+    maxRow = std::min(maxRow, rowCount() - 1);
+    maxCol = std::min(maxCol, columnCount() - 1);
+    if (minRow > maxRow || minCol > maxCol)
+        return;
+    emit dataChanged(index(minRow, minCol), index(maxRow, maxCol), roles);
+}
+
 void InputEditorModel::update()
 {
     static uint64_t last_framecount = 0;
     if (context->framecount != last_framecount) {
-        emit dataChanged(index(context->framecount,0), index(context->framecount,columnCount()-2));
-        emit dataChanged(index(last_framecount,0), index(last_framecount,columnCount()-2));
+        notifyDataChanged(context->framecount, 0, context->framecount, columnCount()-2);
+        notifyDataChanged(last_framecount, 0, last_framecount, columnCount()-2);
         last_framecount = context->framecount;
     }
 }
@@ -1235,7 +1248,7 @@ void InputEditorModel::highlightUpdate()
         const std::chrono::duration<float> highlightDiff = highlightEnd - highlightStart;
         highlightTimeoutSec = std::min(highlightTimeoutSec, maxHighlightTimeoutSec - highlightDiff.count());
         
-        emit dataChanged(index(highlightMinRow,highlightMinCol), index(highlightMaxRow,highlightMaxCol));
+        notifyDataChanged(highlightMinRow, highlightMinCol, highlightMaxRow, highlightMaxCol);
     }
     else
         highlightTimer->stop();
@@ -1247,8 +1260,8 @@ void InputEditorModel::highlightUpdate()
 void InputEditorModel::registerSavestate(int slot, unsigned long long frame)
 {
     /* Refresh the first column for previous and current state framecount */
-    emit dataChanged(index(last_savestate,0), index(last_savestate,0));
-    emit dataChanged(index(frame,0), index(frame,0));
+    notifyDataChanged(last_savestate, 0, last_savestate, 0);
+    notifyDataChanged(frame, 0, frame, 0);
 
     /* Update last savestate frame */
     if (frame == 0) {
@@ -1266,9 +1279,9 @@ void InputEditorModel::registerSavestate(int slot, unsigned long long frame)
         return;
         
     if (oldRoot < newRoot)
-        emit dataChanged(index(oldRoot,0), index(newRoot,columnCount()-2));
+        notifyDataChanged(oldRoot, 0, newRoot, columnCount()-2);
     else
-        emit dataChanged(index(newRoot,0), index(oldRoot,columnCount()-2));
+        notifyDataChanged(newRoot, 0, oldRoot, columnCount()-2);
 }
 
 void InputEditorModel::moveInputs(int oldIndex, int newIndex)
@@ -1369,8 +1382,8 @@ void InputEditorModel::setHoveredCell(const QModelIndex &i)
     
     const QModelIndex old = hoveredIndex;
     hoveredIndex = i;
-    emit dataChanged(index(0,old.column()), index(rowCount(),old.column()), roles);
-    emit dataChanged(index(0,hoveredIndex.column()), index(rowCount(),hoveredIndex.column()), QVector<int>(1, Qt::BackgroundRole));
+    notifyDataChanged(0, old.column(), rowCount(), old.column(), roles);
+    notifyDataChanged(0, hoveredIndex.column(), rowCount(), hoveredIndex.column(), QVector<int>(1, Qt::BackgroundRole));
     emit headerDataChanged(Qt::Horizontal, old.column(), old.column());
     emit headerDataChanged(Qt::Horizontal, hoveredIndex.column(), hoveredIndex.column());
 }
@@ -1390,7 +1403,7 @@ void InputEditorModel::setAutoholdInput(int column, bool checked)
 
     movie->editor->setAutohold(column-COLUMN_SPECIAL_SIZE, checked);
 
-    emit dataChanged(index(0,column), index(rowCount(),column), QVector<int>(1, Qt::BackgroundRole));
+    notifyDataChanged(0, column, rowCount(), column, QVector<int>(1, Qt::BackgroundRole));
     emit headerDataChanged(Qt::Horizontal, column, column);
 }
 
@@ -1415,7 +1428,7 @@ void InputEditorModel::setAutofireInput(int column, bool checked)
 
     movie->editor->setAutofire(column-COLUMN_SPECIAL_SIZE, checked);
 
-    emit dataChanged(index(0,column), index(rowCount(),column), QVector<int>(1, Qt::BackgroundRole));
+    notifyDataChanged(0, column, rowCount(), column, QVector<int>(1, Qt::BackgroundRole));
     emit headerDataChanged(Qt::Horizontal, column, column);
 }
 
