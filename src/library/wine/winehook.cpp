@@ -107,20 +107,31 @@ bool wine_should_init(int argc, char** argv)
     }
 
     if (strcasecmp(exe, game) != 0) {
-        LOG(LL_INFO, LCF_WINE, "Skipping libtas init in wine process %s", argc > 0 ? argv[0] : "");
-        /* Don't propagate our library to the children of this process */
-        unsetenv("LD_PRELOAD");
-        return false;
-    }
+        LOG(LL_INFO, LCF_WINE, "Skipping libtas init in process %s %s", argc > 0 ? argv[0] : "", exe);
 
-    if (getenv("LIBTAS_WINE_RESTART")) {
-        LOG(LL_INFO, LCF_WINE, "Skipping libtas init in wine process that restarts the game");
-        /* Keep our library for the restarted game process */
-        unsetenv("LIBTAS_WINE_RESTART");
+        /* Don't propagate our library to the children of the other Windows
+         * programs that wine starts. Keep it in the processes that lead to
+         * the game: unix processes such as the Proton script (env, python),
+         * and the steam.exe of Proton, which starts the game. */
+        size_t len = strlen(exe);
+        bool windows_program = (len > 4) && (strcasecmp(exe + len - 4, ".exe") == 0);
+        if (windows_program && (strcasecmp(exe, "steam.exe") != 0))
+            unsetenv("LD_PRELOAD");
         return false;
     }
 
     wine_game = true;
+    return true;
+}
+
+bool wine_restart_pending()
+{
+    if (!wine_game || !getenv("LIBTAS_WINE_RESTART"))
+        return false;
+
+    LOG(LL_INFO, LCF_WINE, "Skipping libtas init in wine process that restarts the game");
+    /* Keep our library for the restarted game process */
+    unsetenv("LIBTAS_WINE_RESTART");
     return true;
 }
 
@@ -220,6 +231,27 @@ void hook_wine_syscall(const char* library, const char* name, void** orig_functi
             if (*entry == function)
                 entries.push_back(entry);
         }
+    }
+
+    /* Proton has other tables with some of these functions. The syscall
+     * table is sorted by name, so keep the entry between its neighbors. */
+    if (entries.size() > 1) {
+        auto symbolName = [](void* addr) -> const char* {
+            Dl_info info;
+            if (dladdr(addr, &info) && info.dli_sname && (info.dli_saddr == addr))
+                return info.dli_sname;
+            return nullptr;
+        };
+        std::vector<void**> sorted_entries;
+        for (void** entry : entries) {
+            const char* prev = symbolName(entry[-1]);
+            const char* next = symbolName(entry[1]);
+            if ((prev || next) &&
+                (!prev || (strcmp(prev, name) < 0)) &&
+                (!next || (strcmp(next, name) > 0)))
+                sorted_entries.push_back(entry);
+        }
+        entries = sorted_entries;
     }
 
     if (entries.size() != 1) {

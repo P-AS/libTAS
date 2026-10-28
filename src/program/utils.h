@@ -58,6 +58,14 @@ bool isWindowsBinary(int binaryType);
  * or an empty path if not found. */
 std::filesystem::path protonDistPath(const std::filesystem::path& proton_path);
 
+/* Get the path to the `proton` script when the game must be launched with
+ * Proton (Proton >= 5.13), or an empty path. */
+std::filesystem::path protonScriptPath(const Context* context);
+
+/* Get the Steam app id of a game installed in a Steam library, and the
+ * steamapps directory of that library if found, or an empty string. */
+std::string steamAppId(const std::filesystem::path& gamepath, std::filesystem::path* steamapps);
+
 /* Get the path to the wine executable used to launch a Windows game,
  * or an empty path if not found. */
 std::filesystem::path findWinePath(const Context* context, int gameArch);
