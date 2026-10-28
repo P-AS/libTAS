@@ -20,6 +20,7 @@
 #include "Movie.h"
 
 #include "Context.h"
+#include "movie/MovieFile.h"
 
 #include <iostream>
 extern "C" {
@@ -28,6 +29,8 @@ extern "C" {
 }
 
 static Context* context;
+static MovieFile* movie = nullptr;
+static std::function<void(int, const std::string&)> setMarkerFunc;
 
 /* List of functions to register */
 static const luaL_Reg movie_functions[] =
@@ -41,6 +44,10 @@ static const luaL_Reg movie_functions[] =
     { "getMovieFileName", Lua::Movie::getMovieFileName},
     { "getInitialSystemTime", Lua::Movie::getInitialSystemTime},
     { "getInitialElapsedTime", Lua::Movie::getInitialElapsedTime},
+    { "getMarker", Lua::Movie::getMarker},
+    { "setMarker", Lua::Movie::setMarker},
+    { "insertFrame", Lua::Movie::insertFrame},
+    { "insertFrames", Lua::Movie::insertFrames},
     { NULL, NULL }
 };
 
@@ -49,6 +56,12 @@ void Lua::Movie::registerFunctions(lua_State *L, Context* c)
     context = c;
     luaL_newlib(L, movie_functions);
     lua_setglobal(L, "movie");
+}
+
+void Lua::Movie::registerMovie(MovieFile* m, std::function<void(int, const std::string&)> set_marker)
+{
+    movie = m;
+    setMarkerFunc = set_marker;
 }
 
 int Lua::Movie::currentFrame(lua_State *L)
@@ -112,4 +125,51 @@ int Lua::Movie::getInitialElapsedTime(lua_State *L)
     lua_pushinteger(L, context->config.sc.initial_monotonic_time_sec);
     lua_pushinteger(L, context->config.sc.initial_monotonic_time_nsec);
     return 2;
+}
+
+int Lua::Movie::getMarker(lua_State *L)
+{
+    if (!movie || (context->config.sc.recording == SharedConfig::NO_RECORDING)) {
+        lua_pushnil(L);
+        return 1;
+    }
+
+    auto it = movie->editor->markers.find(context->framecount);
+    if (it == movie->editor->markers.end()) {
+        lua_pushnil(L);
+        return 1;
+    }
+
+    lua_pushstring(L, it->second.c_str());
+    return 1;
+}
+
+int Lua::Movie::setMarker(lua_State *L)
+{
+    const char* text = luaL_checkstring(L, 1);
+    if (!setMarkerFunc || (context->config.sc.recording == SharedConfig::NO_RECORDING))
+        return 0;
+
+    /* Markers are owned by the UI thread */
+    setMarkerFunc(context->framecount, text);
+    return 0;
+}
+
+int Lua::Movie::insertFrame(lua_State *L)
+{
+    if (!movie || (context->config.sc.recording == SharedConfig::NO_RECORDING))
+        return 0;
+
+    movie->inputs->insertInputsBefore(context->framecount, 1);
+    return 0;
+}
+
+int Lua::Movie::insertFrames(lua_State *L)
+{
+    lua_Integer count = luaL_checkinteger(L, 1);
+    if (!movie || (context->config.sc.recording == SharedConfig::NO_RECORDING) || (count <= 0))
+        return 0;
+
+    movie->inputs->insertInputsBefore(context->framecount, static_cast<int>(count));
+    return 0;
 }

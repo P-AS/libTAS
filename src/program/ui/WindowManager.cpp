@@ -32,6 +32,8 @@
 #include "InputEditorWindow.h"
 #include "InputEditorView.h"
 #include "InputEditorModel.h"
+#include "MarkerView.h"
+#include "MarkerModel.h"
 #include "AnnotationsWindow.h"
 #include "TimeTraceWindow.h"
 #include "TimeTraceModel.h"
@@ -412,6 +414,17 @@ void WindowManager::getMarkerText(std::string &text) const
     }
     else {
         text.clear();
+    }
+}
+
+void WindowManager::setMarker(int frame, const QString &text)
+{
+    /* Go through the marker model so that the input editor is notified */
+    if (inputEditorWindow_) {
+        inputEditorWindow_->markerView->markerModel->addMarker(frame, text);
+    }
+    else {
+        gameLoop->movie.editor->markers[frame] = text.toStdString();
     }
 }
 

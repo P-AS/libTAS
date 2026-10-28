@@ -318,6 +318,32 @@ and `nseconds` is the number of nanoseconds.
 Returns the elapsed time set at game startup. `seconds` is in whole seconds
 and `nseconds` is the number of nanoseconds.
 
+#### movie.getMarker
+
+    String movie.getMarker()
+
+Returns the text of the marker at the current frame, or nil if there is none
+or no movie is loaded.
+
+#### movie.setMarker
+
+    none movie.setMarker(String text)
+
+Adds a marker at the current frame with the given text, or replaces the text
+of the existing marker.
+
+#### movie.insertFrame
+
+    none movie.insertFrame()
+
+Inserts a blank frame in the movie at the current frame.
+
+#### movie.insertFrames
+
+    none movie.insertFrames(Number count)
+
+Inserts `count` blank frames in the movie at the current frame.
+
 ### Runtime functions
 
 Runtime functions must be performed in callback `onFrame()` to be effective on
