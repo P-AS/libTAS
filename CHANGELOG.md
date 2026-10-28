@@ -96,6 +96,8 @@
 * Fix signed/unsigned comparison compiler warnings
 * Input editor: fix input columns missing when the editor is first opened
   after the movie was loaded
+* Fix xlib key inputs being dropped when the game opens multiple displays
+  (#765)
 
 ## [1.4.8] - 2026-05-14
 ### Added
