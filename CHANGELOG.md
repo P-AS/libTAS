@@ -86,6 +86,10 @@
   were created since the state was saved
 * Steam: fix the arguments of ISteamUser and ISteamUserStats methods being
   shifted by one
+* Steam: fix crashes when games call ISteamFriends methods that were not
+  implemented
+* Steam: don't give the ISteamUGC interface for versions that we don't
+  implement, as games crashed when calling it
 
 ## [1.4.8] - 2026-05-14
 ### Added

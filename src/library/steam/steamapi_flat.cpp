@@ -77,8 +77,7 @@ ISteamUGC *SteamAPI_SteamUGC_v021()
         RETURN_NATIVE(SteamAPI_SteamUGC_v021, (), "steam_api");
     }
 
-    static ISteamUGC steamugc;
-    return &steamugc;
+    return SteamUGC_generic("STEAMUGC_INTERFACE_VERSION021");
 }
 
 ISteamMatchmaking *SteamAPI_SteamMatchmaking_v009()

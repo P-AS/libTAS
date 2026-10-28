@@ -115,7 +115,7 @@ void * SteamInternal_CreateInterface( const char *ver )
     else if (0 == symbol.compare("STEAMSCREENSHOTS_INTERFACE_VERSION"))
         symbol = "SteamScreenshots";
     else if (0 == symbol.compare("STEAMUGC_INTERFACE_VERSION"))
-        return SteamUGC();
+        return SteamUGC_generic(ver);
     else if (0 == symbol.compare("STEAMVIDEO_INTERFACE_V")) // Not a typo
         symbol = "SteamVideo";
     
@@ -166,7 +166,7 @@ void * SteamInternal_FindOrCreateUserInterface(HSteamUser steam_user, const char
     else if (0 == symbol.compare("STEAMSCREENSHOTS_INTERFACE_VERSION"))
         symbol = "SteamScreenshots";
     else if (0 == symbol.compare("STEAMUGC_INTERFACE_VERSION"))
-        return SteamUGC();
+        return SteamUGC_generic(version);
     else if (0 == symbol.compare("STEAMVIDEO_INTERFACE_V")) // Not a typo
         symbol = "SteamVideo";    
     
@@ -217,7 +217,7 @@ void * SteamInternal_FindOrCreateGameServerInterface(HSteamUser steam_user, cons
     else if (0 == symbol.compare("STEAMSCREENSHOTS_INTERFACE_VERSION"))
         symbol = "SteamScreenshots";
     else if (0 == symbol.compare("STEAMUGC_INTERFACE_VERSION"))
-        return SteamUGC();
+        return SteamUGC_generic(version);
     else if (0 == symbol.compare("STEAMVIDEO_INTERFACE_V")) // Not a typo
         symbol = "SteamVideo";    
     
