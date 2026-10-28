@@ -165,6 +165,22 @@ bool isWineX11drvAddress(const void* addr)
     return (a >= x11drv_start) && (a < x11drv_end);
 }
 
+void* find_wine_symbol(const char* library, const char* name)
+{
+    std::string libpath = find_lib(library);
+    if (libpath.empty())
+        return nullptr;
+
+    void* handle;
+    NATIVECALL(handle = dlopen(libpath.c_str(), RTLD_LAZY | RTLD_NOLOAD));
+    if (!handle)
+        return nullptr;
+
+    void* function;
+    NATIVECALL(function = dlsym(handle, name));
+    return function;
+}
+
 void hook_wine_syscall(const char* library, const char* name, void** orig_function, void* my_function)
 {
     std::string libpath = find_lib(library);

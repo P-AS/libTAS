@@ -28,6 +28,9 @@ namespace libtas {
  * the original function. */
 void hook_wine_syscall(const char* library, const char* name, void** orig_function, void* my_function);
 
+/* Returns the address of a symbol of an already loaded wine unix library */
+void* find_wine_symbol(const char* library, const char* name);
+
 /* Returns if libtas must be initialized in this process. When launching a
  * wine game, only the game process is hooked, and not the other processes
  * that wine starts, nor the 64-bit process that restarts a 32-bit game. */

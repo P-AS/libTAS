@@ -32,6 +32,7 @@
 #include "GlobalState.h"
 #ifdef __linux__
 #include "wine/winehook.h"
+#include "wine/win32u.h"
 #endif
 
 #include <string.h>
@@ -325,7 +326,13 @@ EGLBoolean eglSwapBuffers( EGLDisplay dpy, EGLSurface surface )
     /* Start the frame boundary and pass the function to draw */
     static RenderHUD_GL renderHUD;
     renderHUD.setGLES(bindAPI == EGL_OPENGL_ES_API);
-    frameBoundary([&] () {NATIVECALL(orig::eglSwapBuffers(dpy, surface));}, renderHUD);
+    frameBoundary([&] () {
+        NATIVECALL(orig::eglSwapBuffers(dpy, surface));
+        /* Wine copies offscreen surfaces into the game window only after
+         * this swap returns, so do it now for frames shown while paused */
+        if (isWineGame())
+            present_wine_client_surface();
+    }, renderHUD);
 
     return EGL_TRUE;
 }

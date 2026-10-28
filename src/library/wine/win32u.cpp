@@ -60,6 +60,9 @@ static int (*NtUserGetCursorPos)(POINT *pt);
 static uint32_t (*NtUserMsgWaitForMultipleObjectsEx)(uint32_t count, void* const *handles, uint32_t timeout, uint32_t mask, uint32_t flags);
 static int (*NtUserGetMessage)(void *msg, void *hwnd, uint32_t first, uint32_t last);
 static int (*NtUserPeekMessage)(void *msg, void *hwnd, uint32_t first, uint32_t last, uint32_t flags);
+static void (*client_surface_present)(void *surface);
+static void (*client_surface_add_ref)(void *surface);
+static void (*client_surface_release)(void *surface);
 
 }
 
@@ -253,6 +256,29 @@ static int NtUserGetMessage(void *msg, void *hwnd, uint32_t first, uint32_t last
     return orig::NtUserGetMessage(msg, hwnd, first, last);
 }
 
+/* Last client surface presented by wine */
+static void *last_client_surface = nullptr;
+
+void client_surface_present(void *surface)
+{
+    if (!GlobalState::isNative() && surface && (surface != last_client_surface) &&
+        orig::client_surface_add_ref && orig::client_surface_release) {
+        /* Keep a reference, so that the surface stays valid */
+        orig::client_surface_add_ref(surface);
+        if (last_client_surface)
+            orig::client_surface_release(last_client_surface);
+        last_client_surface = surface;
+    }
+
+    orig::client_surface_present(surface);
+}
+
+void present_wine_client_surface()
+{
+    if (last_client_surface && orig::client_surface_present)
+        orig::client_surface_present(last_client_surface);
+}
+
 void hook_win32u()
 {
     /* Patching twice would make the trampoline call our own function */
@@ -270,6 +296,13 @@ void hook_win32u()
     HOOK_PATCH_ORIG(NtUserGetKeyboardState, "win32u.so");
     HOOK_PATCH_ORIG(NtUserGetCursorPos, "win32u.so");
 
+    /* Wine presents offscreen OpenGL/Vulkan surfaces (child windows) into the
+     * game window itself after the swap, so we must present again after
+     * the swaps that we perform during the frame boundary */
+    HOOK_PATCH_ORIG(client_surface_present, "win32u.so");
+    orig::client_surface_add_ref = reinterpret_cast<decltype(orig::client_surface_add_ref)>(find_wine_symbol("win32u.so", "client_surface_add_ref"));
+    orig::client_surface_release = reinterpret_cast<decltype(orig::client_surface_release)>(find_wine_symbol("win32u.so", "client_surface_release"));
+
     /* Only redirect the waits coming from the Windows side */
     hook_wine_syscall("win32u.so", "NtUserMsgWaitForMultipleObjectsEx",
         reinterpret_cast<void**>(&orig::NtUserMsgWaitForMultipleObjectsEx),
@@ -284,6 +317,10 @@ void hook_win32u()
 
 #else
 void hook_win32u()
+{
+}
+
+void present_wine_client_surface()
 {
 }
 #endif
