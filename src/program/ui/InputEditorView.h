@@ -64,6 +64,7 @@ public slots:
     void clearInputs();
     void addMarker();
     void removeMarker();
+    void toggleNoFastForward();
     void getCurrentMarkerText(std::string &marker);
 
     void copyInputs();
@@ -134,6 +135,7 @@ private:
     QAction *pasteInsertAct;
     QAction *markAct;
     QAction *unmarkAct;
+    QAction *noFastForwardAct;
     QAction *undoAct;
     QAction *redoAct;
 

@@ -48,6 +48,9 @@ public:
     /* List of nondraw frames */
     std::set<uint64_t> nondraw_frames;
 
+    /* List of frames where fast-forward is disabled */
+    std::set<uint64_t> no_fastforward_frames;
+
     /* Prepare a movie file from the context */
     MovieFileEditor(Context* c);
 
@@ -69,6 +72,9 @@ public:
 
     /* Returns if draw frame */
     bool isDraw(uint64_t frame);
+
+    /* Returns if fast-forward is allowed on a frame */
+    bool isFastForwardAllowed(uint64_t frame);
 
     /* Set autohold of single input */
     void setAutohold(int index, bool checked);

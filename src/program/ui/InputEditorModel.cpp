@@ -353,6 +353,15 @@ QVariant InputEditorModel::data(const QModelIndex &index, int role) const
         /* Special columns */
         if (col < COLUMN_SPECIAL_SIZE) {
             color = color.lighter(105);
+
+            /* Highlight frames with fast-forward disabled */
+            if (col == COLUMN_FRAME && isNoFastForward(row)) {
+                color.getRgb(&r, &g, &b, nullptr);
+                if (lightTheme)
+                    color.setRgb(r, g - 0x20, b - 0x40);
+                else
+                    color.setRgb(r + 0x40, g + 0x20, b);
+            }
         }
         else {
             /* Check for locked input */
@@ -862,6 +871,23 @@ std::string InputEditorModel::getMarkerText(int frame)
         return movie->editor->markers[frame];
 
     return "";
+}
+
+bool InputEditorModel::isNoFastForward(int frame) const
+{
+    return movie->editor->no_fastforward_frames.count(frame) != 0;
+}
+
+void InputEditorModel::setNoFastForward(int minRow, int maxRow, bool disabled)
+{
+    for (int row = minRow; row <= maxRow; row++) {
+        if (disabled)
+            movie->editor->no_fastforward_frames.insert(row);
+        else
+            movie->editor->no_fastforward_frames.erase(row);
+    }
+
+    notifyDataChanged(minRow, COLUMN_FRAME, maxRow, COLUMN_FRAME, QVector<int>(1, Qt::BackgroundRole));
 }
 
 void InputEditorModel::copyInputs(int row, int count, std::ostringstream& inputString)
@@ -1486,4 +1512,39 @@ void InputEditorModel::removeMarkersInRange(int startRow, int endRow) {
     }
 
     movie->editor->markers = std::move(updatedMarkers);
+}
+
+void InputEditorModel::shiftNoFastForward(int startRow, int offset)
+{
+    /* Frames inserted inside a region with fast-forward disabled are part
+     * of that region */
+    bool inside = (startRow > 0) && isNoFastForward(startRow - 1) && isNoFastForward(startRow);
+
+    std::set<uint64_t> updatedFrames;
+    for (uint64_t frame : movie->editor->no_fastforward_frames) {
+        if (frame >= static_cast<uint64_t>(startRow))
+            updatedFrames.insert(frame + offset);
+        else
+            updatedFrames.insert(frame);
+    }
+    if (inside) {
+        for (int row = startRow; row < startRow + offset; row++)
+            updatedFrames.insert(row);
+    }
+
+    movie->editor->no_fastforward_frames = std::move(updatedFrames);
+}
+
+void InputEditorModel::removeNoFastForwardInRange(int startRow, int endRow)
+{
+    int offset = endRow - startRow + 1;
+    std::set<uint64_t> updatedFrames;
+    for (uint64_t frame : movie->editor->no_fastforward_frames) {
+        if (frame < static_cast<uint64_t>(startRow))
+            updatedFrames.insert(frame);
+        else if (frame > static_cast<uint64_t>(endRow))
+            updatedFrames.insert(frame - offset);
+    }
+
+    movie->editor->no_fastforward_frames = std::move(updatedFrames);
 }

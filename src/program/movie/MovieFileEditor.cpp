@@ -37,6 +37,7 @@ void MovieFileEditor::clear()
     autohold.clear();
     locked_inputs.clear();
     nondraw_frames.clear();
+    no_fastforward_frames.clear();
     markers.clear();
 }
 
@@ -68,6 +69,14 @@ void MovieFileEditor::load()
         editor.setArrayIndex(i);
         uint64_t f = static_cast<uint64_t>(editor.value("frame").toULongLong());
         nondraw_frames.insert(f);
+    }
+    editor.endArray();
+
+    size = editor.beginReadArray("no_fastforward_frames");
+    for (int i = 0; i < size; ++i) {
+        editor.setArrayIndex(i);
+        uint64_t f = static_cast<uint64_t>(editor.value("frame").toULongLong());
+        no_fastforward_frames.insert(f);
     }
     editor.endArray();
     
@@ -124,6 +133,15 @@ void MovieFileEditor::save()
         config.setValue("frame", static_cast<unsigned long long>(f));
     }
     config.endArray();
+
+    config.remove("no_fastforward_frames");
+    config.beginWriteArray("no_fastforward_frames");
+    i = 0;
+    for (uint64_t f : no_fastforward_frames) {
+        config.setArrayIndex(i++);
+        config.setValue("frame", static_cast<unsigned long long>(f));
+    }
+    config.endArray();
     
     config.remove("markers");
     config.beginWriteArray("markers");
@@ -162,6 +180,11 @@ void MovieFileEditor::setDraw(bool draw)
 bool MovieFileEditor::isDraw(uint64_t frame)
 {
     return !nondraw_frames.count(frame);
+}
+
+bool MovieFileEditor::isFastForwardAllowed(uint64_t frame)
+{
+    return !no_fastforward_frames.count(frame);
 }
 
 void MovieFileEditor::setAutohold(int index, bool checked)
