@@ -126,6 +126,8 @@ EncodeWindow::EncodeWindow(Context* c, QWidget *parent) : QDialog(parent), conte
     videoChoice->addItem("FFmpeg video codec #1", "ffv1");
     videoChoice->addItem("Ut video codec", "utvideo");
     videoChoice->addItem("raw video", "rawvideo");
+    videoChoice->addItem("VP9", "libvpx-vp9");
+    videoChoice->addItem("AV1 (SVT-AV1)", "libsvtav1");
     connect(videoChoice, static_cast<void (QComboBox::*)(int)>(&QComboBox::activated), this, &EncodeWindow::slotUpdate);
 
     videoBitrate = new QSpinBox();
@@ -429,6 +431,14 @@ void EncodeWindow::slotUpdate()
             break;
         case SharedConfig::VCODEC_RAW:
             videoBitrate->setEnabled(false);
+            break;
+        case SharedConfig::VCODEC_VP9:
+            videoBitrate->setEnabled(true);
+            options.append(QString(" -b:v %1k -pix_fmt yuv420p -deadline good -cpu-used 5 -row-mt 1").arg(videoBitrate->value()));
+            break;
+        case SharedConfig::VCODEC_AV1:
+            videoBitrate->setEnabled(true);
+            options.append(QString(" -b:v %1k -pix_fmt yuv420p -preset 8").arg(videoBitrate->value()));
             break;
         default:
             videoBitrate->setEnabled(true);

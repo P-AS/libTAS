@@ -98,6 +98,8 @@ struct __attribute__((packed, aligned(8))) SharedConfig {
         VCODEC_FFV1,
         VCODEC_UT,
         VCODEC_RAW,
+        VCODEC_VP9,
+        VCODEC_AV1,
     };
 
     /* Video filtering */
