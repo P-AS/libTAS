@@ -267,8 +267,14 @@ class CCallbackBase
 public:
     CCallbackBase() { m_nCallbackFlags = 0; m_iCallback = STEAM_CALLBACK_TYPE_ZERO; }
     // don't add a virtual destructor because we export this binary interface across dll's
+#ifdef _WIN32
+    /* MSVC puts overloaded virtual functions in reverse order */
+    virtual void Run( void *pvParam, bool bIOFailure, SteamAPICall_t hSteamAPICall ) = 0;
+    virtual void Run( void *pvParam ) = 0;
+#else
     virtual void Run( void *pvParam ) = 0;
     virtual void Run( void *pvParam, bool bIOFailure, SteamAPICall_t hSteamAPICall ) = 0;
+#endif
     steam_callback_type GetICallback() { return m_iCallback; }
     virtual int GetCallbackSizeBytes() = 0;
 

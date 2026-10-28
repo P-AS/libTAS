@@ -16,24 +16,24 @@ namespace libtas {
 
 struct ISteamUser023Vtbl
 {
-    HSteamUser (*GetHSteamUser)();
-    bool (*BLoggedOn)();
-    CSteamID (*GetSteamID)();
-    int (*InitiateGameConnection)( void *pAuthBlob, int cbMaxAuthBlob, CSteamID steamIDGameServer, unsigned int unIPServer, uint16_t usPortServer, bool bSecure );
-    void (*TerminateGameConnection)( unsigned int unIPServer, uint16_t usPortServer );
-    void (*TrackAppUsageEvent)( CGameID gameID, int eAppUsageEvent, const char *pchExtraInfo );
-    bool (*GetUserDataFolder)( char *pchBuffer, int cubBuffer );
-    void (*StartVoiceRecording)();
-    void (*StopVoiceRecording)();
-    EVoiceResult (*GetAvailableVoice)( unsigned int *pcbCompressed, unsigned int *pcbUncompressed_Deprecated, unsigned int nUncompressedVoiceDesiredSampleRate_Deprecated);
-    EVoiceResult (*GetVoice)( bool bWantCompressed, void *pDestBuffer, unsigned int cbDestBufferSize, unsigned int *nBytesWritten, bool bWantUncompressed_Deprecated, void *pUncompressedDestBuffer_Deprecated, unsigned int cbUncompressedDestBufferSize_Deprecated, unsigned int *nUncompressBytesWritten_Deprecated, unsigned int nUncompressedVoiceDesiredSampleRate_Deprecated);
-    EVoiceResult (*DecompressVoice)( const void *pCompressed, unsigned int cbCompressed, void *pDestBuffer, unsigned int cbDestBufferSize, unsigned int *nBytesWritten, unsigned int nDesiredSampleRate );
-    unsigned int (*GetVoiceOptimalSampleRate)();
-    HAuthTicket (*GetAuthSessionTicket)( void *pTicket, int cbMaxTicket, unsigned int *pcbTicket );
-    HAuthTicket (*GetAuthTicketForWebApi)( const char *pchIdentity );
-    EBeginAuthSessionResult (*BeginAuthSession)( const void *pAuthTicket, int cbAuthTicket, CSteamID steamID );
-    void (*EndAuthSession)( CSteamID steamID );
-    void (*CancelAuthTicket)( HAuthTicket hAuthTicket );
+    HSteamUser (STEAM_CALL *GetHSteamUser)( void* iface );
+    bool (STEAM_CALL *BLoggedOn)( void* iface );
+    STEAMID_RET (STEAM_CALL *GetSteamID)( void* iface STEAMID_RET_ARG_LAST );
+    int (STEAM_CALL *InitiateGameConnection)( void* iface, void *pAuthBlob, int cbMaxAuthBlob, CSteamID steamIDGameServer, unsigned int unIPServer, uint16_t usPortServer, bool bSecure );
+    void (STEAM_CALL *TerminateGameConnection)( void* iface, unsigned int unIPServer, uint16_t usPortServer );
+    void (STEAM_CALL *TrackAppUsageEvent)( void* iface, CGameID gameID, int eAppUsageEvent, const char *pchExtraInfo );
+    bool (STEAM_CALL *GetUserDataFolder)( void* iface, char *pchBuffer, int cubBuffer );
+    void (STEAM_CALL *StartVoiceRecording)( void* iface );
+    void (STEAM_CALL *StopVoiceRecording)( void* iface );
+    EVoiceResult (STEAM_CALL *GetAvailableVoice)( void* iface, unsigned int *pcbCompressed, unsigned int *pcbUncompressed_Deprecated, unsigned int nUncompressedVoiceDesiredSampleRate_Deprecated);
+    EVoiceResult (STEAM_CALL *GetVoice)( void* iface, bool bWantCompressed, void *pDestBuffer, unsigned int cbDestBufferSize, unsigned int *nBytesWritten, bool bWantUncompressed_Deprecated, void *pUncompressedDestBuffer_Deprecated, unsigned int cbUncompressedDestBufferSize_Deprecated, unsigned int *nUncompressBytesWritten_Deprecated, unsigned int nUncompressedVoiceDesiredSampleRate_Deprecated);
+    EVoiceResult (STEAM_CALL *DecompressVoice)( void* iface, const void *pCompressed, unsigned int cbCompressed, void *pDestBuffer, unsigned int cbDestBufferSize, unsigned int *nBytesWritten, unsigned int nDesiredSampleRate );
+    unsigned int (STEAM_CALL *GetVoiceOptimalSampleRate)( void* iface );
+    HAuthTicket (STEAM_CALL *GetAuthSessionTicket)( void* iface, void *pTicket, int cbMaxTicket, unsigned int *pcbTicket );
+    HAuthTicket (STEAM_CALL *GetAuthTicketForWebApi)( void* iface, const char *pchIdentity );
+    EBeginAuthSessionResult (STEAM_CALL *BeginAuthSession)( void* iface, const void *pAuthTicket, int cbAuthTicket, CSteamID steamID );
+    void (STEAM_CALL *EndAuthSession)( void* iface, CSteamID steamID );
+    void (STEAM_CALL *CancelAuthTicket)( void* iface, HAuthTicket hAuthTicket );
 	// EUserHasLicenseForAppResult (*UserHasLicenseForApp)( CSteamID steamID, AppId_t appID );
 	// bool (*BIsBehindNAT)();
 	// void (*AdvertiseGame)( CSteamID steamIDGameServer, uint32 unIPServer, uint16 usPortServer );

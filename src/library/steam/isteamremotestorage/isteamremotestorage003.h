@@ -16,26 +16,26 @@ namespace libtas {
 
 struct ISteamRemoteStorage003Vtbl
 {
-    bool (*FileWrite)( void* iface, const char *pchFile, const void *pvData, int cubData );
-    int (*FileRead)( void* iface, const char *pchFile, void *pvData, int cubDataToRead );
-    bool (*FileForget)( void* iface, const char *pchFile );
-    bool (*FileDelete)( void* iface, const char *pchFile );
-    SteamAPICall_t (*FileShare)( void* iface, const char *pchFile );
-    bool (*FileExists)( void* iface, const char *pchFile );
-    bool (*FilePersisted)( void* iface, const char *pchFile );
-    int (*GetFileSize)( void* iface, const char *pchFile );
-    int64_t (*GetFileTimestamp)( void* iface, const char *pchFile );
-    int (*GetFileCount)(void* iface);
-    const char *(*GetFileNameAndSize)( void* iface, int iFile, int *pnFileSizeInBytes );
-    bool (*GetQuota)( void* iface, uint64_t *pnTotalBytes, uint64_t *puAvailableBytes );
-    bool (*IsCloudEnabledForAccount)(void* iface);
-    bool (*IsCloudEnabledForApp)(void* iface);
-    void (*SetCloudEnabledForApp)( void* iface, bool bEnabled );
-    SteamAPICall_t (*UGCDownload)( void* iface, UGCHandle_t hContent, unsigned int unPriority );
-    bool (*GetUGCDetails)( void* iface, UGCHandle_t hContent, AppId_t *pnAppID, char **ppchName, int *pnFileSizeInBytes, CSteamID *pSteamIDOwner );
-    int (*UGCRead)( void* iface, UGCHandle_t hContent, void *pvData, int cubDataToRead, unsigned int cOffset, EUGCReadAction eAction );
-    int (*GetCachedUGCCount)(void* iface);
-    UGCHandle_t (*GetCachedUGCHandle)( void* iface, int iCachedContent );
+    bool (STEAM_CALL *FileWrite)( void* iface, const char *pchFile, const void *pvData, int cubData );
+    int (STEAM_CALL *FileRead)( void* iface, const char *pchFile, void *pvData, int cubDataToRead );
+    bool (STEAM_CALL *FileForget)( void* iface, const char *pchFile );
+    bool (STEAM_CALL *FileDelete)( void* iface, const char *pchFile );
+    SteamAPICall_t (STEAM_CALL *FileShare)( void* iface, const char *pchFile );
+    bool (STEAM_CALL *FileExists)( void* iface, const char *pchFile );
+    bool (STEAM_CALL *FilePersisted)( void* iface, const char *pchFile );
+    int (STEAM_CALL *GetFileSize)( void* iface, const char *pchFile );
+    int64_t (STEAM_CALL *GetFileTimestamp)( void* iface, const char *pchFile );
+    int (STEAM_CALL *GetFileCount)(void* iface);
+    const char *(STEAM_CALL *GetFileNameAndSize)( void* iface, int iFile, int *pnFileSizeInBytes );
+    bool (STEAM_CALL *GetQuota)( void* iface, uint64_t *pnTotalBytes, uint64_t *puAvailableBytes );
+    bool (STEAM_CALL *IsCloudEnabledForAccount)(void* iface);
+    bool (STEAM_CALL *IsCloudEnabledForApp)(void* iface);
+    void (STEAM_CALL *SetCloudEnabledForApp)( void* iface, bool bEnabled );
+    SteamAPICall_t (STEAM_CALL *UGCDownload)( void* iface, UGCHandle_t hContent, unsigned int unPriority );
+    bool (STEAM_CALL *GetUGCDetails)( void* iface, UGCHandle_t hContent, AppId_t *pnAppID, char **ppchName, int *pnFileSizeInBytes, CSteamID *pSteamIDOwner );
+    int (STEAM_CALL *UGCRead)( void* iface, UGCHandle_t hContent, void *pvData, int cubDataToRead, unsigned int cOffset, EUGCReadAction eAction );
+    int (STEAM_CALL *GetCachedUGCCount)(void* iface);
+    UGCHandle_t (STEAM_CALL *GetCachedUGCHandle)( void* iface, int iCachedContent );
 };
 
 struct ISteamRemoteStorage *SteamRemoteStorage003(void);

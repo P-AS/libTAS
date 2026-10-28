@@ -131,25 +131,25 @@ struct ISteamUser *SteamAPI_SteamUser_v023(void)
     return cached_iface;
 }
 
-HSteamUser ISteamUser_GetHSteamUser()
+HSteamUser STEAM_CALL ISteamUser_GetHSteamUser( void* iface )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return 1;
 }
 
-bool ISteamUser_BLoggedOn()
+bool STEAM_CALL ISteamUser_BLoggedOn( void* iface )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return false; // Required for N++ to pass the splash screen
 }
 
-CSteamID ISteamUser_GetSteamID()
+STEAMID_RET STEAM_CALL ISteamUser_GetSteamID( void* iface STEAMID_RET_ARG_LAST )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
-    return 1;
+    STEAMID_RETURN(1);
 }
 
-int ISteamUser_InitiateGameConnection( void *pAuthBlob, int cbMaxAuthBlob, CSteamID steamIDGameServer, unsigned int unIPServer, uint16_t usPortServer, bool bSecure )
+int STEAM_CALL ISteamUser_InitiateGameConnection( void* iface, void *pAuthBlob, int cbMaxAuthBlob, CSteamID steamIDGameServer, unsigned int unIPServer, uint16_t usPortServer, bool bSecure )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
 
@@ -160,17 +160,17 @@ int ISteamUser_InitiateGameConnection( void *pAuthBlob, int cbMaxAuthBlob, CStea
     return 1;
 }
 
-void ISteamUser_TerminateGameConnection( unsigned int unIPServer, uint16_t usPortServer )
+void STEAM_CALL ISteamUser_TerminateGameConnection( void* iface, unsigned int unIPServer, uint16_t usPortServer )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
 }
 
-void ISteamUser_TrackAppUsageEvent( CGameID gameID, int eAppUsageEvent, const char *pchExtraInfo )
+void STEAM_CALL ISteamUser_TrackAppUsageEvent( void* iface, CGameID gameID, int eAppUsageEvent, const char *pchExtraInfo )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
 }
 
-bool ISteamUser_GetUserDataFolder( char *pchBuffer, int cubBuffer )
+bool STEAM_CALL ISteamUser_GetUserDataFolder( void* iface, char *pchBuffer, int cubBuffer )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     if (pchBuffer == nullptr || cubBuffer <= 0)
@@ -182,41 +182,41 @@ bool ISteamUser_GetUserDataFolder( char *pchBuffer, int cubBuffer )
     return true;
 }
 
-void ISteamUser_StartVoiceRecording()
+void STEAM_CALL ISteamUser_StartVoiceRecording( void* iface )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
 }
 
-void ISteamUser_StopVoiceRecording()
+void STEAM_CALL ISteamUser_StopVoiceRecording( void* iface )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
 }
 
-EVoiceResult ISteamUser_GetAvailableVoice( unsigned int *pcbCompressed, unsigned int *pcbUncompressed_Deprecated, unsigned int nUncompressedVoiceDesiredSampleRate_Deprecated)
-{
-    LOGTRACE_SIMPLE(LCF_STEAM);
-    return 3; //k_EVoiceResultNoData
-}
-
-EVoiceResult ISteamUser_GetVoice( bool bWantCompressed, void *pDestBuffer, unsigned int cbDestBufferSize, unsigned int *nBytesWritten, bool bWantUncompressed_Deprecated, void *pUncompressedDestBuffer_Deprecated, unsigned int cbUncompressedDestBufferSize_Deprecated, unsigned int *nUncompressBytesWritten_Deprecated, unsigned int nUncompressedVoiceDesiredSampleRate_Deprecated)
+EVoiceResult STEAM_CALL ISteamUser_GetAvailableVoice( void* iface, unsigned int *pcbCompressed, unsigned int *pcbUncompressed_Deprecated, unsigned int nUncompressedVoiceDesiredSampleRate_Deprecated)
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return 3; //k_EVoiceResultNoData
 }
 
-EVoiceResult ISteamUser_DecompressVoice( const void *pCompressed, unsigned int cbCompressed, void *pDestBuffer, unsigned int cbDestBufferSize, unsigned int *nBytesWritten, unsigned int nDesiredSampleRate )
+EVoiceResult STEAM_CALL ISteamUser_GetVoice( void* iface, bool bWantCompressed, void *pDestBuffer, unsigned int cbDestBufferSize, unsigned int *nBytesWritten, bool bWantUncompressed_Deprecated, void *pUncompressedDestBuffer_Deprecated, unsigned int cbUncompressedDestBufferSize_Deprecated, unsigned int *nUncompressBytesWritten_Deprecated, unsigned int nUncompressedVoiceDesiredSampleRate_Deprecated)
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return 3; //k_EVoiceResultNoData
 }
 
-unsigned int ISteamUser_GetVoiceOptimalSampleRate()
+EVoiceResult STEAM_CALL ISteamUser_DecompressVoice( void* iface, const void *pCompressed, unsigned int cbCompressed, void *pDestBuffer, unsigned int cbDestBufferSize, unsigned int *nBytesWritten, unsigned int nDesiredSampleRate )
+{
+    LOGTRACE_SIMPLE(LCF_STEAM);
+    return 3; //k_EVoiceResultNoData
+}
+
+unsigned int STEAM_CALL ISteamUser_GetVoiceOptimalSampleRate( void* iface )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return 44100;
 }
 
-HAuthTicket ISteamUser_GetAuthSessionTicket( void *pTicket, int cbMaxTicket, unsigned int *pcbTicket )
+HAuthTicket STEAM_CALL ISteamUser_GetAuthSessionTicket( void* iface, void *pTicket, int cbMaxTicket, unsigned int *pcbTicket )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     // if (pcbTicket)
@@ -224,7 +224,7 @@ HAuthTicket ISteamUser_GetAuthSessionTicket( void *pTicket, int cbMaxTicket, uns
     return 1;
 }
 
-HAuthTicket ISteamUser_GetAuthTicketForWebApi( const char *pchIdentity )
+HAuthTicket STEAM_CALL ISteamUser_GetAuthTicketForWebApi( void* iface, const char *pchIdentity )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     // if (pcbTicket)
@@ -232,18 +232,18 @@ HAuthTicket ISteamUser_GetAuthTicketForWebApi( const char *pchIdentity )
     return 1;
 }
     
-EBeginAuthSessionResult ISteamUser_BeginAuthSession( const void *pAuthTicket, int cbAuthTicket, CSteamID steamID )
+EBeginAuthSessionResult STEAM_CALL ISteamUser_BeginAuthSession( void* iface, const void *pAuthTicket, int cbAuthTicket, CSteamID steamID )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
     return 0; //k_EBeginAuthSessionResultOK;
 }
 
-void ISteamUser_EndAuthSession( CSteamID steamID )
+void STEAM_CALL ISteamUser_EndAuthSession( void* iface, CSteamID steamID )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
 }
 
-void ISteamUser_CancelAuthTicket( HAuthTicket hAuthTicket )
+void STEAM_CALL ISteamUser_CancelAuthTicket( void* iface, HAuthTicket hAuthTicket )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
 }

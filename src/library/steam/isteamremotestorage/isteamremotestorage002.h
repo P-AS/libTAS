@@ -16,13 +16,13 @@ namespace libtas {
 
 struct ISteamRemoteStorage002Vtbl
 {
-    bool (*FileWrite)( void* iface, const char *pchFile, const void *pvData, int cubData );
-    int (*GetFileSize)( void* iface, const char *pchFile );
-    int (*FileRead)( void* iface, const char *pchFile, void *pvData, int cubDataToRead );
-    bool (*FileExists)( void* iface, const char *pchFile );
-    int (*GetFileCount)(void* iface);
-    const char *(*GetFileNameAndSize)( void* iface, int iFile, int *pnFileSizeInBytes );
-    bool (*GetQuota)( void* iface, uint64_t *pnTotalBytes, uint64_t *puAvailableBytes );
+    bool (STEAM_CALL *FileWrite)( void* iface, const char *pchFile, const void *pvData, int cubData );
+    int (STEAM_CALL *GetFileSize)( void* iface, const char *pchFile );
+    int (STEAM_CALL *FileRead)( void* iface, const char *pchFile, void *pvData, int cubDataToRead );
+    bool (STEAM_CALL *FileExists)( void* iface, const char *pchFile );
+    int (STEAM_CALL *GetFileCount)(void* iface);
+    const char *(STEAM_CALL *GetFileNameAndSize)( void* iface, int iFile, int *pnFileSizeInBytes );
+    bool (STEAM_CALL *GetQuota)( void* iface, uint64_t *pnTotalBytes, uint64_t *puAvailableBytes );
 };
 
 struct ISteamRemoteStorage *SteamRemoteStorage002(void);

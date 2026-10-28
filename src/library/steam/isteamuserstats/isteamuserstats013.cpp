@@ -10,10 +10,8 @@
 namespace libtas {
 
 static const struct ISteamUserStats013Vtbl ISteamUserStats013_vtbl = {
-    ISteamUserStats_GetStatInt32,
-    ISteamUserStats_GetStatFloat,
-    ISteamUserStats_SetStatInt32,
-    ISteamUserStats_SetStatFloat,
+    STEAM_OVERLOAD_PAIR(ISteamUserStats_GetStatInt32, ISteamUserStats_GetStatFloat),
+    STEAM_OVERLOAD_PAIR(ISteamUserStats_SetStatInt32, ISteamUserStats_SetStatFloat),
     ISteamUserStats_UpdateAvgRateStat,
     ISteamUserStats_GetAchievement,
     ISteamUserStats_SetAchievement,
@@ -26,8 +24,7 @@ static const struct ISteamUserStats013Vtbl ISteamUserStats013_vtbl = {
     ISteamUserStats_GetNumAchievements,
     ISteamUserStats_GetAchievementName,
     ISteamUserStats_RequestUserStats,
-    ISteamUserStats_GetUserStatInt32,
-    ISteamUserStats_GetUserStatFloat,
+    STEAM_OVERLOAD_PAIR(ISteamUserStats_GetUserStatInt32, ISteamUserStats_GetUserStatFloat),
     ISteamUserStats_GetUserAchievement,
     ISteamUserStats_GetUserAchievementAndUnlockTime,
     ISteamUserStats_ResetAllStats,
@@ -48,12 +45,9 @@ static const struct ISteamUserStats013Vtbl ISteamUserStats013_vtbl = {
     ISteamUserStats_GetNextMostAchievedAchievementInfo,
     ISteamUserStats_GetAchievementAchievedPercent,
     ISteamUserStats_RequestGlobalStats,
-    ISteamUserStats_GetGlobalStatInt64,
-    ISteamUserStats_GetGlobalStatDouble,
-    ISteamUserStats_GetGlobalStatHistoryInt64,
-    ISteamUserStats_GetGlobalStatHistoryDouble,
-    ISteamUserStats_GetAchievementProgressLimitsInt32,
-    ISteamUserStats_GetAchievementProgressLimitsFloat,
+    STEAM_OVERLOAD_PAIR(ISteamUserStats_GetGlobalStatInt64, ISteamUserStats_GetGlobalStatDouble),
+    STEAM_OVERLOAD_PAIR(ISteamUserStats_GetGlobalStatHistoryInt64, ISteamUserStats_GetGlobalStatHistoryDouble),
+    STEAM_OVERLOAD_PAIR(ISteamUserStats_GetAchievementProgressLimitsInt32, ISteamUserStats_GetAchievementProgressLimitsFloat),
 };
 
 struct ISteamUserStats *SteamUserStats013(void)

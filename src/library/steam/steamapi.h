@@ -71,6 +71,11 @@ OVERRIDE bool SteamAPI_IsSteamRunning();
 //       to your executable, Steam's DRM will handle restarting through Steam if necessary.
 OVERRIDE bool SteamAPI_RestartAppIfNecessary( unsigned int unOwnAppID );
 
+#ifdef _WIN32
+/* Path of the steam_api.dll of the game, which our dll replaces */
+const char* SteamGetOriginalLibraryPath();
+#endif
+
 OVERRIDE bool SteamAPI_Init();
 
 OVERRIDE bool SteamAPI_InitSafe();
