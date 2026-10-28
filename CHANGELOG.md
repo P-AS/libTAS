@@ -80,6 +80,7 @@
 * Fix Xlib BadIDChoice errors after loading a savestate
 * Fix recreating threads when loading a savestate without the
   CAP_CHECKPOINT_RESTORE capability
+* Fix savestate loading hanging forever on a truncated savestate
 
 ## [1.4.8] - 2026-05-14
 ### Added
