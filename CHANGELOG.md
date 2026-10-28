@@ -35,6 +35,8 @@
   which fixes mouse offset in some Godot games (#750)
 * Add a video setting to include only the Lua drawings in the video encode
   (#670)
+* Add hotkeys to select a savestate slot and to save/load the selected
+  slot (#550)
 
 ### Changed
 
