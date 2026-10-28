@@ -158,7 +158,7 @@ size_t SaveStateSaving::queuePageSave(char* addr)
             queued_target_addr = addr + page_size;
 
             /* Check for remaining size */
-            if ((queued_compressed_max_size - queued_compressed_size) < LZ4_COMPRESSBOUND(page_size)) {
+            if ((queued_compressed_max_size - queued_compressed_size) < static_cast<int>(LZ4_COMPRESSBOUND(page_size))) {
                 returned_size += flushCompressedSave();
             }
             return returned_size;

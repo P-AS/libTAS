@@ -178,7 +178,7 @@ QVariant InputEditorModel::data(const QModelIndex &index, int role) const
     unsigned int row = index.row();
     unsigned int col = index.column();
     
-    if (col == columnCount() - 1)
+    if (static_cast<int>(col) == columnCount() - 1)
         return QVariant();
 
     if (role == Qt::TextAlignmentRole) {
@@ -204,7 +204,7 @@ QVariant InputEditorModel::data(const QModelIndex &index, int role) const
         if (col < COLUMN_SPECIAL_SIZE) {
             return QGuiApplication::palette().text();
         }
-        if (col == columnCount() - 1) {
+        if (static_cast<int>(col) == columnCount() - 1) {
             return QGuiApplication::palette().text();
         }
 
@@ -284,7 +284,7 @@ QVariant InputEditorModel::data(const QModelIndex &index, int role) const
         if (row >= frameCount())
             return QBrush(color);
             
-        if (col == columnCount() - 1)
+        if (static_cast<int>(col) == columnCount() - 1)
             return QBrush(color);
 
         bool lightTheme = isLightTheme();

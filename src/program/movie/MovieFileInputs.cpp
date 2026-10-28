@@ -208,7 +208,7 @@ void MovieFileInputs::editInputs(const std::vector<AllInputs>& inputs, uint64_t 
 
 void MovieFileInputs::editInputs(const std::vector<AllInputs>& inputs, uint64_t pos, int count)
 {
-    if ((count > 0) && (inputs.size() >= count))
+    if ((count > 0) && (inputs.size() >= static_cast<size_t>(count)))
         action_queue.push(new MovieActionEditFrames(pos, pos+count-1, inputs, this));
 }
 
