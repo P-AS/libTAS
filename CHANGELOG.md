@@ -2,6 +2,7 @@
 ### Added
 
 * Can tweak the number of cpu cores seen by the game
+* Add a guide to run Sonic Generations through Proton
 * Vulkan: Use a fence to wait for each image to be presented (#741)
 * Add a command-line option to set any setting at startup
 * Add an option to set any environment variable on the game process
@@ -36,6 +37,41 @@
 * Map hourglass left mouse button to libTAS mouse click
 * Wine: support the virtual Steam client, with a replacement steam_api.dll
   built with mingw-w64
+* Encode: save and load named presets of encoding settings
+* Encode: add VP9 and AV1 (SVT-AV1) video codecs
+* Add an input option to always report the game window position as (0,0),
+  which fixes mouse offset in some Godot games (#750)
+* Add a video setting to include only the Lua drawings in the video encode
+  (#670)
+* Add hotkeys to select a savestate slot and to save/load the selected
+  slot (#550)
+* Lua: add movie.getMarker(), movie.setMarker(), movie.insertFrame() and
+  movie.insertFrames() (#668)
+* Input editor: mark frames where fast-forward is disabled, for game
+  sections that break when fast-forwarded (#729)
+* Wine: launch games through the proton script of Proton, with the Steam
+  client of Proton, in WoW64 mode and with wined3d
+* Add the Proton, game and directory settings to the --set command-line
+  option
+* Add a fastforward setting to the --set command-line option, so that
+  non-interactive runs can start without fast-forward
+* Wine: write the logs of the virtual Steam client to steam_api.log in the
+  data directory, with the log level of the game
+* Add an "Idle Threads" sync option for Wine games, that makes loadings play
+  the same way on every run: the sleeps of other threads end when the game
+  advances frames, and the main thread waits for them to be idle
+* Wine: Windows games that use XInput get the controllers of libTAS through
+  our own xinput dlls, which replace the ones of Wine, and DirectInput shows
+  them as Xbox 360 pads instead of the controllers of the host (fix Sonic
+  Generations controllers)
+* Steam: add a setting (`steam_cloud`) to tell games that Steam Cloud is
+  enabled or disabled in the virtual Steam client
+* Add "Open Logs Folder" to the File menu, with an error message when the
+  folder does not exist
+* Wine: give the keys of libTAS to the DirectInput keyboard of games that
+  read it with GetDeviceState(), so that key presses reach the same frame
+  (Rayman 2)
+* Docs: add a guide to run Rayman 2 (GOG, with Ray2Fix) through Wine
 
 ### Changed
 
@@ -71,6 +107,24 @@
 * Don't touch non-present anonymous pages when saving and loading states,
   which makes savestates much faster for wine games
 * Don't consider procfs files as savefiles
+* Docs: link to the TASVideos lists of movies made with libTAS (#716)
+* Docs: add a page listing the sources of randomness used by games (#679)
+* Docs: clarify the package installation step of the WSL guide (#506)
+* Save the game executable path and command-line arguments in the movie
+  file instead of the executable name (#557)
+* Settings given with the --set command-line option are not saved in the
+  config files anymore
+* Include the git branch name in the window titlebar alongside the
+  commit hash for interim builds
+* Logging to the console and to a file are now two separate options, that
+  can both be enabled, and give the same text. Log files are written to the
+  logs folder of the data directory, named after the game executable and
+  the date and time, instead of next to the game executable
+* build.sh and the CI build do not build an AppImage by default anymore: pass
+  --appimage to build.sh, or enable the appimage input when running the CI
+  workflow manually
+* Wine: the main thread becomes the thread that draws the frames when it is
+  not the first thread of the game (Rayman 2)
 
 ### Fixed
 
@@ -125,6 +179,75 @@
   implemented
 * Steam: don't give the ISteamUGC interface for versions that we don't
   implement, as games crashed when calling it
+* Input editor: Fix Qt warnings about invalid dataChanged() index ranges
+* Fix signed/unsigned comparison compiler warnings
+* Input editor: fix input columns missing when the editor is first opened
+  after the movie was loaded
+* Fix xlib key inputs being dropped when the game opens multiple displays
+  (#765)
+* Find the lavapipe Vulkan driver for software rendering on any arch and
+  in non-standard locations such as NixOS (#763)
+* Fix SDL text input events ignoring Shift/Caps Lock for letter keys
+  (#742)
+* Fix the annotations menu being disabled when a movie is loaded from the
+  command line (#693)
+* Fix a crash when passing a non-numeric value such as true to the --set
+  command-line option
+* Fix the movie not being saved and libTAS aborting when the game exits in
+  non-interactive mode
+* Wine: fix hotkeys not working for games drawn with GLX, such as with
+  Proton, or paused before their first frame
+* Wine: fix errors about sending on a non-socket when Proton's steam.exe
+  destroys windows
+* Don't run ldd and readelf on Windows executables, which printed errors
+* Don't warn about refused audio capture streams, which Wine opens when
+  listing audio devices
+* Wine: fix keyboard inputs and hotkeys not working with a window manager,
+  which could not give the focus to a paused game
+* Wine: fix the OSD not showing for OpenGL games, and the OSD and screen
+  capture using the size of another window
+* Fix BadRROutput X errors with a custom screen resolution, when games read
+  the properties or the primary output of the fake monitor
+* Proton: give fullscreen games the custom screen resolution instead of
+  scaling them to the screen
+* Fix crashes (double free) when games read XInput2 events on several X
+  connections, such as Wine games while dragging the mouse
+* Give X events to the OSD only from the main thread, as games may read them
+  from other threads
+* Fix a freeze when another thread queues X events for the OSD while holding
+  the display lock (Sonic Generations with the Steam client of Proton)
+* Wine: apply the custom screen resolution to the display size seen by Wine,
+  so that fullscreen games are no longer drawn for the real screen and cropped
+* Wine: fix random crashes when saving or loading a state while a thread of a
+  32-bit game runs its own code (WoW64)
+* Steam: report Steam Cloud as enabled in the virtual Steam client, so that
+  games save through the Steam API as they do with the real client
+* Steam: confirm ISteamUserStats::StoreStats() with the stats and achievement
+  stored callbacks and report the game's own id in the stats callbacks (Sonic
+  Generations never showed the button prompt of the results screen)
+* Wine: fix encoded videos of OpenGL games having red and blue swapped and a
+  garbled strip at the bottom, as the encoder started with the size and pixel
+  format of another screen capture backend (Sonic Generations)
+* Encode: start again when the screen capture changes its size or pixel format
+  after the video started, instead of writing frames that do not match it
+* Wine: fix clicks on the game window or on a window below it doing nothing
+  after focusing another window, as the window that Wine maps to clip the
+  cursor stayed over the game (Sonic Generations)
+* Apply OSD font size changes while the game is running
+* CI: give the AppImage a PNG icon, as the current linuxdeploy requires one
+* Hourglass import: Don't report 0xF0 as an unknown key
+* Hourglass import: Map Caps Lock, Alt, Right Ctrl and F2 keys
+* Hourglass import: Write each key only once per frame
+* Hourglass import: Write the inputs file next to a relative input path
+* Hourglass import: Map the Pause and slash keys
+* Hourglass import: Map the numpad and the comma, period, grave and bracket keys
+* Fix crashes after loading a state when a thread was suspended on another
+  stack than at the time of the save (Rayman 2 under Wine)
+* Wine: fix non-draw frames and desyncs at startup in games whose first
+  thread only handles window messages (Rayman 2)
+* Wine: only patch the DirectInput of Wine, not wrappers with the same name
+  that games ship (Xidi for Rayman 2)
+* Fix log files being partly overwritten after loading a state
 
 ## [1.4.8] - 2026-05-14
 ### Added
