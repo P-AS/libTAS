@@ -67,6 +67,7 @@
 #ifdef __unix__
 #include <X11/Xlibint.h>
 #include <X11/Xlib-xcb.h>
+#include "../external/X11/Xxcbint.h"
 #endif
 #ifdef __linux__
 #include <sys/syscall.h>
@@ -126,6 +127,34 @@ static size_t loadPagemapWindow(int spmfd, PagemapCache& pagemap_cache, const vo
 
     return static_cast<size_t>((offset - pagemap_cache.offset) / sizeof(uint64_t));
 }
+
+#ifdef __unix__
+/* Return the resource id that Xlib keeps for its next allocation, or nullptr
+ * if the layout of its private data is not recognized. */
+static XID* xlibNextXid(Display* display)
+{
+    xcb_connection_t *xcb_conn = XGetXCBConnection(display);
+    const xcb_setup_t *setup = xcb_get_setup(xcb_conn);
+    if (!setup)
+        return nullptr;
+
+    /* Xlib marks the id as invalid after using it, until it gets a new one */
+    auto isValid = [setup](XID xid) {
+        return (xid == ~0UL) ||
+            ((xid & ~static_cast<XID>(setup->resource_id_mask)) == setup->resource_id_base);
+    };
+
+    auto *priv = reinterpret_cast<_X11XCBPrivateStart*>(display->xcb);
+    if ((priv->connection == xcb_conn) && isValid(priv->next_xid))
+        return &priv->next_xid;
+
+    auto *priv_old = reinterpret_cast<_X11XCBPrivateStartOld*>(display->xcb);
+    if ((priv_old->connection == xcb_conn) && isValid(priv_old->next_xid))
+        return &priv_old->next_xid;
+
+    return nullptr;
+}
+#endif
 
 /* Savestate paths (for file storing)*/
 static char pagemappath[1024] = "\0";
@@ -336,6 +365,12 @@ void Checkpoint::handler(int signum, siginfo_t *info, void *ucontext)
         char xcb_conn[GAMEDISPLAYNUM][XCB_CONN_MAX_SIZE];
         size_t xcb_conn_size[GAMEDISPLAYNUM];
 
+        /* Xlib also keeps the next resource id to use, which it got from xcb.
+         * Restoring it from the savestate would give an id that may have been
+         * used by a resource created after the savestate. */
+        XID* next_xid_ptr[GAMEDISPLAYNUM];
+        XID next_xid[GAMEDISPLAYNUM];
+
         for (int i=0; i<GAMEDISPLAYNUM; i++) {
             if (x11::gameDisplays[i]) {
 #ifdef X_DPY_GET_LAST_REQUEST_READ
@@ -356,6 +391,11 @@ void Checkpoint::handler(int signum, siginfo_t *info, void *ucontext)
                     xcb_conn_size[i] = XCB_CONN_MAX_SIZE;
                 }
                 memcpy(xcb_conn[i], cur_xcb_conn, xcb_conn_size[i]);
+
+                next_xid_ptr[i] = xlibNextXid(x11::gameDisplays[i]);                if (next_xid_ptr[i])
+                    next_xid[i] = *next_xid_ptr[i];
+                else
+                    LOG(LL_WARN, LCF_CHECKPOINT, "Could not locate the next resource id of the X connection");
             }
         }
 #endif
@@ -384,7 +424,9 @@ void Checkpoint::handler(int signum, siginfo_t *info, void *ucontext)
                 /* Restore the entire xcb connection struct */
                 xcb_connection_t *cur_xcb_conn = XGetXCBConnection(x11::gameDisplays[i]);
                 memcpy(cur_xcb_conn, xcb_conn[i], xcb_conn_size[i]);
-            }
+
+                if (next_xid_ptr[i])
+                    *next_xid_ptr[i] = next_xid[i];            }
         }
 #endif
 
