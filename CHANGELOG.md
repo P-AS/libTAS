@@ -30,6 +30,7 @@
   and aarch64
 * Support Wayland in the AppImage and the deb package
 * Encode: save and load named presets of encoding settings
+* Encode: add VP9 and AV1 (SVT-AV1) video codecs
 
 ### Changed
 
