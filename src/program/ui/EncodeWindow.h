@@ -56,12 +56,21 @@ private:
     QComboBox *videoFilter;
     QGroupBox *framerateGroupBox;
     QGroupBox *resizeGroupBox;
+    QComboBox *presetChoice;
+    QPushButton *loadPresetButton;
+    QPushButton *deletePresetButton;
+
+    /* Fill the preset list from the saved presets */
+    void updatePresetList();
 
 private slots:
     void slotBrowseEncodePath();
     void slotUpdate();
     void slotOk();
     void slotDefault();
+    void slotLoadPreset();
+    void slotSavePreset();
+    void slotDeletePreset();
 };
 
 #endif
