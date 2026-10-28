@@ -98,6 +98,8 @@ typedef int ERemoteStoragePlatform;
 typedef int EAccountType;
 typedef int EPersonaState;
 typedef int EFriendRelationship;
+typedef int16_t FriendsGroupID_t;
+typedef int EOverlayToStoreFlag;
 typedef int EVRScreenshotType;
 
 typedef int EUGCQuery;

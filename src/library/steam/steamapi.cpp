@@ -129,11 +129,27 @@ const steam_interface* SteamGetAllInterfaces() {
         // { STEAMSCREENSHOTS_INTERFACE_VERSION_001, SteamScreenshots_set_version },
         // { STEAMSCREENSHOTS_INTERFACE_VERSION_002, SteamScreenshots_set_version },
         // { STEAMSCREENSHOTS_INTERFACE_VERSION_003, SteamScreenshots_set_version },
-        // { STEAMUGC_INTERFACE_VERSION_001, SteamUGC_set_version },
-        // { STEAMUGC_INTERFACE_VERSION_005, SteamUGC_set_version },
-        // { STEAMUGC_INTERFACE_VERSION_007, SteamUGC_set_version },
-        // { STEAMUGC_INTERFACE_VERSION_009, SteamUGC_set_version },
-        // { STEAMUGC_INTERFACE_VERSION_010, SteamUGC_set_version },
+        { "STEAMUGC_INTERFACE_VERSION001", SteamUGC_set_version, reinterpret_cast<void *(*)(const char*)>(SteamUGC_generic) },
+        { "STEAMUGC_INTERFACE_VERSION002", SteamUGC_set_version, reinterpret_cast<void *(*)(const char*)>(SteamUGC_generic) },
+        { "STEAMUGC_INTERFACE_VERSION003", SteamUGC_set_version, reinterpret_cast<void *(*)(const char*)>(SteamUGC_generic) },
+        { "STEAMUGC_INTERFACE_VERSION004", SteamUGC_set_version, reinterpret_cast<void *(*)(const char*)>(SteamUGC_generic) },
+        { "STEAMUGC_INTERFACE_VERSION005", SteamUGC_set_version, reinterpret_cast<void *(*)(const char*)>(SteamUGC_generic) },
+        { "STEAMUGC_INTERFACE_VERSION006", SteamUGC_set_version, reinterpret_cast<void *(*)(const char*)>(SteamUGC_generic) },
+        { "STEAMUGC_INTERFACE_VERSION007", SteamUGC_set_version, reinterpret_cast<void *(*)(const char*)>(SteamUGC_generic) },
+        { "STEAMUGC_INTERFACE_VERSION008", SteamUGC_set_version, reinterpret_cast<void *(*)(const char*)>(SteamUGC_generic) },
+        { "STEAMUGC_INTERFACE_VERSION009", SteamUGC_set_version, reinterpret_cast<void *(*)(const char*)>(SteamUGC_generic) },
+        { "STEAMUGC_INTERFACE_VERSION010", SteamUGC_set_version, reinterpret_cast<void *(*)(const char*)>(SteamUGC_generic) },
+        { "STEAMUGC_INTERFACE_VERSION011", SteamUGC_set_version, reinterpret_cast<void *(*)(const char*)>(SteamUGC_generic) },
+        { "STEAMUGC_INTERFACE_VERSION012", SteamUGC_set_version, reinterpret_cast<void *(*)(const char*)>(SteamUGC_generic) },
+        { "STEAMUGC_INTERFACE_VERSION013", SteamUGC_set_version, reinterpret_cast<void *(*)(const char*)>(SteamUGC_generic) },
+        { "STEAMUGC_INTERFACE_VERSION014", SteamUGC_set_version, reinterpret_cast<void *(*)(const char*)>(SteamUGC_generic) },
+        { "STEAMUGC_INTERFACE_VERSION015", SteamUGC_set_version, reinterpret_cast<void *(*)(const char*)>(SteamUGC_generic) },
+        { "STEAMUGC_INTERFACE_VERSION016", SteamUGC_set_version, reinterpret_cast<void *(*)(const char*)>(SteamUGC_generic) },
+        { "STEAMUGC_INTERFACE_VERSION017", SteamUGC_set_version, reinterpret_cast<void *(*)(const char*)>(SteamUGC_generic) },
+        { "STEAMUGC_INTERFACE_VERSION018", SteamUGC_set_version, reinterpret_cast<void *(*)(const char*)>(SteamUGC_generic) },
+        { "STEAMUGC_INTERFACE_VERSION019", SteamUGC_set_version, reinterpret_cast<void *(*)(const char*)>(SteamUGC_generic) },
+        { "STEAMUGC_INTERFACE_VERSION020", SteamUGC_set_version, reinterpret_cast<void *(*)(const char*)>(SteamUGC_generic) },
+        { "STEAMUGC_INTERFACE_VERSION021", SteamUGC_set_version, reinterpret_cast<void *(*)(const char*)>(SteamUGC_generic) },
         // { STEAMUNIFIEDMESSAGES_INTERFACE_VERSION_001, SteamUnifiedMessages_set_version },
         // { STEAMUSER_INTERFACE_VERSION_004, SteamUser_set_version },
         { STEAMUSER_INTERFACE_VERSION_016, SteamUser_set_version, reinterpret_cast<void *(*)(const char*)>(SteamUser_generic) },
@@ -505,8 +521,7 @@ ISteamUGC *SteamUGC()
         RETURN_NATIVE(SteamUGC, (), "steam_api");
     }
 
-    static ISteamUGC steamugc;
-    return &steamugc;
+    return SteamUGC_generic(nullptr);
 }
 
 ISteamMatchmaking *SteamMatchmaking()
