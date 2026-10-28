@@ -313,7 +313,7 @@ void GameThread::launch(Context *context)
             break;
         case SharedConfig::LOGGING_TO_FILE:
             std::cout << "Logging to file: " << logfile << std::endl;
-            fd = open(logfile.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+            fd = open(logfile.c_str(), O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
             dup2(fd, 2);
             close(fd);
             break;

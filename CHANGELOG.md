@@ -81,6 +81,7 @@
 * Fix recreating threads when loading a savestate without the
   CAP_CHECKPOINT_RESTORE capability
 * Fix savestate loading hanging forever on a truncated savestate
+* Fix the game log file keeping the end of previous runs
 
 ## [1.4.8] - 2026-05-14
 ### Added
