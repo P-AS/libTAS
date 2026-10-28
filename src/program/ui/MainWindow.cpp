@@ -829,6 +829,15 @@ void MainWindow::updateStatus(int status)
             stopButton->setEnabled(false);
 
             updateMovieParams();
+
+            /* Exit the program when the game has exited in non-interactive
+             * mode. The game thread has finished its exit procedure (which
+             * saved the movie), so we can wait for it and quit from here. */
+            if (!context->interactive) {
+                if (game_thread.joinable())
+                    game_thread.join();
+                QApplication::quit();
+            }
             break;
 
         case Context::STARTING:

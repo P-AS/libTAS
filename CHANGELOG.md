@@ -117,6 +117,8 @@
   command line (#693)
 * Fix a crash when passing a non-numeric value such as true to the --set
   command-line option
+* Fix the movie not being saved and libTAS aborting when the game exits in
+  non-interactive mode
 
 ## [1.4.8] - 2026-05-14
 ### Added
