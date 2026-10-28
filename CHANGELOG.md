@@ -108,6 +108,7 @@
 * Wine: don't redirect temporary files into savefiles, fixing missing
   sound in Clickteam games
 * Fix savestate loading hanging forever on a truncated savestate
+* Fix the game log file keeping the end of previous runs
 
 ## [1.4.8] - 2026-05-14
 ### Added
