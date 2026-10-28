@@ -150,3 +150,9 @@ not go past the game screen.
 
 If checked, libTAS will prevent games from warping the mouse cursor (but will still register
 the warp internally).
+
+### Ignore window coordinates
+
+If checked, libTAS always reports the game window position as (0,0) instead of
+the position requested by the game. This fixes the mouse position being offset
+in some engines such as Godot.
