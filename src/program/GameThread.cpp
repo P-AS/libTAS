@@ -157,6 +157,16 @@ void GameThread::set_env_variables(Context *context, int gameArch)
         int processArch = wineProcessArch(findWinePath(context, gameArch), gameArch);
         if (((gameArch & BT_TYPEMASK) != BT_PE32P) && (processArch == BT_ELF64))
             setenv("LIBTAS_WINE_RESTART", "1", 1);
+
+        /* The virtual Steam client of Windows games is a dll that libtas
+         * loads instead of the steam_api.dll of the game, and which cannot
+         * receive messages from us, so give it its folders here */
+        if (context->config.sc.virtual_steam) {
+            std::filesystem::path remotestorage = context->config.steamuserdir;
+            remotestorage /= context->gamename;
+            setenv("LIBTAS_STEAM_USER_DATA_PATH", context->config.steamuserdir.c_str(), 1);
+            setenv("LIBTAS_STEAM_REMOTE_STORAGE", remotestorage.c_str(), 1);
+        }
     }
     else {
         /* Tell SDL >= 2.0.2 to let us override functions even if it is statically linked.

@@ -296,6 +296,61 @@ Not handled yet:
 - creating directories happens on disk;
 - the registry (`user.reg`, `system.reg`) is written by wineserver.
 
+## Steam
+
+The Steam API of a Windows game is the PE `steam_api.dll` (or
+`steam_api64.dll`), and the game calls its C++ interfaces with the MSVC
+ABI, so the hooks of the virtual Steam client of native games don't apply,
+and 32-bit PE code cannot call our 64-bit unix code anyway.
+
+- `src/steamdll` builds `libtas-steam_api.dll` and `libtas-steam_api64.dll`
+  from the same `src/library/steam` sources with the mingw-w64 cross
+  compilers (optional, skipped when they are missing), with replacement
+  headers in `src/steamdll/compat` for `logging.h`, `hook.h`, `global.h`,
+  etc. `RETURN_NATIVE` returns a default value, as there is no Steam client
+  to fall back to. They are installed next to `libtas.so`.
+- When the virtual Steam client is enabled, the `NtOpenFile` hook gives
+  the loader our dll instead of the `steam_api.dll` or `steam_api64.dll`
+  of the game (`openSteamApiReplacement()` in `wine/ntdllfile.cpp`). It
+  recognizes the loader by its access `GENERIC_READ | SYNCHRONIZE` with
+  `FILE_NON_DIRECTORY_FILE` (`open_dll_file()` in ntdll `loader.c`), while
+  `CreateFile()` goes through `NtCreateFile`, so our dll can still read the
+  original one (named by `GetModuleFileName()` of our module) to find the
+  interface versions, like the native code does with `libsteam_api.so`.
+- The dll cannot receive messages from the program, so the launcher passes
+  `LIBTAS_STEAM_USER_DATA_PATH` and `LIBTAS_STEAM_REMOTE_STORAGE` (unix
+  paths, converted with `wine_get_dos_file_name`). Remote storage files are
+  then opened through `NtCreateFile`, so "Prevent writing to disk" applies.
+  `LIBTAS_STEAM_LOG_LEVEL=5` prints every call on stderr (default: warnings).
+- MSVC ABI differences, handled in the shared sources with macros that do
+  nothing on Linux (`steamtypes.h`):
+  - methods are `thiscall` on i386 (`this` in ecx, the callee pops the
+    arguments): `STEAM_CALL` on the functions of the C vtables. C++
+    interface classes get it from mingw g++ already.
+  - overloaded virtual methods are in the reverse order of their
+    declaration: `STEAM_OVERLOAD_PAIR` in the ISteamUserStats vtables
+    (`GetStat`, `SetStat`, `GetUserStat`, `GetGlobalStat`, ...), and the two
+    `CCallbackBase::Run()`.
+  - methods returning a class (`CSteamID`) take a hidden return pointer
+    after `this` and return it: `STEAMID_RET`, `STEAMID_RET_ARG...`,
+    `STEAMID_RETURN`.
+  - callback structs use 8-byte packing (`UserStatsReceived_t`).
+  These were checked by disassembling the flat wrappers of Valve's MSVC
+  `steam_api.dll` (`SteamAPI_ISteamUserStats_GetStat0` uses vtable slot 1
+  and loads a float, `GetStat` slot 2; `SteamAPI_ISteamUser_GetSteamID`
+  pushes a return pointer), then by calling our interfaces through those
+  wrappers from small mingw test programs (32-bit with the Sega Classics
+  dll, 64-bit with the Fancy Pants Adventures one), and dispatching a
+  `UserStatsReceived_t` to a hand-made MSVC-like callback object.
+- The ISteamUser and ISteamUserStats functions did not take the interface
+  pointer, so the arguments of native games were shifted too; fixed for both.
+- Tested with Kero Blaster (32-bit): the game loads our dll, calls
+  `SteamAPI_Init`, registers its user stats callbacks and runs normally.
+  Touhou 10 from Steam does not use the Steam API at all (only thcrap
+  ships a `steam_api.dll`).
+- The dll has no access to libtas inputs, so Steam controllers stay
+  neutral.
+
 ## Savestates
 
 - Wine reserves tens of GB of address space, which made savestates take 15 s.
@@ -418,6 +473,8 @@ the game config, not in the movie.
 
 ## Open problems
 
+- The Windows steam_api.dll replacement has no access to libtas inputs, so
+  Steam controllers stay neutral in Windows games.
 - SRB2 video dumps are black after the first frame, while the game renders
   correctly.
 - Directory listings, renames and directory creation for savefiles (see Files).
