@@ -38,6 +38,8 @@ OVERRIDE XRRCrtcInfo *XRRGetCrtcInfo (Display *dpy, XRRScreenResources *resource
 OVERRIDE void XRRFreeCrtcInfo (XRRCrtcInfo *crtcInfo);
 
 OVERRIDE Atom *XRRListOutputProperties (Display *dpy, RROutput output, int *nprop);
+OVERRIDE int XRRGetOutputProperty (Display *dpy, RROutput output, Atom property, long offset, long length, Bool _delete, Bool pending, Atom req_type, Atom *actual_type, int *actual_format, unsigned long *nitems, unsigned long *bytes_after, unsigned char **prop);
+OVERRIDE RROutput XRRGetOutputPrimary (Display *dpy, Window window);
 
 OVERRIDE Status XRRSetCrtcConfig (Display *dpy, XRRScreenResources *resources, RRCrtc crtc, Time timestamp, int x, int y, RRMode mode, Rotation rotation, RROutput *outputs, int noutputs);
 OVERRIDE Status XRRSetScreenConfig (Display *dpy, XRRScreenConfiguration *config, Drawable draw, int size_index, Rotation rotation, Time timestamp);
