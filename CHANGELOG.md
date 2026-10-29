@@ -127,6 +127,7 @@
   command-line option
 * Fix the movie not being saved and libTAS aborting when the game exits in
   non-interactive mode
+* Don't run ldd and readelf on Windows executables, which printed errors
 
 ## [1.4.8] - 2026-05-14
 ### Added

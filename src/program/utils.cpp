@@ -204,7 +204,12 @@ uint64_t getSymbolAddress(const char* symbol, const char* file)
     if (symbol_file.compare(file) != 0) {
         symbol_file = file;
         symbol_addresses.clear();
-        
+
+        /* Windows executables have no ELF symbols */
+        int type = extractBinaryType(file) & BT_TYPEMASK;
+        if (type != BT_ELF32 && type != BT_ELF64)
+            return 0;
+
         std::ostringstream cmd;
         cmd << "readelf -Ws \"" << file << "\" | awk '{print $2 " " $8}'";
 
