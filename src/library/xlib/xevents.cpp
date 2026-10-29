@@ -32,6 +32,7 @@
 #include "global.h"
 #include "GlobalState.h"
 #include "checkpoint/ThreadSync.h"
+#include "checkpoint/ThreadManager.h"
 #include "renderhud/RenderHUD.h"
 #include "screencapture/ScreenCapture.h"
 #include "../external/X11/XInput2.h"
@@ -150,8 +151,12 @@ void pushNativeXlibEvents(Display *display)
         }
         
         if (ImGui::GetCurrentContext()) {
-            /* Redirect events to ImGui, and notify if it was interested in the event */
-            if (ImGui_ImplXlib_ProcessEvent(&event))
+            /* Redirect events to ImGui, and notify if it was interested in the
+             * event. ImGui is not thread-safe, and Wine reads events from
+             * several threads, which corrupted the heap. */
+            if (!ThreadManager::isMainThread())
+                RenderHUD::queueXlibEvent(event);
+            else if (ImGui_ImplXlib_ProcessEvent(&event))
                 RenderHUD::userInputs();
         }
 

@@ -47,6 +47,8 @@
 
 #include <sstream>
 #include <math.h>
+#include <mutex>
+#include <vector>
 #include <X11/X.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h> // XSetWMName
@@ -54,6 +56,10 @@
 namespace libtas {
 
 bool RenderHUD::show_game_window = false;
+
+/* X events read by other threads than the main thread */
+static std::mutex queuedXlibEventsMutex;
+static std::vector<XEvent> queuedXlibEvents;
 
 bool RenderHUD::init()
 {
@@ -94,6 +100,16 @@ void RenderHUD::newFrame()
     int w = 0, h = 0;
     ScreenCapture::getDimensions(w, h);
     GlobalNative gn;
+
+    /* Events read by other threads */
+    {
+        std::lock_guard<std::mutex> lock(queuedXlibEventsMutex);
+        for (XEvent& event : queuedXlibEvents)
+            if (ImGui_ImplXlib_ProcessEvent(&event))
+                userInputs();
+        queuedXlibEvents.clear();
+    }
+
     ImGui_ImplXlib_NewFrame(XlibGameWindow::get(), w, h);
     ImGui::NewFrame();
 }
@@ -282,6 +298,12 @@ void RenderHUD::drawAll(uint64_t framecount, uint64_t nondraw_framecount, const 
 }
 
 int RenderHUD::framesBeforeIdle = 0;
+
+void RenderHUD::queueXlibEvent(const XEvent& event)
+{
+    std::lock_guard<std::mutex> lock(queuedXlibEventsMutex);
+    queuedXlibEvents.push_back(event);
+}
 
 void RenderHUD::userInputs()
 {
