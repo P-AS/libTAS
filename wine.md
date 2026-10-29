@@ -15,6 +15,8 @@ display. Games used for testing:
   `utils/import/shar-iwannabetheboshy-darkboshy.ltm`.
 - **Sonic Robo Blast 2 v2.2.15** (`srb2win.exe`, 32-bit, SDL2 + OpenGL).
 - A pinball game tested by Randomno (commit `75ffe274`).
+- **Sonic Generations** (Steam, 32-bit, Direct3D 9), launched through Proton
+  11.0 (see [Proton](#proton)).
 - Small mingw test programs (file I/O, thread exit across savestates), see
   [Testing](#testing-and-debugging).
 
@@ -165,6 +167,21 @@ then presented by the game thread.
   window when swapping (`7424fbb3`). This is restricted to Wine games because
   on other platforms the native window is not an X window, and an Xlib error
   would kill the game (Wine installs its own X error handler).
+- **Game window not registered** (Proton 11.0, Sonic Generations): windows
+  were only registered when created directly under the root window, and a
+  surface's top-level window could only be promoted if it was registered. The
+  first registered window was wined3d's "WineD3D fake window", whose
+  destruction sent window id 0 to the program, which then listened for
+  hotkeys nowhere. Proton's winex11 also draws with GLX
+  (`glXCreateWindow`/`glXSwapBuffers`, no EGL), which had no promotion at
+  all. Now, for Wine games: a top-level window that is not override-redirect
+  is registered when it is mapped (so before the first frame is drawn, which
+  matters when the game is paused at start), `glXCreateWindow` records the X
+  window of each GLX window like the EGL surfaces, and each swap makes the
+  top-level window drawn to the game window (`XlibGameWindow::setDrawn()`),
+  adding it if missing. Override-redirect windows are never added: the 1x1
+  dummy parent of offscreen client windows is one (Boshy registered it as
+  its game window during testing) (`70d6789d`).
 - **Offscreen client surfaces**: when the GL (or Vulkan) window is a child
   window, has DPI scaling or has child windows (`needs_offscreen_rendering()`
   in winex11 `init.c`), Wine renders into a client window detached under a
@@ -370,6 +387,83 @@ and 32-bit PE code cannot call our 64-bit unix code anyway.
 - The dll has no access to libtas inputs, so Steam controllers stay
   neutral.
 
+## Proton
+
+When the Proton path has a `proton` script, the game is started with
+`proton run <game>` (WIP commit `dc47524b`), giving it the Steam app id, the
+compatdata prefix and the Steam client path, unless they are already set in
+the environment or the env overrides. Proton then starts the game from its
+`steam.exe`.
+
+- **WoW64**: Proton 10 has a separate WoW64 wine in `files/bin-wow64`,
+  while Proton 11.0 has a single wine that runs 32-bit games in a 32-bit
+  process (`lib/wine/i386-unix`) unless `PROTON_USE_WOW64=1` (which sets
+  `WINEARCH=wow64`). Our 64-bit `libtas.so` could not be preloaded in the
+  32-bit process (`wrong ELF class: ELFCLASS64`) and the game never connected.
+  The launcher now always sets `PROTON_USE_WOW64=1` (`ed6c30f2`).
+- **wined3d**: Proton draws Direct3D 9 to 11 with DXVK and vkd3d-proton
+  (Vulkan). With software rendering, libTAS points `VK_DRIVER_FILES` to
+  lavapipe, which is often not installed, and DXVK failed with `Failed to
+  create Vulkan instance` and a C++ exception. Our Wine support is built
+  around wined3d (CSMT setting, GL swaps as frame boundaries), so the launcher
+  sets `PROTON_USE_WINED3D=1` unless the user set it (`ed6c30f2`).
+- Proton 11.0's winex11 draws with GLX, not EGL, see "Game window not
+  registered" in [Rendering and windows](#rendering-and-windows).
+- `Unhandled exception in Xalia: No displays available` is printed by
+  Proton's accessibility helper and is harmless. `Proton: Error while copying
+  to ... amdxcffx64.dll` too.
+- libtas stays preloaded but uninitialized in Proton's `steam.exe`. Its
+  `XCreateWindow` hook registered the windows of that process, and
+  destroying them sent the window id on a socket that does not exist there
+  (`send() returns -1 with error Socket operation on non-socket` at frame 0,
+  found with `strace -f -k -e trace=sendto -e status=failed`).
+  `XlibGameWindow` now ignores windows handled in the native state
+  (`70d6789d`).
+- The launcher ran `ldd` and `readelf` on the game executable (missing
+  libraries, Godot detection, symbol addresses), which printed `Not an ELF
+  file` and `not a dynamic executable` for Windows games; they are skipped
+  for non-ELF executables (`429835df`).
+- `test-sonic-generations.sh` sets up and runs Sonic Generations through
+  Proton 11.0 in a rootful Xwayland with openbox, with the user's libTAS
+  config and the setup described below.
+- A prefix created by another Proton (here GE-Proton 11 from a Flatpak Steam)
+  has its system dlls as symlinks into that Proton (`/run/host/...`), and
+  does not start with another one (`could not load kernel32.dll`). Use a new
+  compatdata directory (`STEAM_COMPAT_DATA_PATH`).
+- Prefix paths written as Windows paths by the prefix's own Proton (the
+  `S:` drive of the Steam library in Sonic Generations' registry key) don't
+  exist in a new prefix.
+
+### Sonic Generations
+
+Tested with Proton 11.0 (`proton-11.0-2e`): the game reaches the title
+screen, keyboard input, pause, frame advance, fast-forward and savestates
+work (identical image after loading). Setup needed in the prefix and the
+game directory, all from the game itself rather than libTAS:
+
+- `Game files either missing or corrupt please reinstall`: the game reads
+  `HKLM\Software\Wow6432Node\Sega\Sonic Generations`, which Steam's install
+  script creates: `install_path`, `exe_path`, `savelocation` and `locale`
+  (`1033`). The `locale` value was the one missing (found with
+  `WINEDEBUG=+reg,+msgbox`: `RegQueryValueExW` of `locale` right before
+  `MSGBOX_OnInit`).
+- `The detected configuration does not match your current hardware`:
+  `GraphicsConfig.cfg` (CRLF lines) stores the Direct3D 9 adapter description,
+  device GUID, monitor id and resolution, and must match what d3d9 reports.
+  DXVK reports the real GPU (`NVIDIA GeForce RTX 2070 SUPER`, a per-device
+  GUID), wined3d a card from its table (`NVIDIA GeForce RTX 2070`, or `GTX 470`
+  with llvmpipe) with the fixed GUID `aeb2cdd4-6e41-43ea-941c-8361cc760781`
+  and an empty monitor id. Saving in `ConfigurationTool.exe` keeps the stored
+  adapter; delete `GraphicsConfig.cfg` first and save again under the same
+  conditions as the game (wined3d, software GL). The resolution must also be
+  one of the modes of the display (see Open problems). The last line,
+  `1515474505`, is the FOURCC `INTZ`, not a checksum.
+- Keyboard: `Documents/My Games/Sonic Generations/Saved Games/PlayerInput.cfg`
+  had all keyboard bindings at 0 (also in the user's own prefix), so the game
+  ignored keys. Its first two lines can be taken from `DefaultInput.cfg` of
+  the game directory (DirectInput scancodes, Return is Start).
+- With software rendering it runs at about 25 frames per second in real time.
+
 ## Savestates
 
 - Wine reserves tens of GB of address space, which made savestates take 15 s.
@@ -441,11 +535,20 @@ the game config, not in the movie.
   `Xwayland :42 -geometry 1600x1200 -decorate -noreset`. Run libTAS there too:
   `env -u WAYLAND_DISPLAY QT_QPA_PLATFORM=xcb DISPLAY=:42 libTAS ...`
   (otherwise Qt and possibly Wine use the Wayland session).
-- libTAS saves the game config on exit, so `-s` overrides and test paths end up
-  in the user's `~/.config/libTAS/<game>.ini`. Use a private copy with
-  `XDG_CONFIG_HOME`, and point `savestatedir`/`datadir` of the copied
-  `libTAS.ini` elsewhere. Per-game logging settings override `-s`; edit the
-  copy directly. `logging_status=2` logs to `<game>.log` next to the game.
+- The compositor still sizes the rootful Xwayland window itself: a tiling
+  compositor gave a restarted `:42` a portrait 1270x1403 screen, and Wine
+  reports the modes of that screen, so a game whose config stores 1280x720
+  refused to start. Check `xdpyinfo | grep dimensions` before blaming libTAS.
+- Killing a Wine game with SIGKILL can leave its windows on the test display
+  (same names as the next run's), so `xdotool search --name` may pick a dead
+  one. Restart the test Xwayland, or check that only one window matches.
+- The libTAS window size changes between runs; resize it
+  (`xdotool windowsize`) before clicking its buttons.
+- Settings given with `-s` are no longer saved in the ini files (`092fa5ab`), and `-s`
+  accepts the Proton (`use_proton`, `proton_path`), game and directory
+  (`savestatedir`, `datadir`, ...) settings. Still use a private copy of the
+  config with `XDG_CONFIG_HOME`, since the UI saves other changes.
+  Per-game logging settings override `-s`; edit the copy directly. `logging_status=2` logs to `<game>.log` next to the game.
   Before `08788282` that file was overwritten from its start without being
   truncated, so older logs hold several runs: the newest one is the start of
   the file, up to the first line that begins mid-sentence.
@@ -489,6 +592,16 @@ the game config, not in the movie.
   `+mmdevapi`, `+loaddll`.
 - Xlib's default error handler prints `X Error of failed request` and exits,
   which looks like a freeze from libTAS.
+- A game that stops advancing at an early frame may be showing a message box
+  (Sonic Generations' configuration errors): capture the screen, or use
+  `WINEDEBUG=+msgbox` (`MSGBOX_OnInit` prints the text). In fast-forward the
+  frame count keeps increasing while the box is shown.
+- `PROTON_LOG=1 PROTON_LOG_DIR=<dir>` writes `steam-<appid>.log` with the
+  `WINEDEBUG` channels you set. libTAS logs can contain binary data: use
+  `grep -a`.
+- To check what Direct3D 9 reports (adapter, GUID, modes), build a small
+  `i686-w64-mingw32-gcc ... -ld3d9` program calling `GetAdapterIdentifier` and
+  `EnumAdapterModes` and run it under the same conditions as the game.
 
 ## Open problems
 
@@ -501,3 +614,13 @@ the game config, not in the movie.
 - After loading a state, the stdout of the test program was not output anymore
   (probably related to pipe recreation).
 - Clickteam games may also enumerate other directories for their own files.
+- The display modes that Wine reports come from the real X display, and the
+  "Screen resolution" setting of libTAS (`screen_width`/`screen_height`) does
+  not change them: Wine collects them in its `explorer.exe` desktop process,
+  where libTAS is not initialized. Games that check their saved resolution
+  (Sonic Generations) fail on a smaller or rotated display, and the modes are
+  not deterministic across machines.
+- Proton launch (`dc47524b`) is only tested with Proton 11.0 and Sonic
+  Generations. The seccomp SIGSYS forwarding of that commit is untested.
+- Sonic Generations: not tested in a stage yet (loading and time-tracking,
+  non-draw frames during gameplay), controllers (XInput) not tested.
