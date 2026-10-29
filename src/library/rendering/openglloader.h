@@ -53,6 +53,8 @@ struct GLProcs {
     DEFINE_GL_POINTER(XQueryDrawable)
     DEFINE_GL_POINTER(XCreateContextAttribsARB)
     DEFINE_GL_POINTER(XDestroyContext)
+    DEFINE_GL_POINTER(XCreateWindow)
+    DEFINE_GL_POINTER(XDestroyWindow)
 
     DEFINE_GL_POINTER(GetString)
     DEFINE_GL_POINTER(BlitFramebuffer)

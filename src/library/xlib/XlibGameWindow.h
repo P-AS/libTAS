@@ -35,6 +35,13 @@ void push(Window w);
 /* Promote an identifier to become the game window */
 void promote(Window w);
 
+/* Make the top-level window that the game draws to the game window, adding
+ * it if it was not registered */
+void setDrawn(Window w);
+
+/* Returns the top-level window containing a window, or 0 on error */
+Window topLevel(Window w);
+
 /* Returns the current game window */
 Window get();
 

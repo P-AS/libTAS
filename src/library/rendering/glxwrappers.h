@@ -59,6 +59,10 @@ OVERRIDE void glXQueryDrawable(Display * dpy,  GLXDrawable draw,  int attribute,
 OVERRIDE GLXContext glXCreateContextAttribsARB (Display *dpy, GLXFBConfig config, GLXContext share_context, Bool direct, const int *attrib_list);
 OVERRIDE void glXDestroyContext(Display * dpy,  GLXContext ctx);
 
+/* Create and destroy an on-screen GLX drawable for a X window */
+OVERRIDE GLXWindow glXCreateWindow(Display *dpy, GLXFBConfig config, Window win, const int *attrib_list);
+OVERRIDE void glXDestroyWindow(Display *dpy, GLXWindow window);
+
 }
 
 #endif

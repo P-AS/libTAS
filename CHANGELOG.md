@@ -131,6 +131,10 @@
   implement, as games crashed when calling it
 * Fix a crash when passing a non-numeric value such as true to the --set
   command-line option
+* Wine: fix hotkeys not working for games drawn with GLX, such as with
+  Proton, or paused before their first frame
+* Wine: fix errors about sending on a non-socket when Proton's steam.exe
+  destroys windows
 * Don't run ldd and readelf on Windows executables, which printed errors
 
 ## [1.4.8] - 2026-05-14
