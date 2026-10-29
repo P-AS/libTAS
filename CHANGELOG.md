@@ -130,6 +130,8 @@
 * Don't run ldd and readelf on Windows executables, which printed errors
 * Don't warn about refused audio capture streams, which Wine opens when
   listing audio devices
+* Fix BadRROutput X errors with a custom screen resolution, when games read
+  the properties or the primary output of the fake monitor
 
 ## [1.4.8] - 2026-05-14
 ### Added

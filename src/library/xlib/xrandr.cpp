@@ -36,6 +36,8 @@ DEFINE_ORIG_POINTER(XRRFreeOutputInfo)
 DEFINE_ORIG_POINTER(XRRGetCrtcInfo)
 DEFINE_ORIG_POINTER(XRRFreeCrtcInfo)
 DEFINE_ORIG_POINTER(XRRListOutputProperties)
+DEFINE_ORIG_POINTER(XRRGetOutputProperty)
+DEFINE_ORIG_POINTER(XRRGetOutputPrimary)
 DEFINE_ORIG_POINTER(XRRSetCrtcConfig)
 DEFINE_ORIG_POINTER(XRRSetScreenConfig)
 DEFINE_ORIG_POINTER(XRRSetScreenConfigAndRate)
@@ -182,6 +184,36 @@ Atom *XRRListOutputProperties (Display *dpy, RROutput output, int *nprop)
 
     /* We need to return something that will be called with XFree() */
     return static_cast<Atom*>(Xmalloc(8));
+}
+
+/* Our fake output does not exist on the server, which returns BadRROutput
+ * (Wine reads the EDID of outputs). It has no property. */
+int XRRGetOutputProperty (Display *dpy, RROutput output, Atom property, long offset, long length, Bool _delete, Bool pending, Atom req_type, Atom *actual_type, int *actual_format, unsigned long *nitems, unsigned long *bytes_after, unsigned char **prop)
+{
+    LOGTRACE_SIMPLE(LCF_WINDOW);
+    if (!Global::shared_config.screen_width) {
+        LINK_NAMESPACE_FULLNAME(XRRGetOutputProperty, "libXrandr.so.2");
+        return orig::XRRGetOutputProperty(dpy, output, property, offset, length, _delete, pending, req_type, actual_type, actual_format, nitems, bytes_after, prop);
+    }
+
+    *actual_type = None;
+    *actual_format = 0;
+    *nitems = 0;
+    *bytes_after = 0;
+    *prop = nullptr;
+    return Success;
+}
+
+RROutput XRRGetOutputPrimary (Display *dpy, Window window)
+{
+    LOGTRACE_SIMPLE(LCF_WINDOW);
+    if (!Global::shared_config.screen_width) {
+        LINK_NAMESPACE_FULLNAME(XRRGetOutputPrimary, "libXrandr.so.2");
+        return orig::XRRGetOutputPrimary(dpy, window);
+    }
+
+    /* Our fake output */
+    return 1;
 }
 
 Status XRRSetCrtcConfig (Display *dpy, XRRScreenResources *resources, RRCrtc crtc, Time timestamp, int x, int y, RRMode mode, Rotation rotation, RROutput *outputs, int noutputs)
