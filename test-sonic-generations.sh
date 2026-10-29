@@ -101,6 +101,15 @@ for w in json.load(sys.stdin):
         [ "${niri_id#* }" = "tiled" ] && niri msg action toggle-window-floating --id "${niri_id% *}"
         niri msg action set-window-width --id "${niri_id% *}" "${TEST_SIZE%x*}"
         niri msg action set-window-height --id "${niri_id% *}" "${TEST_SIZE#*x}"
+        # niri keeps the position of the tile, which can be partly off screen
+        niri msg action center-window --id "${niri_id% *}"
+        out_size=$(niri msg --json focused-output | python3 -c '
+import json, sys
+l = json.load(sys.stdin).get("logical") or {}
+print("%dx%d" % (l.get("width", 0), l.get("height", 0)))')
+        if [ "${TEST_SIZE%x*}" -gt "${out_size%x*}" ] || [ "${TEST_SIZE#*x}" -gt "${out_size#*x}" ]; then
+            echo "warning: TEST_SIZE $TEST_SIZE is larger than the screen ($out_size)"
+        fi
         sleep 0.5
     fi
 fi

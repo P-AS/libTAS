@@ -302,6 +302,30 @@ then presented by the game thread.
   - Without a window manager both problems are hidden: tests that set the
     focus with `xdotool windowfocus` (`XSetInputFocus`) passed. Test with
     openbox and `xdotool windowactivate`.
+- **Crash when dragging the mouse** (`free(): unaligned chunk detected in
+  tcache 2`, `double free or corruption`): while a button is held, Wine
+  enables XInput2 raw events, and libTAS generates `XI_RawMotion` events
+  whose cookie data is allocated by us and freed by our `XFreeEventData()`.
+  `XlibEventQueueList::insert()` put the same event, with the same data
+  pointer, in the queue of each display, and Wine opens one display per
+  thread, so the data was freed several times (in `X11DRV_ProcessEvents()`).
+  Each queued event now owns a copy of the data (`duplicateXIEventData()`),
+  and the generated original is freed after queuing (`6406f967`). Moving the pointer or
+  clicking alone did not crash; holding a button while moving did, which is
+  also what moving the game window does. With `mouse_support=false` it did
+  not crash either.
+  - Found with a temporary wrapper of the `SIGABRT` handler that Wine
+    installs (through our `sigaction` hook), printing `backtrace()` before
+    calling it: Wine turns the abort into an exception and the faulting
+    thread exits, so `coredumpctl info` does not show it, and `ptrace` is
+    not allowed. The frames were `NtUserPeekMessage` -> `processXlibEvents`
+    -> win32u -> winex11 `X11DRV_ProcessEvents` -> `XFreeEventData` ->
+    `free`.
+  - We also gave native X events to Dear ImGui (OSD) from whichever thread
+    pulled them, while ImGui is not thread-safe and Wine reads events from
+    several threads. Events pulled by other threads are now queued and given
+    to ImGui at the next HUD frame of the main thread (`b3f011c5`). This was
+    not the cause of the crash above.
 - Hourglass import: Hourglass records `VK_LBUTTON` as a held key, which the
   importer converts into a pointer button (`95373926`).
 
@@ -601,7 +625,9 @@ the game config, not in the movie.
   Under niri, make the window floating and size it:
   `niri msg action toggle-window-floating --id <id>` and
   `set-window-width`/`set-window-height` (ids from `niri msg --json windows`,
-  title `Xwayland on :42`). `test-sonic-generations.sh` does it (`TEST_SIZE`).
+  title `Xwayland on :42`). niri keeps the position of the tile, which can
+  leave the floating window partly off screen: also run `center-window`.
+  `test-sonic-generations.sh` does it (`TEST_SIZE`).
 - Killing a Wine game with SIGKILL can leave its windows on the test display
   (same names as the next run's), so `xdotool search --name` may pick a dead
   one. Restart the test Xwayland, or check that only one window matches.
