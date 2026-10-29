@@ -181,6 +181,8 @@
   scaling them to the screen
 * Fix crashes (double free) when games read XInput2 events on several X
   connections, such as Wine games while dragging the mouse
+* Give X events to the OSD only from the main thread, as games may read them
+  from other threads
 
 ## [1.4.8] - 2026-05-14
 ### Added
