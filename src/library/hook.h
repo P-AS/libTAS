@@ -30,6 +30,16 @@ namespace libtas {
     #define OVERRIDE extern "C"
 #endif
 
+/* __THROW is a glibc attribute; define as empty for non-glibc platforms */
+#ifndef __THROW
+    #define __THROW
+#endif
+
+/* __THROWNL is a glibc attribute (like __THROW but nothrow); define as empty */
+#ifndef __THROWNL
+    #define __THROWNL
+#endif
+
 /* Get access to a function from a substring of the library name
  * For example, if we want to access to the SDL_Init() function:
  *   void (*SDL_Init_real)(void);

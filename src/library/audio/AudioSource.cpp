@@ -56,7 +56,7 @@ AudioSource::AudioSource(void)
 #ifdef __unix__
     audio_converter = std::unique_ptr<AudioConverter>(new AudioConverterSwr());
 #elif defined(__APPLE__) && defined(__MACH__)
-    audioConverter = std::unique_ptr<AudioConverter>(new AudioConverterCoreAudio());
+    audio_converter = std::unique_ptr<AudioConverter>(new AudioConverterCoreAudio());
 #endif
 
     init();

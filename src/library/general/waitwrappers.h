@@ -48,7 +48,9 @@ OVERRIDE int poll (struct pollfd *fds, nfds_t nfds, int timeout);
 
    This function is a cancellation point and therefore not marked with
    __THROW.  */
+#ifdef __linux__
 OVERRIDE int ppoll (struct pollfd *fds, nfds_t nfds, const struct timespec *timeout, const __sigset_t *ss);
+#endif
 
 /* Check the first NFDS descriptors each in READFDS (if not NULL) for read
    readiness, in WRITEFDS (if not NULL) for write readiness, and in EXCEPTFDS

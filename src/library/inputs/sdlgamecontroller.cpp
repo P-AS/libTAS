@@ -17,6 +17,13 @@
     along with libTAS.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/* Function aliasing is a GNU extension not supported on macOS */
+#ifdef __APPLE__
+#define LIBTAS_ALIAS(name)
+#else
+#define LIBTAS_ALIAS(name) __attribute__((alias(name)))
+#endif
+
 #include "sdlgamecontroller.h"
 #include "sdljoystick.h"
 #include "inputs.h"
@@ -131,7 +138,7 @@ bool mySDL_GameControllerReportEvents(int index)
     return SDL_FALSE;
 }
 
-/* Override */ bool SDL_IsGamepad(sdl3::SDL_JoystickID instance_id) __attribute__((alias("SDL_IsGameController")));
+/* Override */ bool SDL_IsGamepad(sdl3::SDL_JoystickID instance_id) LIBTAS_ALIAS(SDL_IsGameController);
 
 /* Override */ SDL_GameController *SDL_GameControllerOpen(int joystick_index)
 {
@@ -152,7 +159,7 @@ bool mySDL_GameControllerReportEvents(int index)
     return reinterpret_cast<SDL_GameController*>(&gcids[joystick_index]);
 }
 
-/* Override */ SDL_Gamepad * SDL_OpenGamepad(sdl3::SDL_JoystickID instance_id) __attribute__((alias("SDL_GameControllerOpen")));
+/* Override */ SDL_Gamepad * SDL_OpenGamepad(sdl3::SDL_JoystickID instance_id) LIBTAS_ALIAS(SDL_GameControllerOpen);
 
 /* Override */ const char *SDL_GameControllerNameForIndex(int joystick_index)
 {
@@ -160,7 +167,7 @@ bool mySDL_GameControllerReportEvents(int index)
     return joy_name;
 }
 
-/* Override */ const char * SDL_GetGamepadNameForID(sdl3::SDL_JoystickID instance_id) __attribute__((alias("SDL_GameControllerNameForIndex")));
+/* Override */ const char * SDL_GetGamepadNameForID(sdl3::SDL_JoystickID instance_id) LIBTAS_ALIAS(SDL_GameControllerNameForIndex);
 
 /* Override */ sdl2::SDL_GameControllerType SDL_GameControllerTypeForIndex(int joystick_index)
 {
@@ -178,7 +185,7 @@ bool mySDL_GameControllerReportEvents(int index)
     return joy_name;
 }
 
-/* Override */ const char * SDL_GetGamepadName(SDL_Gamepad *gamepad) __attribute__((alias("SDL_GameControllerName")));
+/* Override */ const char * SDL_GetGamepadName(SDL_Gamepad *gamepad) LIBTAS_ALIAS(SDL_GameControllerName);
 
 /* Override */ sdl2::SDL_GameControllerType SDL_GameControllerGetType(SDL_GameController *gamecontroller)
 {
@@ -208,7 +215,7 @@ bool mySDL_GameControllerReportEvents(int index)
     return reinterpret_cast<SDL_Joystick*>(gamecontroller);
 }
 
-/* Override */ SDL_Joystick * SDL_GetGamepadJoystick(SDL_Gamepad *gamepad) __attribute__((alias("SDL_GameControllerGetJoystick")));
+/* Override */ SDL_Joystick * SDL_GetGamepadJoystick(SDL_Gamepad *gamepad) LIBTAS_ALIAS(SDL_GameControllerGetJoystick);
 
 /* Override */ SDL_GameController* SDL_GameControllerFromInstanceID(sdl2::SDL_JoystickID joy)
 {
@@ -220,7 +227,7 @@ bool mySDL_GameControllerReportEvents(int index)
     return reinterpret_cast<SDL_GameController*>(&gcids[joy]);
 }
 
-/* Override */ SDL_Gamepad * SDL_GetGamepadFromID(sdl3::SDL_JoystickID instance_id) __attribute__((alias("SDL_GameControllerFromInstanceID")));
+/* Override */ SDL_Gamepad * SDL_GetGamepadFromID(sdl3::SDL_JoystickID instance_id) LIBTAS_ALIAS(SDL_GameControllerFromInstanceID);
 
 const char* xbox360Mapping = "00000000000000000000000000000000,XInput Controller,a:b0,b:b1,back:b6,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,dpup:h0.1,guide:b8,leftshoulder:b4,leftstick:b9,lefttrigger:a2,leftx:a0,lefty:a1,rightshoulder:b5,rightstick:b10,righttrigger:a5,rightx:a3,righty:a4,start:b7,x:b2,y:b3,";
 
@@ -298,7 +305,7 @@ static char* duplicateMapping()
     return SDL_TRUE;
 }
 
-/* Override */ bool SDL_GamepadConnected(SDL_Gamepad *gamepad) __attribute__((alias("SDL_GameControllerGetAttached")));
+/* Override */ bool SDL_GamepadConnected(SDL_Gamepad *gamepad) LIBTAS_ALIAS(SDL_GameControllerGetAttached);
 
 /* Override */ int SDL_GameControllerEventState(int state)
 {
@@ -370,7 +377,7 @@ static const int gcevents3[] = {
     SDL_JoystickUpdate();
 }
 
-/* Override */ void SDL_UpdateGamepads(void) __attribute__((alias("SDL_GameControllerUpdate")));
+/* Override */ void SDL_UpdateGamepads(void) LIBTAS_ALIAS(SDL_GameControllerUpdate);
 
 /* Override */ sdl2::SDL_GameControllerButtonBind SDL_GameControllerGetBindForAxis(SDL_GameController *gamecontroller,
                                  sdl2::SDL_GameControllerAxis axis)
@@ -428,7 +435,7 @@ static const int gcevents3[] = {
     return SDL_TRUE;
 }
 
-/* Override */ bool SDL_GamepadHasAxis(SDL_Gamepad *gamepad, sdl3::SDL_GamepadAxis axis) __attribute__((alias("SDL_GameControllerHasAxis")));
+/* Override */ bool SDL_GamepadHasAxis(SDL_Gamepad *gamepad, sdl3::SDL_GamepadAxis axis) LIBTAS_ALIAS(SDL_GameControllerHasAxis);
 
 /* Override */ Sint16 SDL_GameControllerGetAxis(SDL_GameController *gamecontroller,
                                           sdl2::SDL_GameControllerAxis axis)
@@ -457,7 +464,7 @@ static const int gcevents3[] = {
 }
 
 /* sdl2::SDL_GameControllerAxis and sdl3::SDL_GamepadAxis do match */
-/* Override */ Sint16 SDL_GetGamepadAxis(SDL_Gamepad *gamepad, sdl3::SDL_GamepadAxis axis) __attribute__((alias("SDL_GameControllerGetAxis")));
+/* Override */ Sint16 SDL_GetGamepadAxis(SDL_Gamepad *gamepad, sdl3::SDL_GamepadAxis axis) LIBTAS_ALIAS(SDL_GameControllerGetAxis);
 
 /* Override */ sdl2::SDL_GameControllerButtonBind 
 SDL_GameControllerGetBindForButton(SDL_GameController *gamecontroller,
@@ -523,7 +530,7 @@ SDL_GameControllerGetBindForButton(SDL_GameController *gamecontroller,
     return SDL_TRUE;
 }
 
-/* Override */ bool SDL_GamepadHasButton(SDL_Gamepad *gamepad, sdl3::SDL_GamepadButton button) __attribute__((alias("SDL_GameControllerHasButton")));
+/* Override */ bool SDL_GamepadHasButton(SDL_Gamepad *gamepad, sdl3::SDL_GamepadButton button) LIBTAS_ALIAS(SDL_GameControllerHasButton);
 
 /* Override */ Uint8 SDL_GameControllerGetButton(SDL_GameController *gamecontroller,
                                                  sdl2::SDL_GameControllerButton button)
@@ -564,7 +571,7 @@ SDL_GameControllerGetBindForButton(SDL_GameController *gamecontroller,
     return SDL_FALSE;
 }
 
-/* Override */ bool SDL_GamepadHasSensor(SDL_Gamepad *gamepad, sdl3::SDL_SensorType type) __attribute__((alias("SDL_GameControllerHasSensor")));
+/* Override */ bool SDL_GamepadHasSensor(SDL_Gamepad *gamepad, sdl3::SDL_SensorType type) LIBTAS_ALIAS(SDL_GameControllerHasSensor);
 
 /* Override */ int SDL_GameControllerSetSensorEnabled(SDL_GameController *gamecontroller, sdl2::SDL_SensorType type, SDL_bool enabled)
 {
@@ -584,7 +591,7 @@ SDL_GameControllerGetBindForButton(SDL_GameController *gamecontroller,
     return SDL_FALSE;
 }
 
-/* Override */ bool SDL_GamepadSensorEnabled(SDL_Gamepad *gamepad, sdl3::SDL_SensorType type) __attribute__((alias("SDL_GameControllerIsSensorEnabled")));
+/* Override */ bool SDL_GamepadSensorEnabled(SDL_Gamepad *gamepad, sdl3::SDL_SensorType type) LIBTAS_ALIAS(SDL_GameControllerIsSensorEnabled);
 
 /* Override */ float SDL_GameControllerGetSensorDataRate(SDL_GameController *gamecontroller, sdl2::SDL_SensorType type)
 {
@@ -592,7 +599,7 @@ SDL_GameControllerGetBindForButton(SDL_GameController *gamecontroller,
     return 0.0f;
 }
 
-/* Override */ float SDL_GetGamepadSensorDataRate(SDL_Gamepad *gamepad, sdl3::SDL_SensorType type) __attribute__((alias("SDL_GameControllerGetSensorDataRate")));
+/* Override */ float SDL_GetGamepadSensorDataRate(SDL_Gamepad *gamepad, sdl3::SDL_SensorType type) LIBTAS_ALIAS(SDL_GameControllerGetSensorDataRate);
 
 /* Override */ int SDL_GameControllerGetSensorData(SDL_GameController *gamecontroller, sdl2::SDL_SensorType type, float *data, int num_values)
 {
@@ -693,6 +700,6 @@ SDL_GameControllerGetBindForButton(SDL_GameController *gamecontroller,
         gcids[*gcid] = -1;
 }
 
-/* Override */ void SDL_CloseGamepad(SDL_Gamepad *gamepad) __attribute__((alias("SDL_GameControllerClose")));
+/* Override */ void SDL_CloseGamepad(SDL_Gamepad *gamepad) LIBTAS_ALIAS(SDL_GameControllerClose);
 
 }

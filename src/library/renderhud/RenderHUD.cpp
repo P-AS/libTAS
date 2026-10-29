@@ -32,24 +32,26 @@
 
 #include "GlobalState.h"
 #include "global.h" // Global::shared_config
+#include "FPSMonitor.h"
+#ifdef __unix__
 #include "xlib/xdisplay.h" // x11::gameDisplays
 #include "xlib/XlibGameWindow.h"
-#include "FPSMonitor.h"
+#include "../external/imgui/imgui_impl_xlib.h"
+#include <X11/X.h>
+#include <X11/Xlib.h>
+#include <X11/Xutil.h> // XSetWMName
+#endif
 #include "screencapture/ScreenCapture.h"
 #include "general/timewrappers.h" // clock_gettime
 #include "TimeHolder.h"
 #include "UnityHacks.h"
 #include "../external/imgui/imgui.h"
 #include "../external/imgui/implot.h"
-#include "../external/imgui/imgui_impl_xlib.h"
 #include "../external/imgui/Roboto-Medium.h"
 #include "../external/imgui/ProggyClean.h"
 
 #include <sstream>
 #include <math.h>
-#include <X11/X.h>
-#include <X11/Xlib.h>
-#include <X11/Xutil.h> // XSetWMName
 
 namespace libtas {
 
@@ -58,6 +60,7 @@ bool RenderHUD::show_game_window = false;
 bool RenderHUD::init()
 {
     if (!ImGui::GetCurrentContext()) {
+#ifdef __unix__
         if (!XlibGameWindow::get())
             return false;
 
@@ -79,8 +82,10 @@ bool RenderHUD::init()
                 return true;
             }
         }
+#endif
+        return false;
     }
-    return false;
+    return true;
 }
 
 void RenderHUD::newFrame()
@@ -94,7 +99,9 @@ void RenderHUD::newFrame()
     int w = 0, h = 0;
     ScreenCapture::getDimensions(w, h);
     GlobalNative gn;
+#ifdef __unix__
     ImGui_ImplXlib_NewFrame(XlibGameWindow::get(), w, h);
+#endif
     ImGui::NewFrame();
 }
 
@@ -225,6 +232,7 @@ void RenderHUD::drawAll(uint64_t framecount, uint64_t nondraw_framecount, const 
     }
 
     if (supportsGameWindow()) {
+#ifdef __unix__
         if (show_game_window && !old_show_game_window) {
             setWindowResizable(true);
         }
@@ -239,6 +247,7 @@ void RenderHUD::drawAll(uint64_t framecount, uint64_t nondraw_framecount, const 
                 }
             }
         }
+#endif
     }
     old_show_game_window = show_game_window;
 
@@ -314,6 +323,7 @@ bool RenderHUD::doRender()
 
 void RenderHUD::setWindowResizable(bool resizable)
 {
+#ifdef __unix__
     /* TODO: select one display? */
     for (int i=0; i<GAMEDISPLAYNUM; i++) {
         if (x11::gameDisplays[i]) {
@@ -339,6 +349,7 @@ void RenderHUD::setWindowResizable(bool resizable)
             return;
         }
     }
+#endif
 }
 
 /* Returns if the game is rendered inside an ImGui window */

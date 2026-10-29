@@ -1,7 +1,47 @@
 /*
     Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
-    This file is part of libTAS.
+    libTAS is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    libTAS is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with libTAS.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/* cookie_io_functions_t and fopencookie are glibc extensions.
+ * macOS has them too, but _DARWIN_C_SOURCE must be defined before stdio.h. */
+#ifdef __APPLE__
+#ifndef _DARWIN_C_SOURCE
+#define _DARWIN_C_SOURCE
+#endif
+/* First include stdio.h to get ssize_t, size_t, fpos_t, FILE */
+#include <stdio.h>
+/* cookie_io_functions_t is a glibc extension not available on macOS.
+ * Provide a stub structure for compatibility. */
+typedef struct {
+    ssize_t (*read)  (void *cookie, char *buf, size_t size);
+    ssize_t (*write) (void *cookie, const char *buf, size_t size);
+    int     (*seek)  (void *cookie, fpos_t *pos, int whence);
+    int     (*close) (void *cookie);
+} cookie_io_functions_t;
+
+/* fopencookie is a glibc extension; provide a stub that returns nullptr.
+ * SaveFileStream functionality is not supported on macOS. */
+static inline FILE *fopencookie(void *cookie, const char *mode, cookie_io_functions_t io)
+{
+    return nullptr;
+}
+#endif
+
+/*
+    Copyright 2015-2026 Clément Gallet <clement.gallet@ens-lyon.org>
 
     libTAS is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,12 +57,22 @@
     along with libTAS.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/*
+ * SaveFileStream implementation.
+ * Uses fopencookie on Linux for custom stream operations.
+ * On macOS, fopencookie is not available; this provides a stub.
+ */
+
 #include "SaveFileStream.h"
 
 #include "GlobalState.h"
 #include "logging.h"
 
+#ifdef __APPLE__
+#include <stdio.h>
+#else
 #include <cstdio>
+#endif
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <errno.h>
@@ -32,6 +82,18 @@
 
 namespace libtas {
 
+#ifdef __APPLE__
+/* On macOS, SaveFileStream::open returns nullptr since fopencookie is not available */
+FILE *SaveFileStream::open (const char *path, const char *mode)
+{
+    /* SaveFileStream functionality is not supported on macOS */
+    return nullptr;
+}
+#else
+
+/* on Linux, off64_t is the 64-bit file offset type */
+typedef off64_t off64_t_linux;
+
 /* Our custom stream consists of a private mapping of the original file, so that
  * we take advantage of copy-on-write feature, followed by anonymous memory, in
  * case we write past the end of the file. */
@@ -39,7 +101,7 @@ struct savefile_cookie_t
 {
     char *file_addr;
     size_t file_size;
-    off64_t pos;
+    off64_t_linux pos;
     std::vector<char> extra_memory;
     size_t size;
 };
@@ -55,7 +117,7 @@ static ssize_t savefile_read (void *cookie, char *b, size_t s)
     size_t file_read = 0;
     
     /* Read the file part of the stream */
-    if (c->pos < (off64_t)c->file_size) {
+    if (c->pos < (off64_t_linux)c->file_size) {
         file_read = s;
         if (c->pos + s > c->file_size)
             file_read = c->file_size - c->pos;
@@ -80,7 +142,7 @@ static ssize_t savefile_write (void *cookie, const char *b, size_t s)
     size_t file_write = 0;
     
     /* Write the file part of the stream */
-    if (c->pos < (off64_t)c->file_size) {
+    if (c->pos < (off64_t_linux)c->file_size) {
         file_write = s;
         if (c->pos + s > c->file_size)
             file_write = c->file_size - c->pos;
@@ -100,10 +162,10 @@ static ssize_t savefile_write (void *cookie, const char *b, size_t s)
     return s;
 }
 
-static int savefile_seek (void *cookie, off64_t *p, int w)
+static int savefile_seek (void *cookie, off64_t_linux *p, int w)
 {
     savefile_cookie_t *c = static_cast<savefile_cookie_t*>(cookie);
-    off64_t np;
+    off64_t_linux np;
 
     switch (w) {
         case SEEK_SET:
@@ -113,7 +175,7 @@ static int savefile_seek (void *cookie, off64_t *p, int w)
             np = c->pos + *p;
             break;
         case SEEK_END:
-            np = static_cast<off64_t>(c->size) + *p;
+            np = static_cast<off64_t_linux>(c->size) + *p;
             break;
         default:
             return -1;
@@ -179,7 +241,7 @@ FILE *SaveFileStream::open (const char *path, const char *mode)
     else
         c->pos = 0;
 
-    cookie_io_functions_t iof;
+    cookie_io_functions_t iof = {};
     iof.read = savefile_read;
     iof.write = savefile_write;
     iof.seek = savefile_seek;
@@ -196,5 +258,7 @@ FILE *SaveFileStream::open (const char *path, const char *mode)
 
     return result;
 }
+
+#endif /* __APPLE__ */
 
 }

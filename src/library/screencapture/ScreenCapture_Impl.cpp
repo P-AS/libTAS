@@ -25,11 +25,13 @@
 #include "global.h"
 #include "encoding/AVEncoder.h"
 #include "GlobalState.h"
+#ifdef __unix__
 #include "xlib/xwindows.h"
 #include "xlib/xdisplay.h"
 #include "xlib/XlibGameWindow.h"
 
 #include <X11/Xlib.h>
+#endif
 #include <cstring>
 // #include "../external/SDL2.h"
 
@@ -45,11 +47,6 @@ int ScreenCapture_Impl::init()
     /* Don't initialize if window is not registered */
     if (!XlibGameWindow::get())
         return -1;
-#else
-#error "ScreenCapture not implemented for MacOS"
-    // /* Use SDL window for now */
-    // if ((Global::game_info.video & GameInfo::SDL2) && (!sdl::gameSDLWindow))
-    //     return 0;
 #endif
 
     unsigned int depth = 8;
@@ -76,11 +73,9 @@ int ScreenCapture_Impl::init()
         width = w;
         height = h;
 #else
-#error "ScreenCapture not implemented for MacOS"
-        /* Use SDL2 window for now */
-        // if (Global::game_info.video & GameInfo::SDL2) {
-            //     ORIG_SDL2_CALL(SDL_GetWindowSize, (sdl::gameSDLWindow, &width, &height));
-            // }
+        /* macOS: dimensions will be set by SDL-based capture */
+        width = 0;
+        height = 0;
 #endif
     }
 

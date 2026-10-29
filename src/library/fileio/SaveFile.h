@@ -66,8 +66,12 @@ public:
     /* Fills the stat struct */
     int getStat(struct stat *buf) const;
 
-    /* Fills the stat64 struct */
+    /* Fills the stat struct */
+#ifdef __linux__
     int getStat64(struct stat64 *buf) const;
+#else
+    int getStat64(struct stat *buf) const;
+#endif
 
     /* Write the content of a savefile in its original path */
     bool saveOnDisk() const;

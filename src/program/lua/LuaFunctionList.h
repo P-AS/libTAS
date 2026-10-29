@@ -41,7 +41,9 @@ public:
         lua_State *lua_state;
         std::filesystem::path file;
         std::filesystem::path filename;
+#ifdef __linux__
         int wd;
+#endif
         bool enabled;
     };
     
@@ -80,7 +82,9 @@ public:
     
 private:
     std::list<NamedLuaFunction> functions;
+#ifdef __linux__
     int inotifyfd;
+#endif
 
 };
 }

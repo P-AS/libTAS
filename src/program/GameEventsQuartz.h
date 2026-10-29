@@ -23,7 +23,8 @@
 #include "GameEvents.h"
 #include "KeyMapping.h"
 
-#import <AppKit/AppKit.h>
+/* AppKit is Objective-C; imported only in the .mm implementation file.
+ * Use a void pointer for the opaque object reference. */
 #include <CoreGraphics/CoreGraphics.h>
 #include <memory>
 #include <stdint.h>
@@ -49,12 +50,12 @@ public:
     static bool haveFocus(Context *c);
 
 private:
-    /* Game running app */
-    static NSRunningApplication* gameApp;
-    
+    /* Game running app (opaque object pointer; cast to NSRunningApplication* in .mm) */
+    static void* gameApp;
+
     /* Event tap */
     CFMachPortRef eventTap;
-    
+
     EventType nextEvent(struct HotKey &hk);
 };
 

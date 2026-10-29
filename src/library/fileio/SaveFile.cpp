@@ -34,8 +34,8 @@
 #include <limits.h> //PATH_MAX
 #ifdef __linux__
 #include <sys/syscall.h>
-#endif
 #include <sys/sendfile.h>
+#endif
 #include <sys/mman.h>
 
 namespace libtas {
@@ -472,7 +472,7 @@ int SaveFile::getStat(struct stat *buf) const
     return -1;
 }
 
-int SaveFile::getStat64(struct stat64 *buf) const
+int SaveFile::getStat64(struct stat *buf) const
 {
     if (removed) {
         errno = ENOENT;
@@ -492,7 +492,7 @@ int SaveFile::getStat64(struct stat64 *buf) const
     }
     
     if (fd != 0) {
-        NATIVECALL(fstat64(fd, buf));
+        NATIVECALL(fstat(fd, buf));
         return 0;
     }
 

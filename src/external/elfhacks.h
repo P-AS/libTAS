@@ -29,8 +29,10 @@
   Pyry Haulos <pyry.haulos@gmail.com>
 */
 #pragma once
+#ifdef __linux__
 #include <elf.h>
 #include <link.h>
+#endif
 #include <stdint.h>
 
 #ifdef __cplusplus

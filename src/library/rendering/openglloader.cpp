@@ -48,7 +48,8 @@ void gl_load_procs(GLGetProcAddressProc proc)
     if (proc == old_proc)
         return;
     old_proc = proc;
-    
+
+#ifdef __unix__
     GET_GL_POINTER(XMakeCurrent)
     GET_GL_POINTER(XMakeContextCurrent)
     GET_GL_POINTER(XSwapBuffers)
@@ -60,6 +61,7 @@ void gl_load_procs(GLGetProcAddressProc proc)
     GET_GL_POINTER(XQueryDrawable)
     GET_GL_POINTER(XCreateContextAttribsARB)
     GET_GL_POINTER(XDestroyContext)
+#endif
 
     GET_GL_POINTER(GetString)
     GET_GL_POINTER(BlitFramebuffer)
@@ -114,6 +116,7 @@ void gl_load_procs(GLGetProcAddressProc proc)
     GET_GL_POINTER(DeleteProgram)
     GET_GL_POINTER(Viewport)
     GET_GL_POINTER(Clear)
+#ifdef __unix__
     GET_GL_POINTER(Begin)
     GET_GL_POINTER(End)
     GET_GL_POINTER(Vertex2d)
@@ -140,6 +143,7 @@ void gl_load_procs(GLGetProcAddressProc proc)
     GET_GL_POINTER(Vertex4fv)
     GET_GL_POINTER(Vertex4iv)
     GET_GL_POINTER(Vertex4sv)
+#endif
 
     GET_GL_POINTER(DrawArrays)
     GET_GL_POINTER(DrawElements)

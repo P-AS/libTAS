@@ -34,7 +34,7 @@ HexViewWindow::HexViewWindow(QWidget *parent) : QDialog(parent)
 {
     setWindowTitle("Hex View");
     iodevice = new IOProcessDevice(this);
-    QHexDocument* doc = QHexDocument::fromDevice<QDeviceBuffer>(iodevice);
+    QHexDocument* doc = QHexDocument::fromDevice<QDeviceBuffer>(static_cast<QIODevice*>(iodevice));
 
     view = new QHexView(this);
     view->setDocument(doc);

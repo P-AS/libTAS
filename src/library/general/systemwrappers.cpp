@@ -35,7 +35,9 @@
 namespace libtas {
 
 DEFINE_ORIG_POINTER(fork)
+#ifdef __linux__
 DEFINE_ORIG_POINTER(sched_getaffinity)
+#endif
 
 /* Override */ pid_t getpid (void) __THROW
 {
@@ -105,6 +107,7 @@ DEFINE_ORIG_POINTER(sched_getaffinity)
     RETURN_NATIVE(sched_getcpu, (), nullptr);
 }
 
+#ifdef __linux__
 /* Override */ int sched_getaffinity (pid_t pid, size_t cpusetsize, cpu_set_t *cpuset) __THROW
 {
     LOGTRACE_SIMPLE(LCF_SYSTEM);
@@ -127,6 +130,7 @@ DEFINE_ORIG_POINTER(sched_getaffinity)
 
     return 0;
 }
+#endif
 
 /* Override */ long int sysconf (int name) __THROW
 {

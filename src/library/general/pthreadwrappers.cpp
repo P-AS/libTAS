@@ -37,6 +37,7 @@
 #include <atomic>
 #include <memory>
 #include <exception>
+#include <time.h>
 
 namespace libtas {
 
@@ -305,7 +306,15 @@ static void *pthread_native_start(void *arg)
 
     int ret = 0;
 
+#ifdef __unix__
     NATIVECALL(clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, abstime, NULL));
+#elif defined(__APPLE__) && defined(__MACH__)
+    /* On macOS, use nanosleep instead */
+    struct timespec ts;
+    ts.tv_sec = abstime->tv_sec;
+    ts.tv_nsec = abstime->tv_nsec;
+    NATIVECALL(nanosleep(&ts, NULL));
+#endif
 
     if (thread->state == ThreadInfo::ST_ZOMBIE) {
         if (retval) {
@@ -654,9 +663,15 @@ int pthread_setname_np (const char *name)
     }
 
     if (Global::shared_config.game_specific_timing & SharedConfig::GC_TIMING_ARMA_CWA) {
+#ifdef __unix__
         if (strcmp(name, "G.Main") == 0) {
             ThreadManager::setMainThread(target_thread);
         }
+#else
+        if (strcmp(name, "G.Main") == 0) {
+            ThreadManager::setMainThread();
+        }
+#endif
     }
 
 #ifdef __unix__
@@ -713,7 +728,7 @@ static void pthread_workqueue_kevent_func(void **events, int *nevents)
     return orig::kevent_func(events, nevents);
 }
 
-static void pthread_workqueue_workloop_func(uint64_t *workloop_id, void **events, int *nevents)
+static void pthread_workqueue_workloop_func(int *workloop_id, void **events, int *nevents)
 {
     /* Register own thread if not already */
     register_self_thread();

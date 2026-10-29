@@ -19,11 +19,15 @@
 
 #include "sdldynapi.h"
 
+#include "sdl3_weak_imports.h"
+
 #include "logging.h"
 #include "hook.h"
 #include "hookpatch.h"
 #include "GlobalState.h"
+#ifdef __linux__
 #include "../external/elfhacks.h"
+#endif
 
 #include <execinfo.h>
 #include <dlfcn.h>
@@ -103,12 +107,14 @@ void setSDLFullscreenAddr(uint64_t addr)
             /* Get the dynamic library name of our caller */
 
             LOG(LL_DEBUG, LCF_SDL | LCF_HOOK, "   Try extracting original SDL_DYNAPI_entry function from file %s", info.dli_fname);
+#ifdef __linux__
             eh_obj_t obj;
             int ret = eh_find_obj(&obj, info.dli_fname);
             if (ret == 0) {
                 eh_find_sym(&obj, "SDL_DYNAPI_entry", (void **) &orig_SDL_DYNAPI_entry);
                 eh_destroy_obj(&obj);
             }
+#endif
         }
     }
 

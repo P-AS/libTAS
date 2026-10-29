@@ -27,7 +27,9 @@
 
 #include "../external/imgui/imgui.h"
 #include "../external/imgui/imgui_impl_vulkan.h"
+#ifdef __unix__
 #include "../external/imgui/imgui_impl_xlib.h"
+#endif
 
 namespace libtas {
 
@@ -66,7 +68,9 @@ void RenderHUD_Vulkan::init() {
 
 void RenderHUD_Vulkan::fini() {
     if (ImGui::GetCurrentContext()) {
+#ifdef __unix__
         ImGui_ImplXlib_Shutdown();
+#endif
         ImGui_ImplVulkan_Shutdown();
         ImGui::DestroyContext();
     }

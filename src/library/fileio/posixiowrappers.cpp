@@ -417,8 +417,10 @@ int close (int fd)
     if (ret != 1)
         return ret;
 
+#ifdef __linux__
     unref_jsdev(fd);
     unref_evdev(fd);
+#endif
 
     RETURN_NATIVE(close, (fd), nullptr);
 
@@ -499,10 +501,10 @@ static int stat_special(const char *path, struct stat *buf)
     return 1;
 }
 
+#ifdef __linux__
 static int stat64_special(const char *path, struct stat64 *buf)
 {
-#ifdef __linux__
-    /* Check if joystick device */
+    /* Check if joystick device (Linux only) */
     int joy = is_jsdev(path);
     if (joy == -1) joy = is_evdev(path);
 
@@ -514,7 +516,6 @@ static int stat64_special(const char *path, struct stat64 *buf)
             return -1;
         }
     }
-#endif
 
     if (SaveFileList::isSaveFileRemoved(path)) {
         errno = ENOENT;
@@ -528,6 +529,7 @@ static int stat64_special(const char *path, struct stat64 *buf)
 
     return 1;
 }
+#endif /* __linux__ */
 
 int __xstat(int ver, const char *path, struct stat *buf) __THROW
 {
@@ -548,6 +550,7 @@ int __xstat(int ver, const char *path, struct stat *buf) __THROW
     RETURN_NATIVE(__xstat, (ver, path, buf), nullptr);
 }
 
+#ifdef __linux__
 int __xstat64(int ver, const char *path, struct stat64 *buf) __THROW
 {
     RETURN_IF_NATIVE(__xstat64, (ver, path, buf), nullptr);
@@ -566,6 +569,7 @@ int __xstat64(int ver, const char *path, struct stat64 *buf) __THROW
 
     RETURN_NATIVE(__xstat64, (ver, path, buf), nullptr);
 }
+#endif
 
 int stat(const char *path, struct stat *buf) __THROW
 {
@@ -586,6 +590,7 @@ int stat(const char *path, struct stat *buf) __THROW
     RETURN_NATIVE(stat, (path, buf), nullptr);
 }
 
+#ifdef __linux__
 int stat64(const char *path, struct stat64 *buf) __THROW
 {
     RETURN_IF_NATIVE(stat64, (path, buf), nullptr);
@@ -604,6 +609,7 @@ int stat64(const char *path, struct stat64 *buf) __THROW
 
     RETURN_NATIVE(stat64, (path, buf), nullptr);
 }
+#endif
 
 int __lxstat(int ver, const char *path, struct stat *buf) __THROW
 {
@@ -624,6 +630,7 @@ int __lxstat(int ver, const char *path, struct stat *buf) __THROW
     RETURN_NATIVE(__lxstat, (ver, path, buf), nullptr);
 }
 
+#ifdef __linux__
 int __lxstat64(int ver, const char *path, struct stat64 *buf) __THROW
 {
     RETURN_IF_NATIVE(__lxstat64, (ver, path, buf), nullptr);
@@ -643,6 +650,7 @@ int __lxstat64(int ver, const char *path, struct stat64 *buf) __THROW
 
     RETURN_NATIVE(__lxstat64, (ver, path, buf), nullptr);
 }
+#endif
 
 int lstat(const char *path, struct stat *buf) __THROW
 {
@@ -663,6 +671,7 @@ int lstat(const char *path, struct stat *buf) __THROW
     RETURN_NATIVE(lstat, (path, buf), nullptr);
 }
 
+#ifdef __linux__
 int lstat64(const char *path, struct stat64 *buf) __THROW
 {
     RETURN_IF_NATIVE(lstat64, (path, buf), nullptr);
@@ -681,6 +690,7 @@ int lstat64(const char *path, struct stat64 *buf) __THROW
     
     RETURN_NATIVE(lstat64, (path, buf), nullptr);
 }
+#endif
 
 int __fxstat(int ver, int fd, struct stat *buf) __THROW
 {
@@ -699,6 +709,7 @@ int __fxstat(int ver, int fd, struct stat *buf) __THROW
     RETURN_NATIVE(__fxstat, (ver, fd, buf), nullptr);
 }
 
+#ifdef __linux__
 int __fxstat64(int ver, int fd, struct stat64 *buf) __THROW
 {
     RETURN_IF_NATIVE(__fxstat64, (ver, fd, buf), nullptr);
@@ -715,6 +726,7 @@ int __fxstat64(int ver, int fd, struct stat64 *buf) __THROW
 
     RETURN_NATIVE(__fxstat64, (ver, fd, buf), nullptr);
 }
+#endif
 
 int fstat(int fd, struct stat *buf) __THROW
 {
@@ -733,6 +745,7 @@ int fstat(int fd, struct stat *buf) __THROW
     RETURN_NATIVE(fstat, (fd, buf), nullptr);
 }
 
+#ifdef __linux__
 int fstat64(int fd, struct stat64 *buf) __THROW
 {
     RETURN_IF_NATIVE(fstat64, (fd, buf), nullptr);
@@ -749,6 +762,7 @@ int fstat64(int fd, struct stat64 *buf) __THROW
 
     RETURN_NATIVE(fstat64, (fd, buf), nullptr);    
 }
+#endif
 
 int dup2 (int fd, int fd2) __THROW
 {

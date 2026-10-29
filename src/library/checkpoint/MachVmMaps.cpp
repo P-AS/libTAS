@@ -23,6 +23,7 @@
 #include "ReservedMemory.h"
 
 #include "logging.h"
+#include "Utils.h"
 
 #include <unistd.h>
 #include <mach/vm_region.h>
@@ -212,7 +213,7 @@ bool MachVmMaps::getNextArea(Area *area)
         case 0:
             /* No user tag usually means standard mapped file */
             errno = 0;
-            kret = proc_regionfilename(pid, address, area->name, FILENAMESIZE);
+            kret = proc_regionfilename(pid, address, area->name, Area::FILENAMESIZE);
             if ((kret < 0) || (errno != 0))
                 area->name[0] = '\0';
             area->flags |= Area::AREA_FILE;

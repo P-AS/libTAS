@@ -41,7 +41,9 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <dirent.h>
+#ifdef __linux__
 #include <sys/sysmacros.h>
+#endif
 #ifdef __linux__
 #include <sys/syscall.h>
 #endif
@@ -278,9 +280,11 @@ void trackFile(FileHandle &fh)
     else if (fh.needsTracking()) {
         LOG(LL_DEBUG, LCF_FILEIO, "Track file %s (fd=%d)", fh.fileName, fh.fds[0]);
 
+#ifdef __linux__
         if (fdatasync(fh.fds[0]) != 0) {
             LOG(LL_INFO, LCF_FILEIO, "Could not synchronize file %s (fd=%d) before tracking", fh.fileName, fh.fds[0]);
         }
+#endif
 
         off_t currentOffset = lseek(fh.fds[0], 0, SEEK_CUR);
         if (currentOffset == -1) {
@@ -467,6 +471,7 @@ void syncFileDescriptors()
             /* Recreate a memfd if savefile */
             const SaveFile* sf = SaveFileList::getSaveFile(fd);
             if (sf) {
+#ifdef __linux__
                 int new_fd = syscall(SYS_memfd_create, sf->filename.c_str(), 0);
                 if (new_fd < 0) {
                     LOG(LL_ERROR, LCF_CHECKPOINT | LCF_FILEIO, "Could not create memfd");
@@ -477,6 +482,7 @@ void syncFileDescriptors()
                     close(new_fd);
                     continue;
                 }
+#endif
             }
             else if (fh.type == FileHandle::FILE_REGULAR) {
                 /* TODO: We assume that the non-savefile file is read-only for now */

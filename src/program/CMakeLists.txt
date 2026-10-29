@@ -18,13 +18,17 @@ message(STATUS "Using Qt ${Qt${QT_VERSION_MAJOR}_VERSION}")
 # Used by build.sh to bundle the right Qt version in the AppImage
 set(LIBTAS_QT_VERSION_USED ${QT_VERSION_MAJOR} CACHE INTERNAL "")
 
-pkg_check_modules(XCB REQUIRED IMPORTED_TARGET x11 xcb xcb-xkb xcb-keysyms)
-pkg_check_modules(LIBCAP REQUIRED IMPORTED_TARGET libcap)
-pkg_search_module(LIBLUA REQUIRED IMPORTED_TARGET lua54 lua5.4 lua)
-
-if(NOT LIBTAS_HAS_XCB_RANDR)
-    message(FATAL_ERROR "The xcb randr header is required!")
+# Linux-only dependencies: XCB and libcap
+if(NOT APPLE)
+    pkg_check_modules(XCB REQUIRED IMPORTED_TARGET x11 xcb xcb-xkb xcb-keysyms)
+    pkg_check_modules(LIBCAP REQUIRED IMPORTED_TARGET libcap)
+    if(NOT LIBTAS_HAS_XCB_RANDR)
+        message(FATAL_ERROR "The xcb randr header is required!")
+    endif()
 endif()
+
+# Cross-platform: Lua
+pkg_search_module(LIBLUA REQUIRED IMPORTED_TARGET lua54 lua5.4 lua)
 
 find_program(FFMPEG ffmpeg)
 if(NOT FFMPEG)
@@ -32,6 +36,15 @@ if(NOT FFMPEG)
 endif()
 
 #### Sources ####
+
+# Platform-specific event/key mapping: XCB (Linux) or Quartz (macOS)
+if(APPLE)
+    set(LIBTAS_GAME_EVENTS GameEventsQuartz.mm)
+    set(LIBTAS_KEY_MAPPING KeyMappingQuartz.mm)
+else()
+    set(LIBTAS_GAME_EVENTS GameEventsXcb.cpp)
+    set(LIBTAS_KEY_MAPPING KeyMappingXcb.cpp)
+endif()
 
 # Headers that need to be processed by moc
 set(LIBTAS_PROGRAM_QT_HEADERS
@@ -112,11 +125,11 @@ set(LIBTAS_PROGRAM_SOURCES
     AutoSave.cpp
     Config.cpp
     GameEvents.cpp
-    GameEventsXcb.cpp
+    ${LIBTAS_GAME_EVENTS}
     GameLoop.cpp
     GameThread.cpp
     KeyMapping.cpp
-    KeyMappingXcb.cpp
+    ${LIBTAS_KEY_MAPPING}
     main.cpp
     SaveState.cpp
     SaveStateList.cpp
@@ -255,9 +268,25 @@ target_link_libraries(libTAS PRIVATE
     Qt${QT_VERSION_MAJOR}::Core
     Qt${QT_VERSION_MAJOR}::Widgets
     PkgConfig::LIBLUA
-    PkgConfig::XCB
-    PkgConfig::LIBCAP
     Threads::Threads)
+
+# Linux-only: XCB and libcap
+if(NOT APPLE)
+    target_link_libraries(libTAS PRIVATE
+        PkgConfig::XCB
+        PkgConfig::LIBCAP)
+else()
+    # macOS: use Quartz frameworks for input handling
+    find_library(CORE_FOUNDATION CoreFoundation)
+    find_library(CORE_GRAPHICS CoreGraphics)
+    find_library(APPKIT AppKit)
+    find_library(COCOA Cocoa)
+    target_link_libraries(libTAS PRIVATE
+        ${CORE_FOUNDATION}
+        ${CORE_GRAPHICS}
+        ${APPKIT}
+        ${COCOA})
+endif()
 
 install(TARGETS libTAS RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 

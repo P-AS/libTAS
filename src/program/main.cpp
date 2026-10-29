@@ -44,9 +44,11 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <stdint.h>
+#ifdef __linux__
 #include <sys/capability.h>
 #include <linux/sched.h>
 #include <sys/syscall.h>
+#endif
 #include <filesystem>
 #include <stdexcept>
 
@@ -61,6 +63,7 @@
 #undef explicit
 #endif
 
+#ifdef __linux__
 #ifndef CAP_CHECKPOINT_RESTORE
 #define CAP_CHECKPOINT_RESTORE 40
 #endif
@@ -84,6 +87,7 @@ struct clone_args {
     uint64_t set_tid_size;
     uint64_t cgroup;
 };
+#endif
 #endif
 
 Context context;
@@ -285,6 +289,7 @@ int main(int argc, char **argv)
 #endif
 
     /* Set capability CAP_CHECKPOINT_RESTORE so that games inherits it for savestating */
+#ifdef __linux__
     if (CAP_IS_SUPPORTED(CAP_CHECKPOINT_RESTORE)) {
         cap_t cap = cap_get_proc();
         if (cap) {
@@ -305,6 +310,7 @@ int main(int argc, char **argv)
             cap_free(cap);
         }
     }
+#endif
     
     /* libtas.so path */
     /* TODO: Not portable! */

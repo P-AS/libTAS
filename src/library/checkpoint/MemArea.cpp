@@ -28,7 +28,9 @@
 
 #include <unistd.h>
 #include <sys/mman.h> // PROT_READ, PROT_WRITE, etc.
+#ifdef __linux__
 #include <sys/sysmacros.h>
+#endif
 #if defined(__APPLE__) && defined(__MACH__)
 #include <mach/vm_prot.h> // VM_PROT_READ, VM_PROT_WRITE, etc.
 #endif

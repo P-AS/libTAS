@@ -628,7 +628,8 @@ static void receive_messages(std::function<void()> draw, RenderHUD& hud)
             /* We need to poll events, otherwise the game appears as non-responsive.
              * TODO: Put this at appropriate place */
             if ((Global::game_info.video & GameInfo::SDL1) || (Global::game_info.video & GameInfo::SDL2)) {
-                ORIG_SDL2_CALL(SDL_PumpEvents,());
+                /* Poll native SDL events so the game appears responsive */
+                SDL_PumpEvents();
             }
 #endif
             

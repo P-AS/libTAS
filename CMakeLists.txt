@@ -58,7 +58,11 @@ find_package(Threads REQUIRED)
 
 #### Generated config header ####
 
-check_include_file_cxx(xcb/randr.h LIBTAS_HAS_XCB_RANDR)
+if(NOT APPLE)
+    check_include_file_cxx(xcb/randr.h LIBTAS_HAS_XCB_RANDR)
+else()
+    set(LIBTAS_HAS_XCB_RANDR OFF)
+endif()
 
 if(NOT LIBTAS_RELEASE_BUILD)
     find_package(Git QUIET)

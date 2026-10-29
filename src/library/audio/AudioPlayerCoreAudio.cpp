@@ -19,6 +19,7 @@
 
 #include "AudioPlayerCoreAudio.h"
 #include "AudioContext.h"
+#include "AudioBuffer.h"
 
 #include "logging.h"
 #include "global.h" // Global::shared_config
@@ -81,7 +82,7 @@ bool AudioPlayerCoreAudio::init(AudioContext& ac)
     strdesc.mSampleRate = ac.frequency;
     strdesc.mFramesPerPacket = 1;
 
-    switch (ac.bitdepth) {
+    switch (AudioBuffer::formatToBitDepth(ac.format)) {
         case 8:
             strdesc.mBitsPerChannel = 8;
             break;
@@ -90,7 +91,7 @@ bool AudioPlayerCoreAudio::init(AudioContext& ac)
             strdesc.mFormatFlags |= kLinearPCMFormatFlagIsSignedInteger;
             break;
         default:
-            LOG(LL_ERROR, LCF_SOUND, "Unsupported audio format %d", ac.bitdepth);
+            LOG(LL_ERROR, LCF_SOUND, "Unsupported audio format %d", AudioBuffer::formatToBitDepth(ac.format));
             return false;
     }
     

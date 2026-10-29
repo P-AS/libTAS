@@ -21,6 +21,7 @@
 
 #include "logging.h"
 #include "GlobalState.h"
+#include "global.h"
 #include "hook.h"
 #include "checkpoint/ThreadSync.h"
 #include "checkpoint/SaveStateManager.h" // checkpoint signals

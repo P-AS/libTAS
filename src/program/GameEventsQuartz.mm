@@ -23,6 +23,7 @@
 #include "movie/MovieFile.h"
 #include "../external/QuartzKeycodes.h"
 
+#import <AppKit/AppKit.h>
 #include <CoreGraphics/CoreGraphics.h>
 
 #include <string>
@@ -31,7 +32,7 @@
 #include <unistd.h> // usleep()
 #include <stdint.h>
 
-NSRunningApplication* GameEventsQuartz::gameApp = nullptr;
+void* GameEventsQuartz::gameApp = nullptr;
 
 GameEventsQuartz::GameEventsQuartz(Context* c, MovieFile* m) : GameEvents(c, m) {
     eventTap = nullptr;
@@ -178,12 +179,14 @@ bool GameEventsQuartz::haveFocus(Context *context)
 
     /* Get game NSRunningApplication object */
     if (!gameApp) {
-        gameApp = [NSRunningApplication runningApplicationWithProcessIdentifier:context->game_pid];
-        
-        if (!gameApp) {
+        NSRunningApplication* app =
+            [NSRunningApplication runningApplicationWithProcessIdentifier:context->game_pid];
+        if (!app) {
             std::cerr << "Could not get NSRunningApplication object from pid: " << context->game_pid << std::endl;
         }
+        gameApp = (__bridge void*)app;
     }
     
-    return [gameApp isActive];
+    NSRunningApplication* app = (__bridge NSRunningApplication*)gameApp;
+    return [app isActive];
 }

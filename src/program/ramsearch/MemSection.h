@@ -22,6 +22,7 @@
 
 #include <string>
 #include <cstdint>
+#include <sys/types.h>
 
 /* Store a section of the game memory */
 class MemSection {

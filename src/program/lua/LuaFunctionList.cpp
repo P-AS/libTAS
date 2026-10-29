@@ -24,19 +24,25 @@
 
 #include <iostream>
 #include <unistd.h>
+#ifdef __linux__
 #include <sys/inotify.h>
+#endif
 #include <cerrno>
 
 namespace Lua {
 
 LuaFunctionList::LuaFunctionList() {
+#ifdef __linux__
     inotifyfd = inotify_init1(IN_NONBLOCK);
     if (inotifyfd < 0)
         std::cerr << "inotify_init() failed with error " << errno << std::endl;
+#endif
 }
 
 LuaFunctionList::~LuaFunctionList() {
+#ifdef __linux__
     close(inotifyfd);
+#endif
 }
 
 void LuaFunctionList::add(lua_State *L, NamedLuaFunction::CallbackType t)
@@ -63,8 +69,10 @@ void LuaFunctionList::addFile(const std::filesystem::path& file)
     f.lua_state = lua_state;
     f.file = file;
     f.filename = file.filename();
+#ifdef __linux__
     /* Register inotify on file to look for changes */
     f.wd = inotify_add_watch(inotifyfd, file.c_str(), IN_MODIFY);
+#endif
     f.enabled = true;
 
     fileSet.insert(file);
@@ -76,7 +84,9 @@ void LuaFunctionList::removeForFile(int row)
     const std::string& file = fileList[row].file;
     functions.remove_if([&file](const NamedLuaFunction& nlf){ return 0 == file.compare(nlf.file); });
 
+#ifdef __linux__
     inotify_rm_watch(inotifyfd, fileList[row].wd);
+#endif
     if (fileList[row].lua_state)
         lua_close(fileList[row].lua_state);
     fileSet.erase(file);
@@ -85,6 +95,7 @@ void LuaFunctionList::removeForFile(int row)
 
 void LuaFunctionList::watchChanges()
 {
+#ifdef __linux__
     struct inotify_event ev;
     int ret = read(inotifyfd, &ev, sizeof(struct inotify_event));
     if (ret < 0) {
@@ -96,7 +107,7 @@ void LuaFunctionList::watchChanges()
             if (fileList[i].wd == ev.wd ) {
                 if (ev.mask == IN_MODIFY) {
                     LuaFile& lf = fileList[i];
-                    
+
                     /* Reload the file */
                     const std::string& file = lf.file;
                     functions.remove_if([&file](const NamedLuaFunction& nlf){ return 0 == file.compare(nlf.file); });
@@ -106,7 +117,7 @@ void LuaFunctionList::watchChanges()
                         lua_close(lf.lua_state);
                     lf.lua_state = Main::new_state();
                     Main::run(lf.lua_state, file);
-                    
+
                     /* Set again the active state */
                     switchForFile(i, lf.enabled);
                 }
@@ -115,7 +126,7 @@ void LuaFunctionList::watchChanges()
 
                     const std::filesystem::path& file = lf.file;
 
-                    /* File got potentially modified so check if it still exists 
+                    /* File got potentially modified so check if it still exists
                      * Watch descriptor has been removed automatically so don't need to do that manually */
                     lf.wd = inotify_add_watch(inotifyfd, file.c_str(), IN_MODIFY);
                     if (lf.wd < 0) {
@@ -129,7 +140,7 @@ void LuaFunctionList::watchChanges()
                         lua_close(lf.lua_state);
                     lf.lua_state = Main::new_state();
                     Main::run(lf.lua_state, file);
-                    
+
                     /* Set again the active state */
                     switchForFile(i, lf.enabled);
                 }
@@ -137,6 +148,7 @@ void LuaFunctionList::watchChanges()
             }
         }
     }
+#endif
 }
 
 bool LuaFunctionList::activeState(int row) const

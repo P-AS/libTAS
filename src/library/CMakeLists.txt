@@ -1,16 +1,40 @@
 #### Dependencies ####
 
-pkg_check_modules(X11 REQUIRED IMPORTED_TARGET x11 x11-xcb)
-pkg_check_modules(ALSA REQUIRED IMPORTED_TARGET alsa)
+# Platform-specific dependencies
+if(APPLE)
+    # macOS: use CoreAudio (framework, no pkg-config needed)
+    set(LIBTAS_PLATFORM_OSX ON)
+else()
+    # Linux: use X11 and ALSA
+    pkg_check_modules(X11 REQUIRED IMPORTED_TARGET x11 x11-xcb)
+    pkg_check_modules(ALSA REQUIRED IMPORTED_TARGET alsa)
+endif()
 
 # Headers of libraries that are hooked but not linked
-foreach(_header libudev.h xkbcommon/xkbcommon.h X11/extensions/XInput2.h GL/gl.h GL/glx.h EGL/egl.h)
-    string(MAKE_C_IDENTIFIER ${_header} _var)
-    check_include_file_cxx(${_header} LIBTAS_HAS_${_var})
-    if(NOT LIBTAS_HAS_${_var})
-        message(FATAL_ERROR "The header ${_header} is required!")
+# libudev.h, XInput2.h, xkbcommon/xkbcommon.h are Linux-only
+if(APPLE)
+    # macOS: OpenGL framework provides GL/gl.h and GL/glu.h
+    set(CMAKE_REQUIRED_INCLUDES "/System/Library/Frameworks/OpenGL.framework/Versions/Current/Headers")
+    check_include_file_cxx("OpenGL/gl.h" LIBTAS_HAS_OPENGL_GL_H)
+    if(NOT LIBTAS_HAS_OPENGL_GL_H)
+        message(FATAL_ERROR "The OpenGL/gl.h header is required!")
     endif()
-endforeach()
+    set(CMAKE_REQUIRED_INCLUDES "")
+    # GL/glx.h is Linux-only; use stub on macOS
+    # EGL may come from MoltenVK or the system
+    check_include_file_cxx(EGL/egl.h LIBTAS_HAS_EGL_EGL_H)
+    if(NOT LIBTAS_HAS_EGL_EGL_H)
+        message(WARNING "EGL/egl.h not found; EGL support may be limited")
+    endif()
+else()
+    foreach(_header libudev.h xkbcommon/xkbcommon.h X11/extensions/XInput2.h GL/gl.h GL/glx.h EGL/egl.h)
+        string(MAKE_C_IDENTIFIER ${_header} _var)
+        check_include_file_cxx(${_header} LIBTAS_HAS_${_var})
+        if(NOT LIBTAS_HAS_${_var})
+            message(FATAL_ERROR "The header ${_header} is required!")
+        endif()
+    endforeach()
+endif()
 
 # swresample and swscale are loaded at runtime, so we only need their headers
 foreach(_lib swresample swscale)
@@ -27,7 +51,8 @@ endforeach()
 
 #### Sources ####
 
-set(LIBTAS_LIBRARY_SOURCES
+# Common sources (included on all platforms)
+set(LIBTAS_COMMON_SOURCES
     backtrace.cpp
     BusyLoopDetection.cpp
     DeterministicTimer.cpp
@@ -49,13 +74,9 @@ set(LIBTAS_LIBRARY_SOURCES
     WindowTitle.cpp
     audio/AudioBuffer.cpp
     audio/AudioContext.cpp
-    audio/AudioConverterSwr.cpp
-    audio/AudioPlayerAlsa.cpp
     audio/AudioSource.cpp
     audio/DecoderMSADPCM.cpp
     audio/akaudio/akaudio.cpp
-    audio/alsa/control.cpp
-    audio/alsa/pcm.cpp
     audio/cubeb/cubeb.cpp
     audio/fluidsynth/fluidsynth.cpp
     audio/fmod/fmod.cpp
@@ -71,7 +92,6 @@ set(LIBTAS_LIBRARY_SOURCES
     checkpoint/Checkpoint.cpp
     checkpoint/CheckpointSavefiles.cpp
     checkpoint/MemArea.cpp
-    checkpoint/ProcSelfMaps.cpp
     checkpoint/ReservedMemory.cpp
     checkpoint/SaveStateLoading.cpp
     checkpoint/SaveStateSaving.cpp
@@ -80,7 +100,6 @@ set(LIBTAS_LIBRARY_SOURCES
     checkpoint/ThreadManager.cpp
     checkpoint/ThreadSync.cpp
     encoding/AVEncoder.cpp
-    encoding/ImageScalingSws.cpp
     encoding/NutMuxer.cpp
     encoding/Screenshot.cpp
     fileio/dirwrappers.cpp
@@ -107,11 +126,8 @@ set(LIBTAS_LIBRARY_SOURCES
     general/timewrappers.cpp
     general/tlswrappers.cpp
     general/waitwrappers.cpp
-    inputs/evdev.cpp
     inputs/inputevents.cpp
     inputs/inputs.cpp
-    inputs/ioctl_joy.cpp
-    inputs/jsdev.cpp
     inputs/keyboard_helper.cpp
     inputs/sdlgamecontroller.cpp
     inputs/sdlhaptic.cpp
@@ -120,15 +136,6 @@ set(LIBTAS_LIBRARY_SOURCES
     inputs/sdlkeyboardlayout.cpp
     inputs/sdlpointer.cpp
     inputs/sdltextinput.cpp
-    inputs/udevwrappers.cpp
-    inputs/winekeyboardlayout.cpp
-    inputs/xcbkeyboard.cpp
-    inputs/xcbpointer.cpp
-    inputs/xkbcommon.cpp
-    inputs/xkeyboard.cpp
-    inputs/xkeyboardlayout.cpp
-    inputs/xinput.cpp
-    inputs/xpointer.cpp
     renderhud/AudioDebug.cpp
     renderhud/Crosshair.cpp
     renderhud/FileDebug.cpp
@@ -144,13 +151,10 @@ set(LIBTAS_LIBRARY_SOURCES
     renderhud/RenderHUD_SDL3_renderer.cpp
     renderhud/RenderHUD_Vulkan.cpp
     renderhud/RenderHUD.cpp
-    renderhud/RenderHUD_Base_Linux.cpp
     renderhud/UnityDebug.cpp
     rendering/eglwrappers.cpp
-    rendering/glxwrappers.cpp
     rendering/openglloader.cpp
     rendering/openglwrappers.cpp
-    rendering/vdpauwrappers.cpp
     rendering/vulkanloader.cpp
     rendering/vulkanwrappers.cpp
     screencapture/ScreenCapture_GL.cpp
@@ -158,9 +162,7 @@ set(LIBTAS_LIBRARY_SOURCES
     screencapture/ScreenCapture_SDL2_Renderer.cpp
     screencapture/ScreenCapture_SDL2_Surface.cpp
     screencapture/ScreenCapture_SDL3_Renderer.cpp
-    screencapture/ScreenCapture_VDPAU.cpp
     screencapture/ScreenCapture_Vulkan.cpp
-    screencapture/ScreenCapture_XShm.cpp
     screencapture/ScreenCapture_Impl.cpp
     screencapture/ScreenCapture.cpp
     sdl/SDLEventQueue.cpp
@@ -227,29 +229,6 @@ set(LIBTAS_LIBRARY_SOURCES
     steam/steamapi_flat.cpp
     steam/steamapiinternal.cpp
     steam/steamgameserver.cpp
-    wine/winehook.cpp
-    wine/wined3d.cpp
-    wine/user32.cpp
-    wine/kernel32.cpp
-    xcb/XcbEventQueue.cpp
-    xcb/XcbEventQueueList.cpp
-    xcb/xcbconnection.cpp
-    xcb/xcbevents.cpp
-    xcb/xcbrequests.cpp
-    xcb/xcbwindows.cpp
-    xlib/XlibEventQueue.cpp
-    xlib/XlibEventQueueList.cpp
-    xlib/XlibGameWindow.cpp
-    xlib/xatom.cpp
-    xlib/xcursor.cpp
-    xlib/xdisplay.cpp
-    xlib/xevents.cpp
-    xlib/xf86vidmode.cpp
-    xlib/xfixes.cpp
-    xlib/xinerama.cpp
-    xlib/xrandr.cpp
-    xlib/xshm.cpp
-    xlib/xwindows.cpp
     ../shared/inputs/AllInputsFlat.cpp
     ../shared/inputs/ControllerInputs.cpp
     ../shared/inputs/MiscInputs.cpp
@@ -257,7 +236,6 @@ set(LIBTAS_LIBRARY_SOURCES
     ../shared/inputs/SingleInput.cpp
     ../shared/sockethelpers.cpp
     ../external/lz4.cpp
-    ../external/elfhacks.cpp
     ../external/imgui/imgui_draw.cpp
     ../external/imgui/imgui_demo.cpp
     ../external/imgui/imgui_tables.cpp
@@ -267,10 +245,84 @@ set(LIBTAS_LIBRARY_SOURCES
     ../external/imgui/imgui_impl_sdlrenderer2.cpp
     ../external/imgui/imgui_impl_sdlrenderer3.cpp
     ../external/imgui/imgui_impl_vulkan.cpp
-    ../external/imgui/imgui_impl_xlib.cpp
     ../external/imgui/implot_items.cpp
     ../external/imgui/implot.cpp
 )
+
+# macOS-specific sources
+if(APPLE)
+    list(APPEND LIBTAS_COMMON_SOURCES
+        audio/AudioPlayerCoreAudio.cpp
+        audio/AudioConverterCoreAudio.cpp
+        checkpoint/MachVmMaps.cpp
+        sdl/sdl3_weak_imports.cpp
+        sdl/sdl2_weak_imports.cpp
+        renderhud/RenderHUD_Base_MacOS.cpp
+        ../dyld_func_lookup_helper/dyld_func_lookup_helper.cpp
+    )
+endif()
+
+# Linux-only sources (X11, XCB, ALSA, evdev, jsdev, wine hooks)
+if(NOT APPLE)
+    list(APPEND LIBTAS_COMMON_SOURCES
+        audio/AudioConverterSwr.cpp
+        encoding/ImageScalingSws.cpp
+        audio/AudioPlayerAlsa.cpp
+        audio/alsa/control.cpp
+        audio/alsa/pcm.cpp
+        inputs/evdev.cpp
+        inputs/ioctl_joy.cpp
+        inputs/jsdev.cpp
+        inputs/udevwrappers.cpp
+        inputs/winekeyboardlayout.cpp
+        inputs/xcbkeyboard.cpp
+        inputs/xcbpointer.cpp
+        inputs/xkeyboard.cpp
+        inputs/xpointer.cpp
+        inputs/xkeyboardlayout.cpp
+        inputs/xinput.cpp
+        wine/winehook.cpp
+        wine/wined3d.cpp
+        wine/user32.cpp
+        wine/kernel32.cpp
+        xlib/XlibEventQueue.cpp
+        xlib/XlibEventQueueList.cpp
+        xlib/XlibGameWindow.cpp
+        xlib/xatom.cpp
+        xlib/xcursor.cpp
+        xlib/xdisplay.cpp
+        xlib/xevents.cpp
+        xlib/xf86vidmode.cpp
+        xlib/xfixes.cpp
+        xlib/xinerama.cpp
+        xlib/xrandr.cpp
+        xlib/xshm.cpp
+        xlib/xwindows.cpp
+        xcb/XcbEventQueue.cpp
+        xcb/XcbEventQueueList.cpp
+        xcb/xcbconnection.cpp
+        xcb/xcbevents.cpp
+        xcb/xcbrequests.cpp
+        xcb/xcbwindows.cpp
+        renderhud/RenderHUD_Base_Linux.cpp
+        rendering/glxwrappers.cpp
+        rendering/vdpauwrappers.cpp
+        screencapture/ScreenCapture_VDPAU.cpp
+        screencapture/ScreenCapture_XShm.cpp
+        ../external/elfhacks.cpp
+        inputs/xkbcommon.cpp
+    )
+endif()
+
+# imgui_xlib is Linux-only
+if(NOT APPLE)
+    list(APPEND LIBTAS_COMMON_SOURCES
+        ../external/imgui/imgui_impl_xlib.cpp
+    )
+endif()
+
+# Original full source list for backward compatibility (kept for reference)
+set(LIBTAS_LIBRARY_SOURCES ${LIBTAS_COMMON_SOURCES})
 
 #### Targets ####
 
@@ -291,6 +343,14 @@ function(libtas_add_library target)
         ${PROJECT_BINARY_DIR}
         ${LIBSWRESAMPLE_INCLUDE_DIRS}
         ${LIBSWSCALE_INCLUDE_DIRS})
+    if(APPLE)
+        # macOS: include stub headers for X11, XCB, ALSA, and EGL
+        target_include_directories(${target} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/../external/X11
+            ${CMAKE_CURRENT_SOURCE_DIR}/../external/xcb
+            ${CMAKE_CURRENT_SOURCE_DIR}/../external/alsa
+            ${CMAKE_CURRENT_SOURCE_DIR}/../external/EGL)
+    endif()
     target_compile_options(${target} PRIVATE
         ${LIBSWRESAMPLE_CFLAGS_OTHER}
         ${LIBSWSCALE_CFLAGS_OTHER})
@@ -300,14 +360,25 @@ endfunction()
 
 if(NOT LIBTAS_I386_LIB_ONLY)
     libtas_add_library(tas)
-    target_link_libraries(tas PRIVATE
-        PkgConfig::X11
-        PkgConfig::ALSA
-        Threads::Threads
-        ${CMAKE_DL_LIBS})
+    if(APPLE)
+        # macOS: link CoreAudio and AudioToolbox frameworks
+        find_library(CORE_AUDIO CoreAudio)
+        find_library(AUDIO_TOOLBOX AudioToolbox)
+        target_link_libraries(tas PRIVATE
+            ${CORE_AUDIO}
+            ${AUDIO_TOOLBOX}
+            Threads::Threads
+            ${CMAKE_DL_LIBS})
+    else()
+        target_link_libraries(tas PRIVATE
+            PkgConfig::X11
+            PkgConfig::ALSA
+            Threads::Threads
+            ${CMAKE_DL_LIBS})
+    endif()
 endif()
 
-if(LIBTAS_BUILD_I386)
+if(LIBTAS_BUILD_I386 AND NOT APPLE)
     # pkg-config only describes the native libraries, so link the 32-bit ones
     # by name and let the multilib toolchain find them.
     set(LIBTAS_LIBRARY32_LIBS X11 X11-xcb pthread asound ${CMAKE_DL_LIBS})

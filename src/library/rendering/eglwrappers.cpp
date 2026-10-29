@@ -27,7 +27,9 @@
 #include "renderhud/RenderHUD_GL.h"
 #include "screencapture/ScreenCapture.h"
 #include "frame.h"
+#ifdef __unix__
 #include "xlib/XlibGameWindow.h"
+#endif
 #include "GlobalState.h"
 
 #include <string.h>
@@ -77,9 +79,12 @@ static void* store_orig_and_return_my_symbol(const char* symbol, void* real_poin
     
     RETURN_SYMBOL_CUSTOM(glClear)
 
+#ifdef __unix__
     RETURN_SYMBOL_CUSTOM(glBegin);
     RETURN_SYMBOL_CUSTOM(glEnd);
+#endif
 
+#ifdef __unix__
     RETURN_SYMBOL_CUSTOM(glVertex2d);
     RETURN_SYMBOL_CUSTOM(glVertex2f);
     RETURN_SYMBOL_CUSTOM(glVertex2i);
@@ -109,6 +114,7 @@ static void* store_orig_and_return_my_symbol(const char* symbol, void* real_poin
     RETURN_SYMBOL_CUSTOM(glVertex4fv);
     RETURN_SYMBOL_CUSTOM(glVertex4iv);
     RETURN_SYMBOL_CUSTOM(glVertex4sv);
+#endif
 
     RETURN_SYMBOL_CUSTOM(glDrawArrays)
     RETURN_SYMBOL_CUSTOM(glMultiDrawArrays)
@@ -119,6 +125,8 @@ static void* store_orig_and_return_my_symbol(const char* symbol, void* real_poin
     RETURN_SYMBOL_CUSTOM(glDrawRangeElementsBaseVertex);
     RETURN_SYMBOL_CUSTOM(glDrawElementsInstancedBaseVertex);
     RETURN_SYMBOL_CUSTOM(glMultiDrawElementsBaseVertex);
+
+#ifdef __unix__
     RETURN_SYMBOL_CUSTOM(glDrawArraysInstancedBaseInstance);
     RETURN_SYMBOL_CUSTOM(glDrawElementsInstancedBaseInstance);
     RETURN_SYMBOL_CUSTOM(glDrawElementsInstancedBaseVertexBaseInstance);
@@ -136,6 +144,7 @@ static void* store_orig_and_return_my_symbol(const char* symbol, void* real_poin
     RETURN_SYMBOL_CUSTOM(glMultiDrawArraysEXT);
     RETURN_SYMBOL_CUSTOM(glMultiDrawElementsEXT);
     RETURN_SYMBOL_CUSTOM(glDrawArraysEXT);
+#endif
 
     return real_pointer;
 }
@@ -162,7 +171,13 @@ EGLBoolean eglMakeCurrent( EGLDisplay dpy, EGLSurface draw, EGLSurface read, EGL
 
     LOGTRACE_SIMPLE(LCF_WINDOW | LCF_OGL);
 
-    if (draw && XlibGameWindow::get()) {
+    if (draw && (
+#ifdef __unix__
+        XlibGameWindow::get()
+#else
+        0
+#endif
+        )) {
         Global::game_info.video |= GameInfo::EGL | GameInfo::OPENGL;
         Global::game_info.tosend = true;
     }

@@ -75,7 +75,9 @@ int urandom_create_fd()
          * It should be at least 2*page_size, because on Linux a pipe is
          * considered writeable if at least page_size can be written.
          */
+#ifdef __linux__
         MYASSERT(fcntl(writefd, F_SETPIPE_SZ, 2*Utils::getPageSize()) != -1);
+#endif
 
         /* Fill the pipe */
         urandom_handler(0);
@@ -84,7 +86,9 @@ int urandom_create_fd()
 
         /* Add async signal for when the pipe is writeable */
         MYASSERT(fcntl(writefd, F_SETOWN, getpid()) != -1);
+#ifdef __linux__
         MYASSERT(fcntl(writefd, F_SETSIG, 0) != -1);
+#endif
         MYASSERT(fcntl(writefd, F_SETFL, O_ASYNC | O_NONBLOCK) != -1);
 
         /* Unblock SIGIO signal */

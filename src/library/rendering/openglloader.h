@@ -41,7 +41,8 @@ namespace libtas {
 
 /* gl3w internal state */
 struct GLProcs {
-    
+
+#ifdef __unix__
     DEFINE_GL_POINTER(XMakeCurrent)
     DEFINE_GL_POINTER(XMakeContextCurrent)
     DEFINE_GL_POINTER(XSwapBuffers)
@@ -53,6 +54,7 @@ struct GLProcs {
     DEFINE_GL_POINTER(XQueryDrawable)
     DEFINE_GL_POINTER(XCreateContextAttribsARB)
     DEFINE_GL_POINTER(XDestroyContext)
+#endif
 
     DEFINE_GL_POINTER(GetString)
     DEFINE_GL_POINTER(BlitFramebuffer)
@@ -109,6 +111,7 @@ struct GLProcs {
     DEFINE_GL_POINTER(DeleteProgram)
     DEFINE_GL_POINTER(Viewport)
     DEFINE_GL_POINTER(Clear)
+#ifdef __unix__
     DEFINE_GL_POINTER(Begin)
     DEFINE_GL_POINTER(End)
     DEFINE_GL_POINTER(Vertex2d)
@@ -135,6 +138,7 @@ struct GLProcs {
     DEFINE_GL_POINTER(Vertex4fv)
     DEFINE_GL_POINTER(Vertex4iv)
     DEFINE_GL_POINTER(Vertex4sv)
+#endif
 
     DEFINE_GL_POINTER(DrawArrays)
     DEFINE_GL_POINTER(DrawElements)

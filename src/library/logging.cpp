@@ -179,11 +179,19 @@ void debuglogfull(LogLevel ll, LogCategoryFlag lcf, const char* file, int line, 
 
     if (Global::shared_config.logging_level == LL_STACK && ll == LL_TRACE) {
         if (isTerm) {
+#ifdef __linux__
             fputs_unlocked(LL_COLORS[LL_STACK], stderr);
+#else
+            fputs(LL_COLORS[LL_STACK], stderr);
+#endif
         }
         printBacktrace();
         if (isTerm) {
+#ifdef __linux__
             fputs_unlocked(ANSI_COLOR_RESET, stderr);
+#else
+            fputs(ANSI_COLOR_RESET, stderr);
+#endif
         }
     }
 }

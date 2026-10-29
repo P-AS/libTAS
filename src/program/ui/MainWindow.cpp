@@ -64,7 +64,9 @@
 #include <csignal> // kill
 #include <unistd.h> // access, isatty
 #include <limits>
+#ifndef __APPLE__
 #include <features.h> // __GLIBC_PREREQ
+#endif
 #include <sys/wait.h> // waitpid
 
 namespace {

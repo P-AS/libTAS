@@ -23,6 +23,7 @@
 #define LIBTAS_STATEHEADER_H
 
 #include <pthread.h>
+#include <unistd.h>
 
 #define STATEMAXTHREADS 1000
 

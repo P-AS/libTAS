@@ -23,9 +23,11 @@
 #include "ScreenCapture_SDL2_Renderer.h"
 #include "ScreenCapture_SDL3_Renderer.h"
 #include "ScreenCapture_SDL2_Surface.h"
+#ifdef __unix__
 #include "ScreenCapture_VDPAU.h"
-#include "ScreenCapture_Vulkan.h"
 #include "ScreenCapture_XShm.h"
+#endif
+#include "ScreenCapture_Vulkan.h"
 #include "logging.h"
 #include "global.h"
 
@@ -43,13 +45,16 @@ int ScreenCapture::init()
     }
     
     if (!impl) {
+#ifdef __unix__
         if (Global::game_info.video & GameInfo::VDPAU) {
             impl = new ScreenCapture_VDPAU();
         }
         else if (Global::game_info.video & GameInfo::XSHM) {
             impl = new ScreenCapture_XShm();
         }
-        else if (Global::game_info.video & GameInfo::SDL3_RENDERER) {
+        else
+#endif
+        if (Global::game_info.video & GameInfo::SDL3_RENDERER) {
             impl = new ScreenCapture_SDL3_Renderer();
         }    
         else if (Global::game_info.video & GameInfo::SDL2_RENDERER) {

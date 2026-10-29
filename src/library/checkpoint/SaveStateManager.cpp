@@ -57,8 +57,10 @@
 #include <xcb/xproto.h> // xcb_get_input_focus_reply, xcb_get_input_focus
 #include <X11/Xlib.h> // XLockDisplay
 #endif
-#include <linux/sched.h>
 #include <sched.h>
+#ifdef __linux__
+#include <linux/sched.h>
+#endif
 #include <unistd.h>
 
 /* Define the clone_args struct if not defined */
@@ -163,7 +165,7 @@ void SaveStateManager::init()
     memset(state_dirty, 0, ReservedMemory::SS_SLOTS_SIZE);
 
     /* Check for clone3 support */
-
+#ifdef __linux__
     {
         GlobalNative gn;
 #if defined(__x86_64__) || defined(__aarch64__)
@@ -222,6 +224,7 @@ void SaveStateManager::init()
             close(fd);
         }
     }
+#endif
 }
 
 void SaveStateManager::initCheckpointThread()
@@ -861,6 +864,7 @@ void SaveStateManager::saveThreadList()
     sh->thread_count = n;
 }
 
+#ifdef __linux__
 void SaveStateManager::createNewThreads()
 {
     /* Recover the thread list from before state loading, to compare with the
@@ -963,6 +967,13 @@ void SaveStateManager::createNewThreads()
     if (fd != -1)
         close(fd);
 }
+#else
+// macOS: no thread recreation needed (no clone3 or /proc support)
+void SaveStateManager::createNewThreads()
+{
+    // No-op on macOS
+}
+#endif
 
 int SaveStateManager::startNewThread(void *arg)
 {

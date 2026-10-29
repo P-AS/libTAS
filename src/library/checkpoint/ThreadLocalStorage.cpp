@@ -34,7 +34,7 @@
 
 namespace libtas {
 
-#if defined(__APPLE__) && defined(__MACH__)
+#ifdef __linux__
 void ThreadLocalStorage::saveTLSState(ThreadTLSInfo *tlsInfo) {}
 void ThreadLocalStorage::restoreTLSState(ThreadTLSInfo *tlsInfo) {}
 #endif

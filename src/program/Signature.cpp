@@ -303,15 +303,11 @@ int SigSearch::SearchAVX2(uint8_t* input, size_t inputLen, const Signature &sig,
 int SigSearch::Search(uint8_t* input, size_t inputLen, const Signature &sig, ptrdiff_t* output_offset)
 {
 #if defined(__i386__) || defined(__x86_64__)
-    static bool isAVX2Supported = __builtin_cpu_supports("avx2");
-#else
-    /* AVX2 is for x86 arch, but a similar function could be written for aarch64 using SIMD:
-     * <http://0x80.pl/notesen/2016-11-28-simd-strfind.html#aarch64-64-bit-code>
-     */
-    static bool isAVX2Supported = false;
-#endif
     if (isAVX2Supported)
         return SearchAVX2(input, inputLen, sig, output_offset);
     else
         return SearchCommon(input, inputLen, sig, output_offset);
+#else
+    return SearchCommon(input, inputLen, sig, output_offset);
+#endif
 }

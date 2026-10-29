@@ -35,7 +35,9 @@
 #include "fileio/SaveFileList.h"
 #include "fileio/SaveFile.h"
 #include "rendering/vulkanloader.h"
+#ifdef __linux__
 #include "../external/elfhacks.h"
+#endif
 #include "../dyld_func_lookup_helper/dyld_func_lookup_helper.h"
 
 #include <cstring>
@@ -169,10 +171,12 @@ __attribute__((noipa)) void *dlopen(const char *file, int mode) __THROW {
     LOGTRACE(LCF_HOOK, "%s call with file %s and flags 0x%x", __func__, (file!=nullptr)?file:"<NULL>", mode);
     void *result = nullptr;
 
+#ifdef RTLD_DEEPBIND
     if (mode & RTLD_DEEPBIND) {
         LOG(LL_DEBUG, LCF_HOOK, "   removing RTLD_DEEPBIND flag");
         mode &= ~RTLD_DEEPBIND;
     }
+#endif
 
 #if defined(__APPLE__) && defined(__MACH__)
     if (dlopen_from) {

@@ -256,9 +256,15 @@ void ThreadManager::initThreadFromChild(ThreadInfo* thread)
     thread->ptid = ((pid_t*)thread->pthread_id) + getTidOffset();
 
     /* Get stack address */
+#ifdef __linux__
     pthread_attr_t attrs;
     pthread_getattr_np(thread->pthread_id, &attrs);
     pthread_attr_getstack(&attrs, &thread->stack_addr, &thread->stack_size);
+#elif defined(__APPLE__) && defined(__MACH__)
+    // On macOS, get stack via thread info
+    thread->stack_addr = thread->pthread_id;
+    thread->stack_size = 8 * 1024 * 1024; // Default 8MB stack
+#endif
 
     /* Attach thread_local profiler so that it is accessible by main thread */
     thread->profilerDatabase = &Profiler::Database::get();

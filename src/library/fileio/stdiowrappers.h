@@ -47,10 +47,14 @@ OVERRIDE int setvbuf (FILE *stream, char *buf, int modes, size_t n) __THROW;
 
 /* If BUF is NULL, make STREAM unbuffered.
    Else make it use SIZE bytes of BUF for buffering.  */
+#ifdef __linux__
 OVERRIDE void setbuffer (FILE *stream, char *buf, size_t size) __THROW;
+#endif
 
 /* Make STREAM line-buffered.  */
+#ifdef __linux__
 OVERRIDE void setlinebuf (FILE *stream) __THROW;
+#endif
 
 }
 

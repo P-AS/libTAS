@@ -31,6 +31,11 @@
 #include <string.h>
 #include <dlfcn.h>
 
+/* RTLD_DEEPBIND is Linux-only; provide stub for macOS */
+#ifndef RTLD_DEEPBIND
+#define RTLD_DEEPBIND 0
+#endif
+
 #define RETURN_SYMBOL_DETAILED(FUNC, NEW_FUNC) \
     if (! NEW_FUNC) { \
         LOG(LL_WARN, LCF_HOOK | LCF_VULKAN,"  Trying to hook Vulkan function %s that we didn't define", symbol); \

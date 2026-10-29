@@ -42,7 +42,7 @@ namespace UnityDebug
         std::vector<float> DataY;
         std::string name;
 
-        ScrollingBuffer(int max_size);
+        ScrollingBuffer(int max_size = 400);
         void AddPoint(int x, int y);
         void Erase();
     };

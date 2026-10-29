@@ -52,6 +52,7 @@ void my##gl##NAME DECL\
 }
 
 GLFUNCSKIPDRAW(Clear, (GLbitfield mask), (mask))
+#ifdef __unix__
 GLFUNCSKIPDRAW(Begin, (GLenum mode), (mode))
 GLFUNCSKIPDRAW(End, (), ())
 GLFUNCSKIPDRAW(Vertex2d, (GLdouble x, GLdouble y), (x, y))
@@ -78,6 +79,7 @@ GLFUNCSKIPDRAW(Vertex4dv, (const GLdouble *v), (v))
 GLFUNCSKIPDRAW(Vertex4fv, (const GLfloat *v), (v))
 GLFUNCSKIPDRAW(Vertex4iv, (const GLint *v), (v))
 GLFUNCSKIPDRAW(Vertex4sv, (const GLshort *v), (v))
+#endif
 
 GLFUNCSKIPDRAW(DrawArrays, (GLenum mode, GLint first, GLsizei count), (mode, first, count))
 GLFUNCSKIPDRAW(DrawElements, (GLenum mode, GLsizei count, GLenum type, const GLvoid *indices), (mode, count, type, indices))
@@ -272,11 +274,13 @@ void myglGetIntegerv(GLenum pname, GLint *data)
         // Unity 4.x uses GL_GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX to determine if there is enough memory for a texture
         // However, llvmpipe is bugged and will return an uninitialized variable, i.e. non-deterministic
         // See https://gitlab.freedesktop.org/mesa/mesa/-/issues/14064
+#ifdef GL_GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX
         if (pname == GL_GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX)
         {
             *data = 65536;
             return;
         }
+#endif
     }
 
     return glProcs.GetIntegerv(pname, data);

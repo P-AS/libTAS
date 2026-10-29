@@ -279,6 +279,7 @@ void setbuffer (FILE *stream, char *buf, size_t size) __THROW
     return orig::setbuffer(stream, buf, size);
 }
 
+#ifdef __linux__
 void setlinebuf (FILE *stream) __THROW
 {
     LINK_NAMESPACE_GLOBAL(setlinebuf);
@@ -293,7 +294,8 @@ void setlinebuf (FILE *stream) __THROW
     if (sf)
         return;
 
-    return orig::setlinebuf(stream);
+    orig::setlinebuf(stream);
 }
+#endif
 
 }

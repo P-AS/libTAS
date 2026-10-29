@@ -41,9 +41,10 @@
 #include "../shared/SharedConfig.h"
 
 #include <unistd.h> // getpid()
-#include <vector>
-#include <string>
+#ifdef __linux__
 #include <sys/prctl.h>
+#endif
+#include <vector>
 
 extern char**environ;
 
@@ -85,7 +86,9 @@ void __attribute__((constructor)) init(void)
     }
 
     /* Allow future gdb instances to debug this process */
+#ifdef __linux__
     prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY);
+#endif
 
     ThreadManager::init();
     SaveStateManager::init();

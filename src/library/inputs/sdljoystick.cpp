@@ -17,6 +17,13 @@
     along with libTAS.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/* Function aliasing is a GNU extension not supported on macOS */
+#ifdef __APPLE__
+#define LIBTAS_ALIAS(name)
+#else
+#define LIBTAS_ALIAS(name) __attribute__((alias(name)))
+#endif
+
 #include "sdljoystick.h"
 #include "inputs.h"
 
@@ -34,7 +41,11 @@ namespace libtas {
 
 static int joyids[AllInputs::MAXJOYS+1] = {-1, -1, -1, -1};
 static int refids[AllInputs::MAXJOYS+1] = {0, 0, 0, 0}; // joystick open/close is ref-counted
+#ifdef __linux__
 static const char* joypaths[AllInputs::MAXJOYS+1] = {"/dev/input/js0", "/dev/input/js1", "/dev/input/js2", "/dev/input/js3"};
+#else
+static const char* joypaths[AllInputs::MAXJOYS+1] = {nullptr, nullptr, nullptr, nullptr};
+#endif
 
 /* Helper functions */
 static bool isIdValid(SDL_Joystick* joy)
@@ -159,7 +170,7 @@ const char* joyname = "Microsoft X-Box 360 pad";
     return NULL;
 }
 
-/* Override */ const char * SDL_GetJoystickNameForID(sdl3::SDL_JoystickID instance_id) __attribute__((alias("SDL_JoystickNameForIndex")));
+/* Override */ const char * SDL_GetJoystickNameForID(sdl3::SDL_JoystickID instance_id) LIBTAS_ALIAS(SDL_JoystickNameForIndex);
 
 /* Override */ const char* SDL_JoystickName(SDL_Joystick* joystick)
 {
@@ -171,7 +182,7 @@ const char* joyname = "Microsoft X-Box 360 pad";
     return joyname;
 }
 
-/* Override */ const char * SDL_GetJoystickName(SDL_Joystick *joystick) __attribute__((alias("SDL_JoystickName")));
+/* Override */ const char * SDL_GetJoystickName(SDL_Joystick *joystick) LIBTAS_ALIAS(SDL_JoystickName);
 
 /* Override */ const char *SDL_JoystickPathForIndex(int device_index)
 {
@@ -182,7 +193,7 @@ const char* joyname = "Microsoft X-Box 360 pad";
     return joypaths[device_index];
 }
 
-/* Override */ const char * SDL_GetJoystickPathForID(sdl3::SDL_JoystickID instance_id) __attribute__((alias("SDL_JoystickPathForIndex")));
+/* Override */ const char * SDL_GetJoystickPathForID(sdl3::SDL_JoystickID instance_id) LIBTAS_ALIAS(SDL_JoystickPathForIndex);
 
 /* Override */ const char *SDL_JoystickPath(SDL_Joystick *joystick)
 {
@@ -211,7 +222,7 @@ const char* joyname = "Microsoft X-Box 360 pad";
     return reinterpret_cast<SDL_Joystick*>(&joyids[device_index]);
 }
 
-/* Override */ SDL_Joystick * SDL_OpenJoystick(sdl3::SDL_JoystickID instance_id) __attribute__((alias("SDL_JoystickOpen")));
+/* Override */ SDL_Joystick * SDL_OpenJoystick(sdl3::SDL_JoystickID instance_id) LIBTAS_ALIAS(SDL_JoystickOpen);
 
 /* Override */ SDL_Joystick *SDL_JoystickFromInstanceID(sdl2::SDL_JoystickID joyid)
 {
@@ -228,7 +239,7 @@ const char* joyname = "Microsoft X-Box 360 pad";
     return reinterpret_cast<SDL_Joystick*>(&joyids[joyid]);
 }
 
-/* Override */ SDL_Joystick * SDL_GetJoystickFromID(sdl3::SDL_JoystickID instance_id) __attribute__((alias("SDL_JoystickFromInstanceID")));
+/* Override */ SDL_Joystick * SDL_GetJoystickFromID(sdl3::SDL_JoystickID instance_id) LIBTAS_ALIAS(SDL_JoystickFromInstanceID);
 
 /* Override */ Uint16 SDL_JoystickGetDeviceVendor(int device_index)
 {
@@ -241,7 +252,7 @@ const char* joyname = "Microsoft X-Box 360 pad";
     return 0x045e; // vendor of the wired xbox360 controller
 }
 
-/* Override */ Uint16 SDL_GetJoystickVendorForID(sdl3::SDL_JoystickID instance_id) __attribute__((alias("SDL_JoystickGetDeviceVendor")));
+/* Override */ Uint16 SDL_GetJoystickVendorForID(sdl3::SDL_JoystickID instance_id) LIBTAS_ALIAS(SDL_JoystickGetDeviceVendor);
 
 /* Override */ Uint16 SDL_JoystickGetDeviceProduct(int device_index)
 {
@@ -254,7 +265,7 @@ const char* joyname = "Microsoft X-Box 360 pad";
     return 0x028e; // product of the wired xbox360 controller
 }
 
-/* Override */ Uint16 SDL_GetJoystickProductForID(sdl3::SDL_JoystickID instance_id) __attribute__((alias("SDL_JoystickGetDeviceProduct")));
+/* Override */ Uint16 SDL_GetJoystickProductForID(sdl3::SDL_JoystickID instance_id) LIBTAS_ALIAS(SDL_JoystickGetDeviceProduct);
 
 /* Override */ Uint16 SDL_JoystickGetDeviceProductVersion(int device_index)
 {
@@ -267,7 +278,7 @@ const char* joyname = "Microsoft X-Box 360 pad";
     return 0x0114; // product version of the wired xbox360 controller
 }
 
-/* Override */ Uint16 SDL_GetJoystickProductVersionForID(sdl3::SDL_JoystickID instance_id) __attribute__((alias("SDL_JoystickGetDeviceProductVersion")));
+/* Override */ Uint16 SDL_GetJoystickProductVersionForID(sdl3::SDL_JoystickID instance_id) LIBTAS_ALIAS(SDL_JoystickGetDeviceProductVersion);
 
 /* Override */ sdl2::SDL_JoystickType SDL_JoystickGetDeviceType(int device_index)
 {
@@ -303,7 +314,7 @@ sdl2::SDL_JoystickGUID nullGUID   = {{0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x
     return xinputGUID;
 }
 
-/* Override */ SDL_GUID SDL_GetJoystickGUIDForID(sdl3::SDL_JoystickID instance_id) __attribute__((alias("SDL_JoystickGetDeviceGUID")));
+/* Override */ SDL_GUID SDL_GetJoystickGUIDForID(sdl3::SDL_JoystickID instance_id) LIBTAS_ALIAS(SDL_JoystickGetDeviceGUID);
 
 /* Override */ Uint16 SDL_JoystickGetVendor(SDL_Joystick * joystick)
 {
@@ -315,7 +326,7 @@ sdl2::SDL_JoystickGUID nullGUID   = {{0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x
     return 0x045e; // vendor of the wired xbox360 controller
 }
 
-/* Override */ Uint16 SDL_GetJoystickVendor(SDL_Joystick *joystick) __attribute__((alias("SDL_JoystickGetVendor")));
+/* Override */ Uint16 SDL_GetJoystickVendor(SDL_Joystick *joystick) LIBTAS_ALIAS(SDL_JoystickGetVendor);
 
 /* Override */ Uint16 SDL_JoystickGetProduct(SDL_Joystick * joystick)
 {
@@ -327,7 +338,7 @@ sdl2::SDL_JoystickGUID nullGUID   = {{0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x
     return 0x028e; // product of the wired xbox360 controller
 }
 
-/* Override */ Uint16 SDL_GetJoystickProduct(SDL_Joystick *joystick) __attribute__((alias("SDL_JoystickGetProduct")));
+/* Override */ Uint16 SDL_GetJoystickProduct(SDL_Joystick *joystick) LIBTAS_ALIAS(SDL_JoystickGetProduct);
 
 /* Override */ Uint16 SDL_JoystickGetProductVersion(SDL_Joystick * joystick)
 {
@@ -339,7 +350,7 @@ sdl2::SDL_JoystickGUID nullGUID   = {{0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x
     return 0x0114; // product version of the wired xbox360 controller
 }
 
-/* Override */ Uint16 SDL_GetJoystickProductVersion(SDL_Joystick *joystick) __attribute__((alias("SDL_JoystickGetProductVersion")));
+/* Override */ Uint16 SDL_GetJoystickProductVersion(SDL_Joystick *joystick) LIBTAS_ALIAS(SDL_JoystickGetProductVersion);
 
 /* Override */ sdl2::SDL_JoystickType SDL_JoystickGetType(SDL_Joystick * joystick)
 {
@@ -354,7 +365,7 @@ sdl2::SDL_JoystickGUID nullGUID   = {{0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x
     return sdl2::SDL_JOYSTICK_TYPE_GAMECONTROLLER;
 }
 
-/* Override */ sdl3::SDL_JoystickType SDL_GetJoystickType(SDL_Joystick *joystick) __attribute__((alias("SDL_JoystickGetType")));
+/* Override */ sdl3::SDL_JoystickType SDL_GetJoystickType(SDL_Joystick *joystick) LIBTAS_ALIAS(SDL_JoystickGetType);
 
 /* Override */ sdl2::SDL_JoystickGUID SDL_JoystickGetGUID(SDL_Joystick * joystick)
 {
@@ -365,7 +376,7 @@ sdl2::SDL_JoystickGUID nullGUID   = {{0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x
     return xinputGUID;
 }
 
-/* Override */ SDL_GUID SDL_GetJoystickGUID(SDL_Joystick *joystick) __attribute__((alias("SDL_JoystickGetGUID")));
+/* Override */ SDL_GUID SDL_GetJoystickGUID(SDL_Joystick *joystick) LIBTAS_ALIAS(SDL_JoystickGetGUID);
 
 /* Override */ SDL_bool SDL_JoystickGetAttached(SDL_Joystick * joystick)
 {
@@ -376,7 +387,7 @@ sdl2::SDL_JoystickGUID nullGUID   = {{0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x
     return SDL_TRUE;
 }
 
-/* Override */ bool SDL_JoystickConnected(SDL_Joystick *joystick) __attribute__((alias("SDL_JoystickGetAttached")));
+/* Override */ bool SDL_JoystickConnected(SDL_Joystick *joystick) LIBTAS_ALIAS(SDL_JoystickGetAttached);
 
 /* Override */ int SDL_JoystickOpened(int device_index)
 {
@@ -397,7 +408,7 @@ sdl2::SDL_JoystickGUID nullGUID   = {{0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x
     return static_cast<sdl2::SDL_JoystickID>(*reinterpret_cast<int*>(joystick));
 }
 
-/* Override */ sdl3::SDL_JoystickID SDL_GetJoystickID(SDL_Joystick *joystick) __attribute__((alias("SDL_JoystickInstanceID")));
+/* Override */ sdl3::SDL_JoystickID SDL_GetJoystickID(SDL_Joystick *joystick) LIBTAS_ALIAS(SDL_JoystickInstanceID);
 
 /* Override */ int SDL_JoystickIndex(SDL_Joystick *joystick)
 {
@@ -416,7 +427,7 @@ sdl2::SDL_JoystickGUID nullGUID   = {{0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x
     return 6;
 }
 
-/* Override */ int SDL_GetNumJoystickAxes(SDL_Joystick *joystick) __attribute__((alias("SDL_JoystickNumAxes")));
+/* Override */ int SDL_GetNumJoystickAxes(SDL_Joystick *joystick) LIBTAS_ALIAS(SDL_JoystickNumAxes);
 
 /* Override */ int SDL_JoystickNumBalls(SDL_Joystick* joystick)
 {
@@ -426,7 +437,7 @@ sdl2::SDL_JoystickGUID nullGUID   = {{0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x
     return 0;
 }
 
-/* Override */ int SDL_GetNumJoystickBalls(SDL_Joystick *joystick) __attribute__((alias("SDL_JoystickNumBalls")));
+/* Override */ int SDL_GetNumJoystickBalls(SDL_Joystick *joystick) LIBTAS_ALIAS(SDL_JoystickNumBalls);
 
 /* Override */ int SDL_JoystickNumButtons(SDL_Joystick* joystick)
 {
@@ -436,7 +447,7 @@ sdl2::SDL_JoystickGUID nullGUID   = {{0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x
     return 11;
 }
 
-/* Override */ int SDL_GetNumJoystickButtons(SDL_Joystick *joystick) __attribute__((alias("SDL_JoystickNumButtons")));
+/* Override */ int SDL_GetNumJoystickButtons(SDL_Joystick *joystick) LIBTAS_ALIAS(SDL_JoystickNumButtons);
 
 /* Override */ int SDL_JoystickNumHats(SDL_Joystick* joystick)
 {
@@ -446,14 +457,14 @@ sdl2::SDL_JoystickGUID nullGUID   = {{0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x
     return 1;
 }
 
-/* Override */ int SDL_GetNumJoystickHats(SDL_Joystick *joystick) __attribute__((alias("SDL_JoystickNumHats")));
+/* Override */ int SDL_GetNumJoystickHats(SDL_Joystick *joystick) LIBTAS_ALIAS(SDL_JoystickNumHats);
 
 /* Override */ void SDL_JoystickUpdate(void)
 {
     LOGTRACE_SIMPLE(LCF_SDL | LCF_JOYSTICK);
 }
 
-/* Override */  void SDL_UpdateJoysticks(void) __attribute__((alias("SDL_JoystickUpdate")));
+/* Override */  void SDL_UpdateJoysticks(void) LIBTAS_ALIAS(SDL_JoystickUpdate);
 
 /* Override */ int SDL_JoystickEventState(int state)
 {
@@ -560,7 +571,7 @@ static const int joyevents3[] = {
     return Inputs::game_ai.controllers[*joyid].axes[axis];
 }
 
-/* Override */ Sint16 SDL_GetJoystickAxis(SDL_Joystick *joystick, int axis) __attribute__((alias("SDL_JoystickGetAxis")));
+/* Override */ Sint16 SDL_GetJoystickAxis(SDL_Joystick *joystick, int axis) LIBTAS_ALIAS(SDL_JoystickGetAxis);
 
 /* Override */ bool SDL_GetJoystickAxisInitialState(SDL_Joystick *joystick, int axis, Sint16 *state)
 {
@@ -611,7 +622,7 @@ static const int joyevents3[] = {
     return hatState;
 }
 
-/* Override */ Uint8 SDL_GetJoystickHat(SDL_Joystick *joystick, int hat) __attribute__((alias("SDL_JoystickGetHat")));
+/* Override */ Uint8 SDL_GetJoystickHat(SDL_Joystick *joystick, int hat) LIBTAS_ALIAS(SDL_JoystickGetHat);
 
 /* Override */ int SDL_JoystickGetBall(SDL_Joystick * joystick, int ball, int *dx, int *dy)
 {
@@ -727,7 +738,7 @@ static const int joyevents3[] = {
         joyids[*joyid] = -1;
 }
 
-/* Override */ void SDL_CloseJoystick(SDL_Joystick *joystick) __attribute__((alias("SDL_JoystickClose")));
+/* Override */ void SDL_CloseJoystick(SDL_Joystick *joystick) LIBTAS_ALIAS(SDL_JoystickClose);
 
 /* Override */ sdl2::SDL_JoystickPowerLevel SDL_JoystickCurrentPowerLevel(SDL_Joystick * joystick)
 {

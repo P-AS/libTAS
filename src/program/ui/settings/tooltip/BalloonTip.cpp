@@ -46,7 +46,7 @@ void BalloonTip::showBalloon(const QString& title, const QString& message,
   QString the_message = message;
   the_message.replace(QStringLiteral("<em>"), QStringLiteral("<b>"));
   the_message.replace(QStringLiteral("</em>"), QStringLiteral("</b>"));
-  QToolTip::showText(pos, the_message, parent);
+  QToolTip::showText(target_arrow_tip_position, the_message, parent);
 #else
   s_the_balloon_tip = std::unique_ptr<BalloonTip>(new BalloonTip(PrivateTag{}, title, message, parent));
   s_the_balloon_tip->updateBoundsAndRedraw(target_arrow_tip_position, show_arrow, border_width);

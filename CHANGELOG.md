@@ -1,6 +1,8 @@
 ## [Unreleased]
 ### Added
 
+* Add macOS CMake build with native Quartz framework support
+* Add stub X11, XCB and ALSA headers for macOS builds
 * Can tweak the number of cpu cores seen by the game
 * Vulkan: Use a fence to wait for each image to be presented (#741)
 * Add a command-line option to set any setting at startup

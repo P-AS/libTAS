@@ -42,6 +42,9 @@ namespace ReservedMemory {
         STACK_ADDR = COMPRESSED_ADDR + COMPRESSED_SIZE,
         SS_SLOTS_ADDR = STACK_ADDR + STACK_SIZE,
         SH_ADDR = SS_SLOTS_ADDR + SS_SLOTS_SIZE,
+#ifdef __APPLE__
+        PSM_ADDR = SH_ADDR + SH_SIZE,
+#endif
         RESTORE_TOTAL_SIZE = SH_ADDR + SH_SIZE,
     };
 
