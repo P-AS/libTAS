@@ -170,7 +170,9 @@ public:
     std::unordered_set<std::string> cli_overridden_keys;
 
     /* Apply a key=value setting from the command line. Returns false if the key
-     * is not recognised. On success, the key is added to cli_overridden_keys. */
+     * is not recognised, and throws std::invalid_argument if the value does not
+     * match the type of the setting. On success, the key is added to
+     * cli_overridden_keys. */
     bool applyCliSetting(const std::string& key, const std::string& value);
 
     /* Save the config into the config file */

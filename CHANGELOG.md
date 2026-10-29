@@ -36,6 +36,8 @@
 * Map hourglass left mouse button to libTAS mouse click
 * Wine: support the virtual Steam client, with a replacement steam_api.dll
   built with mingw-w64
+* Add the Proton, game and directory settings to the --set command-line
+  option
 
 ### Changed
 
@@ -71,6 +73,8 @@
 * Don't touch non-present anonymous pages when saving and loading states,
   which makes savestates much faster for wine games
 * Don't consider procfs files as savefiles
+* Settings given with the --set command-line option are not saved in the
+  config files anymore
 
 ### Fixed
 
@@ -125,6 +129,8 @@
   implemented
 * Steam: don't give the ISteamUGC interface for versions that we don't
   implement, as games crashed when calling it
+* Fix a crash when passing a non-numeric value such as true to the --set
+  command-line option
 
 ## [1.4.8] - 2026-05-14
 ### Added
