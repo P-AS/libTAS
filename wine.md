@@ -260,6 +260,25 @@ then presented by the game thread.
     once the xterm took the focus, because Clickteam stops when its window
     is deactivated; it now plays on, and the imported movie gives the same
     image at frame 3000 as before the change, in the same time.
+- **Window manager, no keyboard at all** (Sonic Generations with openbox):
+  - Wine uses the "globally active" focus model: its windows set the input
+    hint to False and ask for `WM_TAKE_FOCUS`, so the window manager does not
+    focus them itself but sends a message to the game, which then calls
+    `XSetInputFocus`. A paused game never processes that message, so clicking
+    the game window left the focus elsewhere, and no key (inputs or libTAS
+    hotkeys) reached it. libTAS already removed `WM_TAKE_FOCUS` and forced the
+    input hint, but only for the window that was already the game window,
+    while Wine sets the hints before mapping it. For Wine games, the input
+    hint is now forced for all windows.
+  - `XlibGameWindow::topLevel()` walked up to the child of the root window,
+    which is the frame of the window manager, so libTAS made that frame the
+    game window and sent the game's key events to it, where Wine never saw
+    them (no `KeyPress` in `WINEDEBUG=+event`). It now stops at the window
+    that has the `WM_STATE` property (the one the window manager manages), or
+    at a window already known.
+  - Without a window manager both problems are hidden: tests that set the
+    focus with `xdotool windowfocus` (`XSetInputFocus`) passed. Test with
+    openbox and `xdotool windowactivate`.
 - Hourglass import: Hourglass records `VK_LBUTTON` as a held key, which the
   importer converts into a pointer button (`95373926`).
 
@@ -624,5 +643,7 @@ the game config, not in the movie.
   not deterministic across machines.
 - Proton launch (`dc47524b`) is only tested with Proton 11.0 and Sonic
   Generations. The seccomp SIGSYS forwarding of that commit is untested.
+- Loading a savestate under openbox once did nothing (1 run out of 4, not
+  reproduced).
 - Sonic Generations: not tested in a stage yet (loading and time-tracking,
   non-draw frames during gameplay), controllers (XInput) not tested.

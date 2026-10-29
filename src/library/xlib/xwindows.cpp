@@ -469,7 +469,15 @@ int XSetWMHints(Display* display, Window w, XWMHints* wm_hints)
 
     LOGTRACE(LCF_WINDOW, "%s called with window %d", __func__, w);
 
-    if ((XlibGameWindow::get() == w) && (wm_hints->input == False)) {
+    /* With the input hint off, the window manager lets the game take the focus
+     * when receiving WM_TAKE_FOCUS, which a paused game never does. Wine sets
+     * the hints before mapping its windows, so before we know the game
+     * window, and all its windows belong to the game anyway. */
+    bool game_window = (XlibGameWindow::get() == w);
+#ifdef __linux__
+    game_window = game_window || isWineGame();
+#endif
+    if (game_window && wm_hints && (wm_hints->input == False)) {
         LOG(LL_DEBUG, LCF_WINDOW, "   switch input hint to True");
         wm_hints->input = True;
     }

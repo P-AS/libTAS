@@ -110,7 +110,28 @@ Window XlibGameWindow::topLevel(Window w)
         return 0;
 
     GlobalNative gn;
+
+    /* With a window manager, top-level windows are reparented into frames of
+     * the window manager, so stop at the window that it manages (which has
+     * the WM_STATE property), or at a window that we already know */
+    static Atom wm_state = XInternAtom(display, "WM_STATE", False);
+
     while (w) {
+        if (contains(w))
+            break;
+
+        Atom type;
+        int format;
+        unsigned long nitems, bytes_after;
+        unsigned char* data = nullptr;
+        if ((XGetWindowProperty(display, w, wm_state, 0, 0, False, AnyPropertyType,
+                &type, &format, &nitems, &bytes_after, &data) == Success)) {
+            if (data)
+                XFree(data);
+            if (type != None)
+                break;
+        }
+
         Window root, parent;
         Window *children = nullptr;
         unsigned int nchildren;
