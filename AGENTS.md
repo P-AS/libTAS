@@ -23,3 +23,11 @@ as the change itself. Do not wait to be asked.
     or `(fix #745)`.
 * Describe the user-visible effect, not implementation details.
 * Do not edit entries of already released versions.
+
+## Command-line options
+
+When testing or automating libTAS, prefer the command-line options (such as
+`-s KEY=VALUE`, `-n`, `-l`) over editing ini files or driving the UI. If the
+existing options are not sufficient for what you need, expand them (add the
+missing keys to `Config::applyCliSetting()` or add a new option) instead of
+working around them, and record it in `CHANGELOG.md`.

@@ -41,6 +41,8 @@
   movie.insertFrames() (#668)
 * Input editor: mark frames where fast-forward is disabled, for game
   sections that break when fast-forwarded (#729)
+* Add the Proton, game and directory settings to the --set command-line
+  option
 
 ### Changed
 
@@ -69,6 +71,8 @@
 * Docs: clarify the package installation step of the WSL guide (#506)
 * Save the game executable path and command-line arguments in the movie
   file instead of the executable name (#557)
+* Settings given with the --set command-line option are not saved in the
+  config files anymore
 
 ### Fixed
 
