@@ -9,6 +9,11 @@ if [ "$1" = "--skip-appimage" ]; then
     shift
 fi
 
+# AppImage only works on Linux
+if [ "$(uname -s)" != "Linux" ]; then
+    SKIP_APPIMAGE=1
+fi
+
 # Translate the former autotools options, and pass everything else to cmake.
 # Options are always set explicitly, because cmake caches them between runs.
 BUILD_I386=OFF
@@ -40,6 +45,8 @@ if [ $SKIP_APPIMAGE -eq 0 ]; then
     chmod +x linuxdeploy-$ARCH.AppImage
     [ -f linuxdeploy-plugin-qt-$ARCH.AppImage ] || wget https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-$ARCH.AppImage
     chmod +x linuxdeploy-plugin-qt-$ARCH.AppImage
+else
+    echo "Skipping AppImage build (not running on Linux)"
 fi
 
 APPDIR_PATH=$(readlink -f ./AppDir)

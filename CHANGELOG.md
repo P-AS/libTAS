@@ -46,6 +46,7 @@
 
 ### Changed
 
+* Skip AppImage build on non-Linux systems (e.g. macOS)
 * Use `#ifdef __linux__` instead of `#ifdef __unix__` for platform-specific code
 * Include all SDL2 needed definitions
 * Try to support games calling vk functions directly
