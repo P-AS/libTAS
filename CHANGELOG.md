@@ -132,6 +132,8 @@
   listing audio devices
 * Fix BadRROutput X errors with a custom screen resolution, when games read
   the properties or the primary output of the fake monitor
+* Fix crashes (double free) when games read XInput2 events on several X
+  connections, such as Wine games while dragging the mouse
 
 ## [1.4.8] - 2026-05-14
 ### Added

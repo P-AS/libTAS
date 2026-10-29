@@ -27,6 +27,12 @@
 #include <X11/Xlib.h>
 
 namespace libtas {
+
+/* The XInput2 events that we generate carry data that we allocated, and that
+ * is freed when the game calls XFreeEventData(). Each event that we deliver
+ * must own its data, so we duplicate it for each queued copy. */
+void duplicateXIEventData(XGenericEventCookie* cookie);
+void freeXIEventData(XGenericEventCookie* cookie);
 /* This is a replacement of the Xlib event queue. */
 class XlibEventQueue
 {
