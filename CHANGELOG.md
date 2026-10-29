@@ -138,6 +138,8 @@
 * Wine: fix errors about sending on a non-socket when Proton's steam.exe
   destroys windows
 * Don't run ldd and readelf on Windows executables, which printed errors
+* Don't warn about refused audio capture streams, which Wine opens when
+  listing audio devices
 
 ## [1.4.8] - 2026-05-14
 ### Added

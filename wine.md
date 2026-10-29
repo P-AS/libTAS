@@ -279,7 +279,9 @@ then presented by the game thread.
   the temporary directories of Wine users are left to Wine (`364b37c8`). To
   check whether a game plays sounds, `WINEDEBUG=+dsound` shows
   `DSOUND_MixToPrimary ... for N buffers`.
-- `WARN: Unsupported stream direction 1` (capture streams) is harmless.
+- winealsa also opens capture streams when listing devices, which we refuse
+  (we have no audio input). This printed `WARN: Unsupported stream
+  direction 1` three times per run; it is now an info message.
 
 ## Files and "Prevent writing to disk"
 
