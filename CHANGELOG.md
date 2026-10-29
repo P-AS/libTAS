@@ -171,6 +171,8 @@
 * Don't run ldd and readelf on Windows executables, which printed errors
 * Don't warn about refused audio capture streams, which Wine opens when
   listing audio devices
+* Wine: fix keyboard inputs and hotkeys not working with a window manager,
+  which could not give the focus to a paused game
 
 ## [1.4.8] - 2026-05-14
 ### Added
