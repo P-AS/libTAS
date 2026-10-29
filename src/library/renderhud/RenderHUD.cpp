@@ -110,6 +110,13 @@ void RenderHUD::newFrame()
         queuedXlibEvents.clear();
     }
 
+    /* Apply font size changes while the game is running */
+    static double osd_font_size = Global::shared_config.osd_font_size;
+    if (osd_font_size != Global::shared_config.osd_font_size) {
+        osd_font_size = Global::shared_config.osd_font_size;
+        ImGui::GetStyle().FontSizeBase = osd_font_size;
+    }
+
     ImGui_ImplXlib_NewFrame(XlibGameWindow::get(), w, h);
     ImGui::NewFrame();
 }
