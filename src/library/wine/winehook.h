@@ -36,6 +36,10 @@ void* find_wine_symbol(const char* library, const char* name);
  * that wine starts, nor the 64-bit process that restarts a 32-bit game. */
 bool wine_should_init(int argc, char** argv);
 
+/* Returns if this game process is the 64-bit process that restarts a 32-bit
+ * game on WoW64, in which libtas must not be initialized */
+bool wine_restart_pending();
+
 /* Returns if this process is a game launched through wine */
 bool isWineGame();
 

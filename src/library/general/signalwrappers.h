@@ -27,6 +27,10 @@
 
 namespace libtas {
 
+/* Handler of our checkpoint signal. It passes the signal to the handler of
+ * the game instead if it was sent by a seccomp filter (Proton). */
+void checkpointSignalHandler(int signum, siginfo_t *info, void *ucontext);
+
     
 #if defined(__APPLE__) && defined(__MACH__)
 typedef void (*sighandler_t) (int);

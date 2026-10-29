@@ -20,6 +20,7 @@
  */
 
 #include "SaveStateManager.h"
+#include "general/signalwrappers.h"
 #include "ThreadManager.h"
 #include "ThreadSync.h"
 #include "Checkpoint.h"
@@ -234,7 +235,7 @@ void SaveStateManager::initCheckpointThread()
     struct sigaction sigcheckpoint;
     sigfillset(&sigcheckpoint.sa_mask);
     sigcheckpoint.sa_flags = SA_ONSTACK | SA_SIGINFO;
-    sigcheckpoint.sa_sigaction = Checkpoint::handler;
+    sigcheckpoint.sa_sigaction = checkpointSignalHandler;
     {
         GlobalNative gn;
         MYASSERT(sigaction(sig_checkpoint, &sigcheckpoint, nullptr) == 0)

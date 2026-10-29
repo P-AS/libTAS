@@ -55,8 +55,10 @@ int snd_pcm_open(snd_pcm_t **pcm, const char *name, snd_pcm_stream_t stream, int
     if (Global::shared_config.audio_disabled)
         return -1;
 
+    /* We don't provide audio input. Wine asks for capture streams when
+     * listing audio devices, so this is not worth a warning. */
     if (stream != SND_PCM_STREAM_PLAYBACK) {
-        LOG(LL_WARN, LCF_SOUND, "    Unsupported stream direction %d", stream);
+        LOG(LL_INFO, LCF_SOUND, "    Refusing capture stream, audio input is not supported");
         return -1;
     }
 

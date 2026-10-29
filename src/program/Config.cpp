@@ -28,6 +28,7 @@
 #include <iostream>
 #include <filesystem>
 #include <limits>
+#include <map>
 #include <stdexcept>
 
 QString Config::iniPath(const std::filesystem::path& gamepath) const {
@@ -125,10 +126,64 @@ bool Config::applyCliSetting(const std::string& key, const std::string& value)
     else if (key == "initial_time_nsec")        sc.initial_time_nsec = int64Value();
     else if (key == "initial_monotonic_time_sec")  sc.initial_monotonic_time_sec = int64Value();
     else if (key == "initial_monotonic_time_nsec") sc.initial_monotonic_time_nsec = int64Value();
+    /* Game settings outside SharedConfig */
+    else if (key == "libdir")                   libdir = value;
+    else if (key == "rundir")                   rundir = value;
+    else if (key == "on_movie_end")             on_movie_end = intValue();
+    else if (key == "autosave")                 autosave = boolValue();
+    else if (key == "autosave_delay_sec")       autosave_delay_sec = parseNumber([](const std::string& v, size_t* pos) { return std::stod(v, pos); }, "a number");
+    else if (key == "autosave_frames")          autosave_frames = intValue();
+    else if (key == "autosave_count")           autosave_count = intValue();
+    else if (key == "auto_restart")             auto_restart = boolValue();
+    else if (key == "mouse_warp")               mouse_warp = boolValue();
+    else if (key == "use_proton")               use_proton = boolValue();
+    else if (key == "proton_path")              proton_path = value;
+    /* General settings (libTAS.ini) */
+    else if (key == "debugger")                 debugger = intValue();
+    else if (key == "strace_events")            strace_events = value;
+    else if (key == "allow_downloads")          allow_downloads = intValue();
+    else if (key == "datadir" || key == "steamuserdir" || key == "tempmoviedir" ||
+             key == "savestatedir" || key == "ramsearchdir" ||
+             key == "extralib32dir" || key == "extralib64dir") {
+        std::filesystem::path& dir = (key == "datadir") ? datadir :
+                                     (key == "steamuserdir") ? steamuserdir :
+                                     (key == "tempmoviedir") ? tempmoviedir :
+                                     (key == "savestatedir") ? savestatedir :
+                                     (key == "ramsearchdir") ? ramsearchdir :
+                                     (key == "extralib32dir") ? extralib32dir : extralib64dir;
+        dir = value;
+        std::error_code ec;
+        std::filesystem::create_directories(dir, ec);
+    }
     else return false;
 
     cli_overridden_keys.insert(key);
     return true;
+}
+
+/* Settings given on the command line only apply to this run, so remember the
+ * values of these keys in an ini file before saving, to put them back after */
+static std::map<QString, QVariant> keepCliValues(QSettings& settings, const std::unordered_set<std::string>& keys)
+{
+    std::map<QString, QVariant> values;
+    for (const auto& key : keys)
+        for (const QString& path : {QString(key.c_str()), QString("shared/") + key.c_str()})
+            if (settings.contains(path))
+                values[path] = settings.value(path);
+    return values;
+}
+
+static void restoreCliValues(QSettings& settings, const std::unordered_set<std::string>& keys, const std::map<QString, QVariant>& values)
+{
+    for (const auto& key : keys) {
+        for (const QString& path : {QString(key.c_str()), QString("shared/") + key.c_str()}) {
+            auto it = values.find(path);
+            if (it != values.end())
+                settings.setValue(path, it->second);
+            else
+                settings.remove(path);
+        }
+    }
 }
 
 void Config::save(const std::filesystem::path& gamepath) {
@@ -149,6 +204,7 @@ void Config::save(const std::filesystem::path& gamepath) {
 
     QSettings general_settings(QString(generalPath.c_str()), QSettings::IniFormat);
     general_settings.setFallbacksEnabled(false);
+    auto general_cli_values = keepCliValues(general_settings, cli_overridden_keys);
 
     general_settings.remove("recent_gamepaths");
     general_settings.beginWriteArray("recent_gamepaths");
@@ -175,6 +231,7 @@ void Config::save(const std::filesystem::path& gamepath) {
     /* Open the preferences for the game */
     QSettings settings(iniPath(gamepath), QSettings::IniFormat);
     settings.setFallbacksEnabled(false);
+    auto game_cli_values = keepCliValues(settings, cli_overridden_keys);
 
     /* Save recent options */
     settings.remove("recent_args");
@@ -304,6 +361,9 @@ void Config::save(const std::filesystem::path& gamepath) {
     settings.setValue("savestate_settings", sc.savestate_settings);
 
     settings.endGroup();
+
+    restoreCliValues(general_settings, cli_overridden_keys, general_cli_values);
+    restoreCliValues(settings, cli_overridden_keys, game_cli_values);
 }
 
 void Config::saveDefaultFfmpeg(const std::filesystem::path& gamepath) {

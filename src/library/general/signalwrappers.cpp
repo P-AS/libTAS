@@ -24,6 +24,7 @@
 #include "hook.h"
 #include "checkpoint/ThreadSync.h"
 #include "checkpoint/SaveStateManager.h" // checkpoint signals
+#include "checkpoint/Checkpoint.h"
 
 #include <cstring>
 #include <csignal>
@@ -48,6 +49,70 @@ static struct sigaction savedSuspendAction = {};
 static struct sigaction savedCheckpointAction = {};
 static bool savedSuspendActionValid = false;
 static bool savedCheckpointActionValid = false;
+
+void checkpointSignalHandler(int signum, siginfo_t *info, void *ucontext);
+
+/* Our checkpoint handler forwards the signals that seccomp sends to the
+ * handler of the game, so it must be set as soon as the game wants one, and
+ * not only when the checkpoint thread is set up */
+static void installCheckpointHandler(int sig)
+{
+    LINK_NAMESPACE_GLOBAL(sigaction);
+    /* Used in the signal handler, where we cannot look for it */
+    LINK_NAMESPACE_GLOBAL(pthread_sigmask);
+
+    struct sigaction sigcheckpoint;
+    sigfillset(&sigcheckpoint.sa_mask);
+    sigcheckpoint.sa_flags = SA_ONSTACK | SA_SIGINFO;
+    sigcheckpoint.sa_sigaction = checkpointSignalHandler;
+    orig::sigaction(sig, &sigcheckpoint, nullptr);
+}
+
+static bool forwardSeccompSignal(int signum, siginfo_t *info, void *ucontext)
+{
+#ifdef SYS_SECCOMP
+    /* Our checkpoint signal is sent with raise(), while seccomp sends it when
+     * a filter of the game traps a syscall. Proton installs one, and its
+     * handler emulates the syscalls made by Windows code. */
+    if (!info || (info->si_code != SYS_SECCOMP))
+        return false;
+
+    if (savedCheckpointActionValid) {
+        /* Our handler blocks all signals, while the handler of the game may
+         * need some of them (wine handles SIGSEGV), so use its mask. The
+         * mask is restored when our handler returns. */
+        sigset_t mask = savedCheckpointAction.sa_mask;
+        if (!(savedCheckpointAction.sa_flags & SA_NODEFER))
+            sigaddset(&mask, signum);
+        if (orig::pthread_sigmask)
+            orig::pthread_sigmask(SIG_SETMASK, &mask, nullptr);
+
+        if (savedCheckpointAction.sa_flags & SA_SIGINFO) {
+            savedCheckpointAction.sa_sigaction(signum, info, ucontext);
+            return true;
+        }
+        if ((savedCheckpointAction.sa_handler != SIG_DFL) && (savedCheckpointAction.sa_handler != SIG_IGN)) {
+            savedCheckpointAction.sa_handler(signum);
+            return true;
+        }
+    }
+
+    LOG(LL_FATAL, LCF_SIGNAL, "Syscall trapped by seccomp, but the game did not set a handler");
+    return true;
+#else
+    return false;
+#endif
+}
+
+void checkpointSignalHandler(int signum, siginfo_t *info, void *ucontext)
+{
+    /* Keep this function small: it may run on the stack of a game thread,
+     * while the checkpoint handler needs a lot of stack */
+    if (forwardSeccompSignal(signum, info, ucontext))
+        return;
+
+    Checkpoint::handler(signum, info, ucontext);
+}
 
 static int signalMaskBit(int sig)
 {
@@ -88,6 +153,7 @@ static int signalMaskBit(int sig)
             savedCheckpointAction.sa_flags = 0;
             sigemptyset(&savedCheckpointAction.sa_mask);
             savedCheckpointActionValid = true;
+            installCheckpointHandler(sig);
         }
         return previousHandler;
     }
@@ -284,6 +350,7 @@ static int signalMaskBit(int sig)
         if (act != nullptr) {
             savedCheckpointAction = *act;
             savedCheckpointActionValid = true;
+            installCheckpointHandler(sig);
         }
 
         return 0;

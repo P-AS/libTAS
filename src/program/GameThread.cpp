@@ -129,7 +129,69 @@ void GameThread::set_env_variables(Context *context, int gameArch)
         if (context->config.use_proton && !context->config.proton_path.empty())
             distpath = protonDistPath(context->config.proton_path);
 
-        if (!distpath.empty()) {
+        if (!protonScriptPath(context).empty()) {
+            /* The proton script sets up the prefix and the environment of
+             * wine, and starts the game from its steam.exe, which connects
+             * to the running Steam client (needed by games wrapped with the
+             * Steam DRM). Give it what Steam would, unless the user did. */
+            auto isEnvSet = [context](const char* name) {
+                if (getenv(name))
+                    return true;
+                for (const auto& env_var : context->config.env_overrides)
+                    if (env_var.first == name)
+                        return true;
+                return false;
+            };
+
+            std::filesystem::path steamapps;
+            std::string appid = steamAppId(context->gamepath, &steamapps);
+            if (!appid.empty()) {
+                for (const char* name : {"SteamAppId", "SteamGameId", "STEAM_COMPAT_APP_ID"})
+                    if (!isEnvSet(name))
+                        setenv(name, appid.c_str(), 1);
+            }
+
+            /* Use the prefix of the game in its Steam library, like Steam */
+            if (!isEnvSet("STEAM_COMPAT_DATA_PATH")) {
+                std::filesystem::path compatdata;
+                if (!steamapps.empty() && !appid.empty())
+                    compatdata = steamapps / "compatdata" / appid;
+                else
+                    compatdata = context->config.datadir / "proton" / context->gamename;
+                std::error_code ec;
+                std::filesystem::create_directories(compatdata, ec);
+                setenv("STEAM_COMPAT_DATA_PATH", compatdata.c_str(), 1);
+            }
+
+            if (!isEnvSet("STEAM_COMPAT_CLIENT_INSTALL_PATH")) {
+                const char* home = getenv("HOME");
+                if (home) {
+                    for (const char* dir : {"/.local/share/Steam", "/.steam/steam"}) {
+                        std::filesystem::path steamdir = std::string(home) + dir;
+                        if (std::filesystem::exists(steamdir)) {
+                            setenv("STEAM_COMPAT_CLIENT_INSTALL_PATH", steamdir.c_str(), 1);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            /* Run 32-bit games in a 64-bit process, like the wine that we
+             * detected in findWinePath(). Proton 10 has a separate WoW64
+             * build of wine in `bin-wow64`, while the single wine of Proton
+             * 11 runs 32-bit games in a 32-bit process unless asked. Older
+             * Proton versions ignore this variable. */
+            if (!isEnvSet("PROTON_USE_WOW64"))
+                setenv("PROTON_USE_WOW64", "1", 1);
+
+            /* Proton draws Direct3D 8 to 11 games with Vulkan (DXVK and
+             * vkd3d-proton), while our Wine support draws through wined3d
+             * and OpenGL (see the CSMT setting below), and Vulkan has no
+             * software driver when lavapipe is not installed */
+            if (!isEnvSet("PROTON_USE_WINED3D"))
+                setenv("PROTON_USE_WINED3D", "1", 1);
+        }
+        else if (!distpath.empty()) {
             std::string winedllpath = (distpath / "lib64" / "wine").string();
             winedllpath += ":";
             winedllpath += (distpath / "lib" / "wine").string();
@@ -149,8 +211,12 @@ void GameThread::set_env_variables(Context *context, int gameArch)
             setenv("WINEPREFIX", wineprefix.c_str(), 1);
         }
 
-        /* We need to delay libtas hooking for wine process. */
-        setenv("LIBTAS_DELAY_INIT", "1", 1);
+        /* We need to delay libtas hooking for wine process, whose first
+         * image execs another one. The game started by the steam.exe of
+         * Proton has a single image. */
+        bool proton_script = !protonScriptPath(context).empty();
+        if (!proton_script)
+            setenv("LIBTAS_DELAY_INIT", "1", 1);
 
         /* Wine starts other processes (wineserver, wineboot, explorer...)
          * that must not be hooked, so tell libtas which one is the game */
@@ -175,7 +241,7 @@ void GameThread::set_env_variables(Context *context, int gameArch)
          * restarts itself into a new 32-bit process. Tell libtas to only hook
          * the restarted process. */
         int processArch = wineProcessArch(findWinePath(context, gameArch), gameArch);
-        if (((gameArch & BT_TYPEMASK) != BT_PE32P) && (processArch == BT_ELF64))
+        if (!proton_script && ((gameArch & BT_TYPEMASK) != BT_PE32P) && (processArch == BT_ELF64))
             setenv("LIBTAS_WINE_RESTART", "1", 1);
 
         /* The virtual Steam client of Windows games is a dll that libtas
@@ -211,7 +277,14 @@ std::list<std::string> GameThread::build_arg_list(Context *context, int gameArch
     /* Build the argument list to be fed to execv */
     std::list<std::string> arg_list;
 
-    if (isWindowsBinary(gameArch)) {
+    std::filesystem::path protonscript = protonScriptPath(context);
+    if (isWindowsBinary(gameArch) && !protonscript.empty()) {
+        /* Let the proton script start the game */
+        arg_list.push_back(protonscript.string());
+        arg_list.push_back("run");
+        arg_list.push_back(context->gameexecutable);
+    }
+    else if (isWindowsBinary(gameArch)) {
         /* Change the executable to wine. Its presence was already checked
          * in ui/ErrorChecking.cpp */
         arg_list.push_back(findWinePath(context, gameArch).string());

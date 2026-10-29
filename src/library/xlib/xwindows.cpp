@@ -37,6 +37,9 @@
 #include "../shared/sockethelpers.h"
 #include "../shared/messages.h"
 #include "../external/mwm.h"
+#ifdef __linux__
+#include "wine/winehook.h"
+#endif
 
 #include <vector>
 #include <X11/Xatom.h> // XA_WINDOW
@@ -136,12 +139,38 @@ int XDestroyWindow(Display *display, Window w)
     RETURN_NATIVE(XDestroyWindow, (display, w), nullptr);
 }
 
+/* Wine creates its top-level windows as override-redirect children of
+ * another window, and changes them before mapping them, so register them
+ * when they are mapped. Otherwise we only find the game window when it is
+ * first drawn, and hotkeys don't work if the game was paused before that. */
+static void registerMappedWineWindow(Display *display, Window w)
+{
+#ifdef __linux__
+    if (!isWineGame() || XlibGameWindow::contains(w))
+        return;
+
+    {
+        GlobalNative gn;
+        XWindowAttributes attributes;
+        if (!XGetWindowAttributes(display, w, &attributes) || attributes.override_redirect)
+            return;
+        if (!XlibGameWindow::isTopLevel(display, w))
+            return;
+    }
+
+    LOG(LL_DEBUG, LCF_WINDOW, "   add mapped window %d", w);
+    XlibGameWindow::push(w);
+#endif
+}
+
 int XMapWindow(Display *display, Window w)
 {
     LOGTRACE(LCF_WINDOW, "%s called with window %d", __func__, w);
     LINK_NAMESPACE_GLOBAL(XMapWindow);
 
     int ret = orig::XMapWindow(display, w);
+
+    registerMappedWineWindow(display, w);
 
     /* We must wait until the window is mapped to send it to the program. */
     XlibGameWindow::promote(w);
@@ -161,6 +190,8 @@ int XMapRaised(Display *display, Window w)
     LINK_NAMESPACE_GLOBAL(XMapRaised);
 
     int ret = orig::XMapRaised(display, w);
+
+    registerMappedWineWindow(display, w);
 
     /* We must wait until the window is mapped to send it to the program. */
     XlibGameWindow::promote(w);
