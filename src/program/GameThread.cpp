@@ -157,9 +157,19 @@ void GameThread::set_env_variables(Context *context, int gameArch)
             }
 
             /* Run 32-bit games in a 64-bit process, like the wine that we
-             * detected in findWinePath() */
-            if (!isEnvSet("PROTON_USE_WOW64") && std::filesystem::exists(distpath / "bin-wow64" / "wine"))
+             * detected in findWinePath(). Proton 10 has a separate WoW64
+             * build of wine in `bin-wow64`, while the single wine of Proton
+             * 11 runs 32-bit games in a 32-bit process unless asked. Older
+             * Proton versions ignore this variable. */
+            if (!isEnvSet("PROTON_USE_WOW64"))
                 setenv("PROTON_USE_WOW64", "1", 1);
+
+            /* Proton draws Direct3D 8 to 11 games with Vulkan (DXVK and
+             * vkd3d-proton), while our Wine support draws through wined3d
+             * and OpenGL (see the CSMT setting below), and Vulkan has no
+             * software driver when lavapipe is not installed */
+            if (!isEnvSet("PROTON_USE_WINED3D"))
+                setenv("PROTON_USE_WINED3D", "1", 1);
         }
         else if (!distpath.empty()) {
             std::string winedllpath = (distpath / "lib64" / "wine").string();

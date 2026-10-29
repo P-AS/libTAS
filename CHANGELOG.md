@@ -36,6 +36,8 @@
 * Map hourglass left mouse button to libTAS mouse click
 * Wine: support the virtual Steam client, with a replacement steam_api.dll
   built with mingw-w64
+* Wine: launch games through the proton script of Proton, with the Steam
+  client of Proton, in WoW64 mode and with wined3d
 * Add the Proton, game and directory settings to the --set command-line
   option
 
