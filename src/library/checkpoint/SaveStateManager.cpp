@@ -58,8 +58,6 @@
 #include <linux/sched.h>
 #endif
 #include <unistd.h>
-#include <xcb/xproto.h> // xcb_get_input_focus_reply, xcb_get_input_focus
-#include <X11/Xlib.h> // XLockDisplay
 
 /* Define the clone_args struct if not defined */
 #ifndef CLONE_ARGS_SIZE_VER0
@@ -91,6 +89,7 @@ static bool* state_dirty;
 static bool has_clone3_set_tid = false;
 static bool can_set_last_pid = false;
 
+#ifdef __linux__
 static void lockGameDisplays()
 {
     for (int i=0; i<GAMEDISPLAYNUM; i++) {
