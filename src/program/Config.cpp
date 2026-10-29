@@ -28,6 +28,7 @@
 #include <iostream>
 #include <filesystem>
 #include <limits>
+#include <map>
 #include <stdexcept>
 
 QString Config::iniPath(const std::filesystem::path& gamepath) const {
@@ -74,9 +75,19 @@ bool Config::applyCliSetting(const std::string& key, const std::string& value)
 
     /* SharedConfig fields – key names match QSettings keys in save()/load() */
     if      (key == "speed_divisor")            sc.speed_divisor = intValue();
+    else if (key == "fastforward")              sc.fastforward = boolValue();
     else if (key == "fastforward_mode")         sc.fastforward_mode = intValue();
     else if (key == "fastforward_render")       sc.fastforward_render = intValue();
-    else if (key == "logging_status")           sc.logging_status = intValue();
+    else if (key == "logging_console")          sc.logging_console = boolValue();
+    else if (key == "logging_file")             sc.logging_file = boolValue();
+    else if (key == "logging_status") { /* Former setting: 0 none, 1 console, 2 file */
+        int status = intValue();
+        sc.logging_console = (status == 1);
+        sc.logging_file = (status == 2);
+        /* The values that this setting gives must not be saved either */
+        cli_overridden_keys.insert("logging_console");
+        cli_overridden_keys.insert("logging_file");
+    }
     else if (key == "logging_level")            sc.logging_level = static_cast<LogLevel>(uintValue());
     else if (key == "logging_include_flags")    sc.logging_include_flags = uintValue();
     else if (key == "logging_exclude_flags")    sc.logging_exclude_flags = uintValue();
@@ -103,6 +114,7 @@ bool Config::applyCliSetting(const std::string& key, const std::string& value)
     else if (key == "openal_soft")              sc.openal_soft = boolValue();
     else if (key == "locale")                   sc.locale = intValue();
     else if (key == "virtual_steam")            sc.virtual_steam = boolValue();
+    else if (key == "steam_cloud")              sc.steam_cloud = boolValue();
     else if (key == "opengl_soft")              sc.opengl_soft = boolValue();
     else if (key == "opengl_quality")           sc.opengl_quality = intValue();
     else if (key == "async_events")             sc.async_events = intValue();
@@ -125,10 +137,64 @@ bool Config::applyCliSetting(const std::string& key, const std::string& value)
     else if (key == "initial_time_nsec")        sc.initial_time_nsec = int64Value();
     else if (key == "initial_monotonic_time_sec")  sc.initial_monotonic_time_sec = int64Value();
     else if (key == "initial_monotonic_time_nsec") sc.initial_monotonic_time_nsec = int64Value();
+    /* Game settings outside SharedConfig */
+    else if (key == "libdir")                   libdir = value;
+    else if (key == "rundir")                   rundir = value;
+    else if (key == "on_movie_end")             on_movie_end = intValue();
+    else if (key == "autosave")                 autosave = boolValue();
+    else if (key == "autosave_delay_sec")       autosave_delay_sec = parseNumber([](const std::string& v, size_t* pos) { return std::stod(v, pos); }, "a number");
+    else if (key == "autosave_frames")          autosave_frames = intValue();
+    else if (key == "autosave_count")           autosave_count = intValue();
+    else if (key == "auto_restart")             auto_restart = boolValue();
+    else if (key == "mouse_warp")               mouse_warp = boolValue();
+    else if (key == "use_proton")               use_proton = boolValue();
+    else if (key == "proton_path")              proton_path = value;
+    /* General settings (libTAS.ini) */
+    else if (key == "debugger")                 debugger = intValue();
+    else if (key == "strace_events")            strace_events = value;
+    else if (key == "allow_downloads")          allow_downloads = intValue();
+    else if (key == "datadir" || key == "steamuserdir" || key == "tempmoviedir" ||
+             key == "savestatedir" || key == "ramsearchdir" ||
+             key == "extralib32dir" || key == "extralib64dir") {
+        std::filesystem::path& dir = (key == "datadir") ? datadir :
+                                     (key == "steamuserdir") ? steamuserdir :
+                                     (key == "tempmoviedir") ? tempmoviedir :
+                                     (key == "savestatedir") ? savestatedir :
+                                     (key == "ramsearchdir") ? ramsearchdir :
+                                     (key == "extralib32dir") ? extralib32dir : extralib64dir;
+        dir = value;
+        std::error_code ec;
+        std::filesystem::create_directories(dir, ec);
+    }
     else return false;
 
     cli_overridden_keys.insert(key);
     return true;
+}
+
+/* Settings given on the command line only apply to this run, so remember the
+ * values of these keys in an ini file before saving, to put them back after */
+static std::map<QString, QVariant> keepCliValues(QSettings& settings, const std::unordered_set<std::string>& keys)
+{
+    std::map<QString, QVariant> values;
+    for (const auto& key : keys)
+        for (const QString& path : {QString(key.c_str()), QString("shared/") + key.c_str()})
+            if (settings.contains(path))
+                values[path] = settings.value(path);
+    return values;
+}
+
+static void restoreCliValues(QSettings& settings, const std::unordered_set<std::string>& keys, const std::map<QString, QVariant>& values)
+{
+    for (const auto& key : keys) {
+        for (const QString& path : {QString(key.c_str()), QString("shared/") + key.c_str()}) {
+            auto it = values.find(path);
+            if (it != values.end())
+                settings.setValue(path, it->second);
+            else
+                settings.remove(path);
+        }
+    }
 }
 
 void Config::save(const std::filesystem::path& gamepath) {
@@ -149,6 +215,7 @@ void Config::save(const std::filesystem::path& gamepath) {
 
     QSettings general_settings(QString(generalPath.c_str()), QSettings::IniFormat);
     general_settings.setFallbacksEnabled(false);
+    auto general_cli_values = keepCliValues(general_settings, cli_overridden_keys);
 
     general_settings.remove("recent_gamepaths");
     general_settings.beginWriteArray("recent_gamepaths");
@@ -175,6 +242,7 @@ void Config::save(const std::filesystem::path& gamepath) {
     /* Open the preferences for the game */
     QSettings settings(iniPath(gamepath), QSettings::IniFormat);
     settings.setFallbacksEnabled(false);
+    auto game_cli_values = keepCliValues(settings, cli_overridden_keys);
 
     /* Save recent options */
     settings.remove("recent_args");
@@ -250,7 +318,9 @@ void Config::save(const std::filesystem::path& gamepath) {
     settings.setValue("speed_divisor", sc.speed_divisor);
     settings.setValue("fastforward_mode", sc.fastforward_mode);
     settings.setValue("fastforward_render", sc.fastforward_render);
-    settings.setValue("logging_status", sc.logging_status);
+    settings.setValue("logging_console", sc.logging_console);
+    settings.setValue("logging_file", sc.logging_file);
+    settings.remove("logging_status"); /* Former setting */
     settings.setValue("logging_level", sc.logging_level);
     settings.setValue("logging_include_flags", sc.logging_include_flags);
     settings.setValue("logging_exclude_flags", sc.logging_exclude_flags);
@@ -285,6 +355,7 @@ void Config::save(const std::filesystem::path& gamepath) {
     settings.setValue("audio_bitrate", sc.audio_bitrate);
     settings.setValue("locale", sc.locale);
     settings.setValue("virtual_steam", sc.virtual_steam);
+    settings.setValue("steam_cloud", sc.steam_cloud);
     settings.setValue("openal_soft", sc.openal_soft);
     settings.setValue("opengl_soft", sc.opengl_soft);
     settings.setValue("opengl_quality", sc.opengl_quality);
@@ -304,6 +375,9 @@ void Config::save(const std::filesystem::path& gamepath) {
     settings.setValue("savestate_settings", sc.savestate_settings);
 
     settings.endGroup();
+
+    restoreCliValues(general_settings, cli_overridden_keys, general_cli_values);
+    restoreCliValues(settings, cli_overridden_keys, game_cli_values);
 }
 
 void Config::saveDefaultFfmpeg(const std::filesystem::path& gamepath) {
@@ -480,7 +554,14 @@ void Config::load(const std::filesystem::path& gamepath) {
     sc.speed_divisor = settings.value("speed_divisor", sc.speed_divisor).toInt();
     sc.fastforward_mode = settings.value("fastforward_mode", sc.fastforward_mode).toInt();
     sc.fastforward_render = settings.value("fastforward_render", sc.fastforward_render).toInt();
-    sc.logging_status = settings.value("logging_status", sc.logging_status).toInt();
+    if (settings.contains("logging_status")) {
+        /* Former setting: 0 none, 1 console, 2 file */
+        int status = settings.value("logging_status").toInt();
+        sc.logging_console = (status == 1);
+        sc.logging_file = (status == 2);
+    }
+    sc.logging_console = settings.value("logging_console", sc.logging_console).toBool();
+    sc.logging_file = settings.value("logging_file", sc.logging_file).toBool();
     sc.logging_level = settings.value("logging_level", sc.logging_level).toUInt();
     sc.logging_include_flags = settings.value("logging_include_flags", sc.logging_include_flags).toUInt();
     sc.logging_exclude_flags = settings.value("logging_exclude_flags", sc.logging_exclude_flags).toUInt();
@@ -507,6 +588,7 @@ void Config::load(const std::filesystem::path& gamepath) {
     sc.openal_soft = settings.value("openal_soft", sc.openal_soft).toBool();
     sc.locale = settings.value("locale", sc.locale).toInt();
     sc.virtual_steam = settings.value("virtual_steam", sc.virtual_steam).toBool();
+    sc.steam_cloud = settings.value("steam_cloud", sc.steam_cloud).toBool();
     sc.async_events = settings.value("async_events", sc.async_events).toInt();
     sc.wait_timeout = settings.value("wait_timeout", sc.wait_timeout).toInt();
     sc.sleep_handling = settings.value("sleep_handling", sc.sleep_handling).toInt();
