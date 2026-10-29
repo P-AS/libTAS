@@ -61,6 +61,7 @@ DEFINE_ORIG_POINTER(eglCreateContext)
 DEFINE_ORIG_POINTER(eglCreateWindowSurface)
 DEFINE_ORIG_POINTER(eglCreatePlatformWindowSurface)
 DEFINE_ORIG_POINTER(eglCreatePlatformWindowSurfaceEXT)
+DEFINE_ORIG_POINTER(eglQuerySurface)
 
 /* If the game uses the eglGetProcAddress functions to access to a function
  * that we hook, we must return our function and store the original pointers
@@ -292,6 +293,16 @@ EGLBoolean eglSwapBuffers( EGLDisplay dpy, EGLSurface surface )
     /* Games may map other windows after the one they draw to, so make sure
      * that the window we draw to is the game window */
     XlibGameWindow::setDrawn(getSurfaceTopLevelWindow(surface));
+
+    /* Wine windows are resized by the window manager or by Wine without
+     * going through our hooks, so follow the size of the surface */
+    if (surfaceWindows.count(surface)) {
+        LINK_NAMESPACE(eglQuerySurface, "EGL");
+        EGLint width = 0, height = 0;
+        if (orig::eglQuerySurface && orig::eglQuerySurface(dpy, surface, EGL_WIDTH, &width) &&
+            orig::eglQuerySurface(dpy, surface, EGL_HEIGHT, &height) && width && height)
+            ScreenCapture::setDrawnSize(width, height);
+    }
 
     /* Start the frame boundary and pass the function to draw */
     static RenderHUD_GL renderHUD;

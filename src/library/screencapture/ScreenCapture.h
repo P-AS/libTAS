@@ -73,6 +73,18 @@ public:
     static void resize(int w, int h);
 
     /**
+     * @brief Follow the size of the surface that the game draws to.
+     *
+     * Called before a frame boundary, when the size is known from the
+     * drawable rather than from a window resize. If the size changed, screen
+     * capture is set up again with it at the next draw.
+     *
+     * @param[in] w Width of the surface in pixels
+     * @param[in] h Height of the surface in pixels
+     */
+    static void setDrawnSize(int w, int h);
+
+    /**
      * @brief Returns whether screen capture has been initialized.
      *
      * @return true if init() completed successfully and a backend is available

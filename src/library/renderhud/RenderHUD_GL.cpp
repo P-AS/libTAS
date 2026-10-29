@@ -23,6 +23,7 @@
 #include "hook.h"
 #include "GlobalState.h"
 #include "sdl/sdlwindows.h"
+#include "rendering/openglloader.h"
 
 #include "../external/imgui/imgui.h"
 #include "../external/imgui/imgui_impl_opengl3.h"
@@ -62,10 +63,23 @@ void RenderHUD_GL::newFrame()
 
 void RenderHUD_GL::render()
 {
-    if (ImGui::GetCurrentContext()) {    
+    if (ImGui::GetCurrentContext()) {
         ImGui::Render();
         GlobalNative gn;
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());        
+
+        /* Draw on the window: games and wined3d may have one of their
+         * framebuffers bound when presenting */
+        LINK_GL_POINTER(GetIntegerv);
+        LINK_GL_POINTER(BindFramebuffer);
+        GLint draw_buffer = 0;
+        glProcs.GetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &draw_buffer);
+        if (draw_buffer)
+            glProcs.BindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+        if (draw_buffer)
+            glProcs.BindFramebuffer(GL_DRAW_FRAMEBUFFER, draw_buffer);
     }
 }
 

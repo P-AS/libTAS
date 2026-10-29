@@ -200,6 +200,29 @@ then presented by the game thread.
   `wmctrl -i -a` and move it away; `xwininfo -root -tree` shows the client
   window under a 1x1 window of another connection (`gdi_display`). Wine
   ignores Expose events itself, since we filter them (`00292664`).
+- **No OSD** (Sonic Generations through Proton):
+  - The OSD was drawn into the framebuffer that wined3d had bound when
+    presenting, not on the window. `RenderHUD_GL::render()` now binds
+    framebuffer 0 for drawing and restores the binding.
+  - Screen capture (used for the OSD layout, redraws while paused and video
+    encodes) picked the XShm backend before the GL one, because Wine flushes
+    the GDI surfaces of windows with `XShmPutImage`, and took its size
+    (1280x768) from such a flush. For Wine games drawing with OpenGL, the GL
+    backend is used.
+  - The window manager and Wine resize windows without going through our
+    hooks, so the size of the drawable is now read at each swap
+    (`glXQueryDrawable`, `eglQuerySurface`) and screen capture is set up
+    again with it at the next frame boundary (`ScreenCapture::setDrawnSize()`).
+    Resizing our GL objects in the swap hook instead made the game spin
+    forever with a black screen, at the frame where it recreates its GL
+    context (cause not found).
+  - The `XGetWindowAttributes` hook replaced the size of every window with
+    the size of screen capture. Wine queries the geometry of all its windows,
+    and draws into a child window of another size than its top-level window
+    (Sonic Generations draws 1600x900 into a 1600x1000 window), so the size
+    is no longer faked for Wine games.
+  - The GL screen capture setup left its texture bound, while games and
+    wined3d track their bindings; it is now restored.
 - Wine sets the title of SRB2's window to "FluidSynth...", cosmetic.
 - SRB2's default window is 2560x1415 (from its own config), larger than a small
   test display.
