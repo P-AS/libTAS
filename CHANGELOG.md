@@ -175,6 +175,10 @@
   which could not give the focus to a paused game
 * Wine: fix the OSD not showing for OpenGL games, and the OSD and screen
   capture using the size of another window
+* Fix BadRROutput X errors with a custom screen resolution, when games read
+  the properties or the primary output of the fake monitor
+* Proton: give fullscreen games the custom screen resolution instead of
+  scaling them to the screen
 
 ## [1.4.8] - 2026-05-14
 ### Added

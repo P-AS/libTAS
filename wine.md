@@ -478,6 +478,21 @@ the environment or the env overrides. Proton then starts the game from its
   `S:` drive of the Steam library in Sonic Generations' registry key) don't
   exist in a new prefix.
 
+- **Custom screen resolution** (windowed game): with `screen_width` set,
+  our XRandR hooks describe a fake monitor with output and CRTC id 1, which
+  don't exist on the server. Wine reads the EDID of outputs
+  (`XRRGetOutputProperty`), and the request failed with `BadRROutput`,
+  killing the game. `XRRGetOutputProperty` now reports no property for the
+  fake output, and `XRRGetOutputPrimary` returns it. Then, Sonic Generations
+  asks for a 1280x720 fullscreen mode, and Proton's fullscreen hack keeps
+  the real mode and scales the game to the size of the screen (1600x900 in
+  a 1600x1000 window), so the game window had the custom size but the
+  picture was cropped. With a custom screen resolution, the launcher sets
+  `WINE_DISABLE_FULLSCREEN_HACK=1`: Wine then switches the display mode
+  through XRandR, which we fake, and the game draws 1280x720 into a 1280x720
+  window. Without a custom resolution, fullscreen games still fill the
+  screen.
+
 ### Sonic Generations
 
 Tested with Proton 11.0 (`proton-11.0-2e`): the game reaches the title
@@ -661,9 +676,11 @@ the game config, not in the movie.
 - The display modes that Wine reports come from the real X display, and the
   "Screen resolution" setting of libTAS (`screen_width`/`screen_height`) does
   not change them: Wine collects them in its `explorer.exe` desktop process,
-  where libTAS is not initialized. Games that check their saved resolution
+  where libTAS is not initialized (d3d9 still lists 41 modes and the real
+  current mode under libTAS). Games that check their saved resolution
   (Sonic Generations) fail on a smaller or rotated display, and the modes are
-  not deterministic across machines.
+  not deterministic across machines. See [Proton](#proton) for what the
+  setting does there.
 - Proton launch (`dc47524b`) is only tested with Proton 11.0 and Sonic
   Generations. The seccomp SIGSYS forwarding of that commit is untested.
 - Loading a savestate under openbox once did nothing (1 run out of 4, not

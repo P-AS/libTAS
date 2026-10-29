@@ -190,6 +190,13 @@ void GameThread::set_env_variables(Context *context, int gameArch)
              * software driver when lavapipe is not installed */
             if (!isEnvSet("PROTON_USE_WINED3D"))
                 setenv("PROTON_USE_WINED3D", "1", 1);
+
+            /* Proton keeps the real display mode and scales fullscreen games
+             * to the size of the screen. With a custom screen resolution, let
+             * Wine switch the display mode instead, which we fake, so that
+             * the game window has that resolution. */
+            if (context->config.sc.screen_width && !isEnvSet("WINE_DISABLE_FULLSCREEN_HACK"))
+                setenv("WINE_DISABLE_FULLSCREEN_HACK", "1", 1);
         }
         else if (!distpath.empty()) {
             std::string winedllpath = (distpath / "lib64" / "wine").string();
