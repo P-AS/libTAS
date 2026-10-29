@@ -33,6 +33,8 @@
 #include <string>
 #include <stdint.h>
 
+union _XEvent;
+
 namespace libtas {
 /**
  * @class RenderHUD
@@ -101,6 +103,16 @@ class RenderHUD
          * user interaction.
          */
         static void userInputs();
+
+        /**
+         * @brief Queues an X event for Dear ImGui, from a thread that is not
+         * the main thread.
+         *
+         * Dear ImGui is not thread-safe, and some games (Wine) read X events
+         * from several threads. Queued events are given to Dear ImGui at the
+         * next newFrame() of the main thread.
+         */
+        static void queueXlibEvent(const union _XEvent& event);
 
         /**
          * @brief Returns whether HUD content should be rendered this frame.
