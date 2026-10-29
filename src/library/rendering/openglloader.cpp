@@ -60,6 +60,8 @@ void gl_load_procs(GLGetProcAddressProc proc)
     GET_GL_POINTER(XQueryDrawable)
     GET_GL_POINTER(XCreateContextAttribsARB)
     GET_GL_POINTER(XDestroyContext)
+    GET_GL_POINTER(XCreateWindow)
+    GET_GL_POINTER(XDestroyWindow)
 
     GET_GL_POINTER(GetString)
     GET_GL_POINTER(BlitFramebuffer)

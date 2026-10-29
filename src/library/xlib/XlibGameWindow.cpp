@@ -23,6 +23,8 @@
 #include "logging.h"
 #include "screencapture/ScreenCapture.h"
 #include "global.h"
+#include "GlobalState.h"
+#include "xdisplay.h"
 #include "../shared/sockethelpers.h"
 #include "../shared/messages.h"
 
@@ -38,8 +40,15 @@ std::list<Window> gameXWindows;
 /* Window coords */
 std::map<Window, std::pair<int, int>> gameXWindowCoords;
 
+/* Windows handled by our own code, or by processes where libtas is not
+ * initialized (such as the steam.exe of Proton, which starts the game) are not
+ * game windows, and the latter have no socket to send the window id to. */
+
 void XlibGameWindow::push(Window w)
 {
+    if (GlobalState::isNative())
+        return;
+
     /* Saving top-level window */
     if (gameXWindows.empty())
         LOG(LL_DEBUG, LCF_WINDOW, "   set game window to %d", w);
@@ -48,6 +57,9 @@ void XlibGameWindow::push(Window w)
 
 void XlibGameWindow::promote(Window w)
 {
+    if (GlobalState::isNative())
+        return;
+
     for (auto iter = gameXWindows.begin(); iter != gameXWindows.end(); iter++) {
         if (w == *iter) {
             gameXWindows.erase(iter);
@@ -56,6 +68,61 @@ void XlibGameWindow::promote(Window w)
             break;
         }
     }
+}
+
+static Display* anyGameDisplay()
+{
+    for (int d=0; d<GAMEDISPLAYNUM; d++)
+        if (x11::gameDisplays[d])
+            return x11::gameDisplays[d];
+    return nullptr;
+}
+
+void XlibGameWindow::setDrawn(Window w)
+{
+    if (!w || (w == get()))
+        return;
+
+    /* Wine creates its top-level windows as override-redirect children of
+     * another window and changes them later, so we may not have registered
+     * it. Wine also draws offscreen surfaces into a window under a 1x1
+     * override-redirect parent, which is not a game window. */
+    if (!contains(w)) {
+        Display* display = anyGameDisplay();
+        if (!display)
+            return;
+
+        GlobalNative gn;
+        XWindowAttributes attributes;
+        if (!XGetWindowAttributes(display, w, &attributes) || attributes.override_redirect)
+            return;
+
+        LOG(LL_DEBUG, LCF_WINDOW, "   add drawn window %d", w);
+        gameXWindows.push_back(w);
+    }
+    promote(w);
+}
+
+Window XlibGameWindow::topLevel(Window w)
+{
+    Display* display = anyGameDisplay();
+    if (!display)
+        return 0;
+
+    GlobalNative gn;
+    while (w) {
+        Window root, parent;
+        Window *children = nullptr;
+        unsigned int nchildren;
+        if (!XQueryTree(display, w, &root, &parent, &children, &nchildren))
+            return 0;
+        if (children)
+            XFree(children);
+        if (!parent || (parent == root))
+            break;
+        w = parent;
+    }
+    return w;
 }
 
 Window XlibGameWindow::get()
@@ -75,6 +142,9 @@ bool XlibGameWindow::contains(Window w)
 
 void XlibGameWindow::pop(Window w)
 {
+    if (GlobalState::isNative())
+        return;
+
     /* If current game window, switch to another one on the list */
     if (!gameXWindows.empty() && w == gameXWindows.front()) {
         ScreenCapture::fini();

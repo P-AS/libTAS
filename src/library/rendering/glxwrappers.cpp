@@ -39,6 +39,7 @@
 #include <GL/glext.h>
 
 #include <string.h>
+#include <map>
 
 #define RETURN_SYMBOL_DETAILED(FUNC_STR, NEW_FUNC) \
     if (!strcmp(reinterpret_cast<const char*>(symbol), FUNC_STR)) { \
@@ -128,6 +129,8 @@ static void* store_orig_and_return_my_symbol(const GLubyte* symbol, void* real_p
     RETURN_SYMBOL(glXQueryExtensionsString)
     RETURN_SYMBOL(glXCreateContextAttribsARB)
     RETURN_SYMBOL(glXDestroyContext)
+    RETURN_SYMBOL(glXCreateWindow)
+    RETURN_SYMBOL(glXDestroyWindow)
 
     /* Some games like Super Meat Boy defines the glDrawArrays function in the
      * executable, so even if we preload our glDrawArrays function, it will still
@@ -306,6 +309,49 @@ Bool glXMakeContextCurrent( Display *dpy, GLXDrawable draw, GLXDrawable read, GL
     return ret;
 }
 
+/* X11 window of each GLX window, and its top-level window */
+static std::map<GLXDrawable, std::pair<Window, Window>> drawableWindows;
+
+/* Returns the top-level window of the X11 window that the drawable draws to */
+static Window getDrawableTopLevelWindow(GLXDrawable drawable)
+{
+    auto it = drawableWindows.find(drawable);
+    if (it == drawableWindows.end())
+        return 0;
+
+    if (!it->second.second)
+        it->second.second = XlibGameWindow::topLevel(it->second.first);
+    return it->second.second;
+}
+
+GLXWindow glXCreateWindow(Display *dpy, GLXFBConfig config, Window win, const int *attrib_list)
+{
+    LINK_GL_POINTER(XCreateWindow);
+
+    GLXWindow window = glProcs.XCreateWindow(dpy, config, win, attrib_list);
+    if (GlobalState::isNative())
+        return window;
+
+    LOGTRACE(LCF_WINDOW | LCF_OGL, "%s call with window %d", __func__, win);
+    /* For other games, the window may be destroyed before we look for its
+     * top-level window, and a request on an invalid window would make Xlib
+     * exit the game. Wine sets its own X error handler. */
+    if (isWineGame() && window && win)
+        drawableWindows[window] = std::make_pair(win, static_cast<Window>(0));
+
+    return window;
+}
+
+void glXDestroyWindow(Display *dpy, GLXWindow window)
+{
+    LINK_GL_POINTER(XDestroyWindow);
+
+    if (!GlobalState::isNative())
+        drawableWindows.erase(window);
+
+    glProcs.XDestroyWindow(dpy, window);
+}
+
 void glXSwapBuffers( Display *dpy, XID drawable )
 {
     LINK_GL_POINTER(XSwapBuffers);
@@ -315,6 +361,9 @@ void glXSwapBuffers( Display *dpy, XID drawable )
 
     LOGTRACE_SIMPLE(LCF_WINDOW | LCF_OGL);
 
+    /* Games may map other windows after the one they draw to, so make sure
+     * that the window we draw to is the game window */
+    XlibGameWindow::setDrawn(getDrawableTopLevelWindow(drawable));
     /* Start the frame boundary and pass the function to draw */
     static RenderHUD_GL renderHUD;
     frameBoundary([&] () {

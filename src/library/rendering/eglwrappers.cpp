@@ -28,7 +28,6 @@
 #include "screencapture/ScreenCapture.h"
 #include "frame.h"
 #include "xlib/XlibGameWindow.h"
-#include "xlib/xdisplay.h"
 #include "GlobalState.h"
 #ifdef __linux__
 #include "wine/winehook.h"
@@ -228,36 +227,9 @@ static Window getSurfaceTopLevelWindow(EGLSurface surface)
     if (it == surfaceWindows.end())
         return 0;
 
-    if (it->second.second)
-        return it->second.second;
-
-    Display* display = nullptr;
-    for (int d=0; d<GAMEDISPLAYNUM; d++) {
-        if (x11::gameDisplays[d]) {
-            display = x11::gameDisplays[d];
-            break;
-        }
-    }
-    if (!display)
-        return 0;
-
-    GlobalNative gn;
-    Window w = it->second.first;
-    while (w) {
-        Window root, parent;
-        Window *children = nullptr;
-        unsigned int nchildren;
-        if (!XQueryTree(display, w, &root, &parent, &children, &nchildren))
-            return 0;
-        if (children)
-            XFree(children);
-        if (!parent || (parent == root))
-            break;
-        w = parent;
-    }
-
-    it->second.second = w;
-    return w;
+    if (!it->second.second)
+        it->second.second = XlibGameWindow::topLevel(it->second.first);
+    return it->second.second;
 }
 
 EGLSurface eglCreateWindowSurface(EGLDisplay dpy, EGLConfig config, EGLNativeWindowType win, const EGLint *attrib_list)
@@ -319,9 +291,7 @@ EGLBoolean eglSwapBuffers( EGLDisplay dpy, EGLSurface surface )
 
     /* Games may map other windows after the one they draw to, so make sure
      * that the window we draw to is the game window */
-    Window w = getSurfaceTopLevelWindow(surface);
-    if (w && (w != XlibGameWindow::get()))
-        XlibGameWindow::promote(w);
+    XlibGameWindow::setDrawn(getSurfaceTopLevelWindow(surface));
 
     /* Start the frame boundary and pass the function to draw */
     static RenderHUD_GL renderHUD;
