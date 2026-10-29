@@ -91,7 +91,7 @@ do { \
 }
 
 
-#ifdef __unix__
+#ifdef __linux__
 #define LINK_NAMESPACE(FUNC,LIB) link_function((void**)&orig::FUNC, #FUNC, "lib" LIB ".so")
 #define LINK_NAMESPACE_FULLNAME(FUNC,LIB) link_function((void**)&orig::FUNC, #FUNC, LIB)
 #define LINK_NAMESPACE_GLOBAL(FUNC) link_function((void**)&orig::FUNC, #FUNC, nullptr)

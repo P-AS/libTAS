@@ -39,7 +39,7 @@ namespace libtas {
 
 void Area::print(const char* prefix) const
 {
-#ifdef __unix__
+#ifdef __linux__
     LOG(LL_DEBUG, LCF_CHECKPOINT, "%s Region %c%c%c%c %p-%p (%s) with size %zu and flags %x",
     prefix,
     (prot&PROT_READ)?'r':'-', (prot&PROT_WRITE)?'w':'-', (prot&PROT_EXEC)?'x':'-', (flags&AREA_SHARED)?'s':'p',

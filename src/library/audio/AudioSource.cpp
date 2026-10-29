@@ -20,7 +20,7 @@
 #include "AudioSource.h"
 #include "AudioConverter.h"
 #include "AudioBuffer.h"
-#ifdef __unix__
+#ifdef __linux__
 #include "AudioConverterSwr.h"
 #elif defined(__APPLE__) && defined(__MACH__)
 #include "AudioConverterCoreAudio.h"
@@ -53,7 +53,7 @@ int AudioSource::ticksToSamples(struct timespec ticks, int frequency)
 
 AudioSource::AudioSource(void)
 {
-#ifdef __unix__
+#ifdef __linux__
     audio_converter = std::unique_ptr<AudioConverter>(new AudioConverterSwr());
 #elif defined(__APPLE__) && defined(__MACH__)
     audio_converter = std::unique_ptr<AudioConverter>(new AudioConverterCoreAudio());

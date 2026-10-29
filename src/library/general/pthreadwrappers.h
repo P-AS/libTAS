@@ -127,7 +127,7 @@ OVERRIDE int pthread_condattr_setclock(pthread_condattr_t *attr, clockid_t clock
 OVERRIDE int pthread_condattr_getclock(const pthread_condattr_t *attr, clockid_t *clock_id) __THROW;
 
 /* Set thread name visible in the kernel and its interfaces.  */
-#ifdef __unix__
+#ifdef __linux__
 OVERRIDE int pthread_setname_np (pthread_t target_thread, const char *name) __THROW;
 #elif defined(__APPLE__) && defined(__MACH__)
 OVERRIDE int pthread_setname_np (const char *name);

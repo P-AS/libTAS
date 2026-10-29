@@ -24,7 +24,7 @@
 
 #define GL_GLEXT_PROTOTYPES
 #define GLX_GLXEXT_PROTOTYPES
-#ifdef __unix__
+#ifdef __linux__
 #include <GL/gl.h>
 #include <GL/glext.h>
 #include <GL/glx.h>
@@ -42,7 +42,7 @@ namespace libtas {
 /* gl3w internal state */
 struct GLProcs {
 
-#ifdef __unix__
+#ifdef __linux__
     DEFINE_GL_POINTER(XMakeCurrent)
     DEFINE_GL_POINTER(XMakeContextCurrent)
     DEFINE_GL_POINTER(XSwapBuffers)
@@ -111,7 +111,7 @@ struct GLProcs {
     DEFINE_GL_POINTER(DeleteProgram)
     DEFINE_GL_POINTER(Viewport)
     DEFINE_GL_POINTER(Clear)
-#ifdef __unix__
+#ifdef __linux__
     DEFINE_GL_POINTER(Begin)
     DEFINE_GL_POINTER(End)
     DEFINE_GL_POINTER(Vertex2d)

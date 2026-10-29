@@ -21,7 +21,7 @@
 #include "SaveStateManager.h"
 #include "ThreadSync.h"
 #include "MemArea.h"
-#ifdef __unix__
+#ifdef __linux__
 #include "ProcSelfMaps.h"
 #elif defined(__APPLE__) && defined(__MACH__)
 #include "MachVmMaps.h"
@@ -169,7 +169,7 @@ pid_t ThreadManager::getThreadTid(pthread_t pthread_id)
 
 void ThreadManager::restoreTid()
 {
-#ifdef __unix__
+#ifdef __linux__
     current_thread->real_tid = syscall(SYS_gettid);
 #elif defined(__APPLE__) && defined(__MACH__)
     uint64_t tid;
@@ -244,7 +244,7 @@ void ThreadManager::initThreadFromChild(ThreadInfo* thread)
 
     thread->pthread_id = getThreadId();
     
-#ifdef __unix__
+#ifdef __linux__
     thread->real_tid = syscall(SYS_gettid);
 #elif defined(__APPLE__) && defined(__MACH__)
     uint64_t tid;
@@ -435,7 +435,7 @@ void ThreadManager::unlockList()
 
 void ThreadManager::updateStackInfo()
 {
-#ifdef __unix__
+#ifdef __linux__
     ProcSelfMaps memMapLayout;
 #elif defined(__APPLE__) && defined(__MACH__)
     MachVmMaps memMapLayout;

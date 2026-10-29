@@ -41,10 +41,6 @@
 #include "fileio/FileHandleList.h"
 #include "fileio/SaveFileList.h"
 #include "renderhud/MessageWindow.h"
-#ifdef __unix__
-#include "xcb/xcbconnection.h" // x11::gameConnections
-#include "xlib/xdisplay.h" // x11::gameDisplays
-#endif
 
 #include <sstream>
 #include <utility>
@@ -53,7 +49,7 @@
 #include <sys/mman.h>
 #include <sys/syscall.h> // syscall, SYS_gettid
 #include <sys/wait.h> // waitpid
-#ifdef __unix__
+#ifdef __linux__
 #include <xcb/xproto.h> // xcb_get_input_focus_reply, xcb_get_input_focus
 #include <X11/Xlib.h> // XLockDisplay
 #endif
@@ -62,6 +58,8 @@
 #include <linux/sched.h>
 #endif
 #include <unistd.h>
+#include <xcb/xproto.h> // xcb_get_input_focus_reply, xcb_get_input_focus
+#include <X11/Xlib.h> // XLockDisplay
 
 /* Define the clone_args struct if not defined */
 #ifndef CLONE_ARGS_SIZE_VER0
@@ -93,7 +91,6 @@ static bool* state_dirty;
 static bool has_clone3_set_tid = false;
 static bool can_set_last_pid = false;
 
-#ifdef __unix__
 static void lockGameDisplays()
 {
     for (int i=0; i<GAMEDISPLAYNUM; i++) {
@@ -336,7 +333,7 @@ int SaveStateManager::checkpoint(int slot)
     /* We save the alternate stack if the game did set one */
     AltStack::saveStack();
 
-#ifdef __unix__
+#ifdef __linux__
     /* Lock the display so we can empty events */
     lockGameDisplays();
 #endif
@@ -363,7 +360,7 @@ int SaveStateManager::checkpoint(int slot)
      *     _XReply () at /usr/lib/x86_64-linux-gnu/libX11.so.6
      *     XSync () at /usr/lib/x86_64-linux-gnu/libX11.so.6
      */
-#ifdef __unix__
+#ifdef __linux__
     syncGameDisplays();
 #endif
 
@@ -374,7 +371,7 @@ int SaveStateManager::checkpoint(int slot)
     /* Sending a suspend signal to all threads */
     suspendThreads();
 
-#ifdef __unix__
+#ifdef __linux__
     /* Do not carry Xlib locks across checkpoint/restore memory changes. */
     unlockGameDisplays();
 #endif
@@ -436,7 +433,7 @@ int SaveStateManager::checkpoint(int slot)
         createNewThreads();
     }
 
-#ifdef __unix__
+#ifdef __linux__
     /* After restore, we need to sync xcb connections to avoid potential deadlocks */
     if (restoreInProgress) {
         syncGameConnectionsAfterRestore();
@@ -488,7 +485,7 @@ int SaveStateManager::restore(int slot)
      * like in SaveStateManager::checkpoint() */
     restoreInProgress = false;
 
-#ifdef __unix__
+#ifdef __linux__
     /* Lock the display so we can empty events */
     lockGameDisplays();
 
@@ -501,7 +498,7 @@ int SaveStateManager::restore(int slot)
     
     suspendThreads();
 
-#ifdef __unix__
+#ifdef __linux__
     /* Release Xlib locks before loading the restored process image. */
     unlockGameDisplays();
 #endif
@@ -544,7 +541,7 @@ int SaveStateManager::restore(int slot)
     urandom_enable_handler();
 #endif
 
-#ifdef __unix__
+#ifdef __linux__
     /* Re-prime xcb state before other threads resume. */
     if (restoreInProgress) {
         syncGameConnectionsAfterRestore();

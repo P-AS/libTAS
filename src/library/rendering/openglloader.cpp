@@ -23,7 +23,7 @@
 
 #define GL_GLEXT_PROTOTYPES
 #define GLX_GLXEXT_PROTOTYPES
-#ifdef __unix__
+#ifdef __linux__
 #include <GL/gl.h>
 #include <GL/glext.h>
 #include <GL/glx.h>
@@ -49,7 +49,7 @@ void gl_load_procs(GLGetProcAddressProc proc)
         return;
     old_proc = proc;
 
-#ifdef __unix__
+#ifdef __linux__
     GET_GL_POINTER(XMakeCurrent)
     GET_GL_POINTER(XMakeContextCurrent)
     GET_GL_POINTER(XSwapBuffers)
@@ -116,7 +116,7 @@ void gl_load_procs(GLGetProcAddressProc proc)
     GET_GL_POINTER(DeleteProgram)
     GET_GL_POINTER(Viewport)
     GET_GL_POINTER(Clear)
-#ifdef __unix__
+#ifdef __linux__
     GET_GL_POINTER(Begin)
     GET_GL_POINTER(End)
     GET_GL_POINTER(Vertex2d)

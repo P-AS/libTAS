@@ -23,7 +23,7 @@
 #include "hook.h"
 #include "global.h"
 #include "GlobalState.h"
-#ifdef __unix__
+#ifdef __linux__
 #include "wine/winehook.h"
 #include "wine/wined3d.h"
 #include "wine/user32.h"
@@ -79,7 +79,7 @@ void add_lib(const char* library)
 DEFINE_ORIG_POINTER(dlopen)
 DEFINE_ORIG_POINTER(dlsym)
 
-#ifdef __unix__
+#ifdef __linux__
 /* Declare internal implementation-dependent dlsym function.
  * It is declared as weak, so we have a fallback if not present */
 extern "C" void *_dl_sym(void *, const char *, void *) __attribute__((weak));
@@ -88,7 +88,7 @@ extern "C" void *_dl_sym(void *, const char *, void *) __attribute__((weak));
 /* Find the address of dlopen and dlsym symbols */
 static void get_dlfct_symbols()
 {
-#ifdef __unix__
+#ifdef __linux__
     /* To access the real dl functions, we use the fact that dlsym
      * calls internally _dl_sym. */
     if (_dl_sym) {
@@ -188,7 +188,7 @@ __attribute__((noipa)) void *dlopen(const char *file, int mode) __THROW {
     } else
 #endif
     {
-#ifdef __unix__
+#ifdef __linux__
         if (file != nullptr && file[0] != '\0' && std::strchr(file, '/') == nullptr) {
             /* Path should be searched using search paths, so let's
              * manually check the paths in the correct order...
@@ -356,7 +356,7 @@ void *dlsym(void *handle, const char *name) __THROW {
     if (GlobalState::isNative()) {
         void* ret;
         if (safe) {
-#ifdef __unix__
+#ifdef __linux__
             if (_dl_sym)
                 ret = _dl_sym(handle, name, reinterpret_cast<void*>(dlsym));
             else

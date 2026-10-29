@@ -306,9 +306,9 @@ static void *pthread_native_start(void *arg)
 
     int ret = 0;
 
-#ifdef __unix__
+#ifdef __linux__
     NATIVECALL(clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, abstime, NULL));
-#elif defined(__APPLE__) && defined(__MACH__)
+#elif __APPLE__
     /* On macOS, use nanosleep instead */
     struct timespec ts;
     ts.tv_sec = abstime->tv_sec;
@@ -389,7 +389,7 @@ static std::map<pthread_cond_t*, clockid_t>& getCondClock() {
     TimeHolder real_time;
     SharedConfig::TimeCallType time_type = SharedConfig::TIMETYPE_UNTRACKED_REALTIME;
     
-#ifdef __unix__
+#ifdef __linux__
     /* Get clock_id of cond */
     clockid_t clock_id = CLOCK_REALTIME;
     const std::map<pthread_cond_t*, clockid_t>& condClocks = getCondClock();
@@ -401,7 +401,7 @@ static std::map<pthread_cond_t*, clockid_t>& getCondClock() {
     NATIVECALL(clock_gettime(clock_id, &real_time));
     time_type = DeterministicTimer::get().clockToTypeUntracked(clock_id);
 
-#elif defined(__APPLE__) && defined(__MACH__)
+#elif __APPLE__
     /* On MacOS, the reference time is based on gettimeofday(). */
     timeval tv;
     NATIVECALL(gettimeofday(&tv, nullptr));
@@ -470,7 +470,7 @@ static std::map<pthread_cond_t*, clockid_t>& getCondClock() {
 
     if (Global::shared_config.wait_timeout == SharedConfig::WAIT_FINITE) {
         /* Wait again for 0.1 sec, arbitrary */
-#ifdef __unix__
+#ifdef __linux__
         NATIVECALL(clock_gettime(clock_id, &real_time));
 #elif defined(__APPLE__) && defined(__MACH__)
         timeval tv;
@@ -599,7 +599,7 @@ int pthread_condattr_setclock(pthread_condattr_t *attr, clockid_t clock_id) __TH
     RETURN_NATIVE(pthread_condattr_setclock, (attr, clock_id), "libpthread.so");    
 }
 
-#ifdef __unix__
+#ifdef __linux__
 
 int pthread_setname_np (pthread_t target_thread, const char *name) __THROW
 {
@@ -644,7 +644,7 @@ int pthread_setname_np (const char *name)
     }
 
     if (strcmp(name, ".NET Finalizer") == 0) {
-#ifdef __unix__
+#ifdef __linux__
         GameHacks::setFinalizerThread(ThreadManager::getThreadTid(target_thread));
 #elif defined(__APPLE__) && defined(__MACH__)
         GameHacks::setFinalizerThread(ThreadManager::getThreadTid());
@@ -663,7 +663,7 @@ int pthread_setname_np (const char *name)
     }
 
     if (Global::shared_config.game_specific_timing & SharedConfig::GC_TIMING_ARMA_CWA) {
-#ifdef __unix__
+#ifdef __linux__
         if (strcmp(name, "G.Main") == 0) {
             ThreadManager::setMainThread(target_thread);
         }
@@ -674,7 +674,7 @@ int pthread_setname_np (const char *name)
 #endif
     }
 
-#ifdef __unix__
+#ifdef __linux__
     return orig::pthread_setname_np(target_thread, name);
 #elif defined(__APPLE__) && defined(__MACH__)
     return orig::pthread_setname_np(name);

@@ -25,7 +25,7 @@
 #include "lua/Callbacks.h"
 #include "KeyMapping.h"
 #include "ramsearch/MemScanner.h"
-#ifdef __unix__
+#ifdef __linux__
 #include "KeyMappingXcb.h"
 #elif defined(__APPLE__) && defined(__MACH__)
 #include "KeyMappingQuartz.h"
@@ -56,7 +56,7 @@
 #include <mach-o/dyld.h> // _NSGetExecutablePath
 #endif
 
-#ifdef __unix__
+#ifdef __linux__
 #include <xcb/xcb.h>
 #define explicit _explicit
 #include <xcb/xkb.h>
@@ -245,7 +245,7 @@ int main(int argc, char **argv)
         gameargsoverride += argv[i];
     }
 
-#ifdef __unix__
+#ifdef __linux__
     /* Open connection with the server */
     context.conn = xcb_connect(NULL,NULL);
     if (xcb_connection_has_error(context.conn))
@@ -322,7 +322,7 @@ int main(int argc, char **argv)
     }
     if (context.libtaspath.empty()) {
         std::filesystem::path binpath = std::filesystem::read_symlink("/proc/self/exe");
-#ifdef __unix__
+#ifdef __linux__
         context.libtaspath = binpath.parent_path() / "libtas.so";
 #elif defined(__APPLE__) && defined(__MACH__)
         context.libtaspath = binpath.parent_path() / "libtas.dylib";
@@ -337,7 +337,7 @@ int main(int argc, char **argv)
         }
     }
     if (context.libtas32path.empty()) {
-#ifdef __unix__
+#ifdef __linux__
         context.libtas32path = context.libtaspath.parent_path() / "libtas32.so";
 #elif defined(__APPLE__) && defined(__MACH__)
         context.libtas32path = context.libtaspath.parent_path() / "libtas32.dylib";
@@ -407,7 +407,7 @@ int main(int argc, char **argv)
 
     /* Store current content of LD_PRELOAD/DYLD_INSERT_LIBRARIES */
 
-#ifdef __unix__
+#ifdef __linux__
     char* old_preload = getenv("LD_PRELOAD");
 #elif defined(__APPLE__) && defined(__MACH__)
     char* old_preload = getenv("DYLD_INSERT_LIBRARIES");
@@ -471,7 +471,7 @@ int main(int argc, char **argv)
         }
     }
 
-#ifdef __unix__
+#ifdef __linux__
     xcb_disconnect(context.conn);
 #endif
     return 0;

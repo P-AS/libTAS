@@ -50,7 +50,7 @@
 #include "renderhud/RenderHUD.h"
 #include "renderhud/UnityDebug.h"
 
-#ifdef __unix__
+#ifdef __linux__
 #include "xlib/xevents.h"
 #include "xlib/xdisplay.h" // x11::gameDisplays
 #include "xcb/xcbevents.h"
@@ -171,7 +171,7 @@ void frameBoundary(std::function<void()> draw, RenderHUD& hud)
         ScreenCapture::init();
 
     /* Wait for events to be processed by the game */
-#ifdef __unix__
+#ifdef __linux__
     if (Global::shared_config.async_events & SharedConfig::ASYNC_XEVENTS_END)
         xlibEventQueueList.waitForEmpty();
 #endif
@@ -213,7 +213,7 @@ void frameBoundary(std::function<void()> draw, RenderHUD& hud)
             pushNativeSDLEvents();
         }
 
-#ifdef __unix__
+#ifdef __linux__
         if (!(Global::shared_config.debug_state & SharedConfig::DEBUG_NATIVE_EVENTS)) {
             pushNativeXlibEvents();
             pushNativeXcbEvents();
@@ -448,7 +448,7 @@ void frameBoundary(std::function<void()> draw, RenderHUD& hud)
         pushNativeSDLEvents();
     }
 
-#ifdef __unix__
+#ifdef __linux__
     if (!(Global::shared_config.debug_state & SharedConfig::DEBUG_NATIVE_EVENTS)) {
         pushNativeXlibEvents();
         pushNativeXcbEvents();
@@ -460,7 +460,7 @@ void frameBoundary(std::function<void()> draw, RenderHUD& hud)
      * because they used the new game inputs. */
     Inputs::update();
 
-#ifdef __unix__
+#ifdef __linux__
     /* Reset the empty state of each xevent queue, for async event handling */
     if (Global::shared_config.async_events & (SharedConfig::ASYNC_XEVENTS_BEG | SharedConfig::ASYNC_XEVENTS_END)) {
         xlibEventQueueList.lock();
@@ -479,7 +479,7 @@ void frameBoundary(std::function<void()> draw, RenderHUD& hud)
         generateInputEvents();
     }
 
-#ifdef __unix__
+#ifdef __linux__
     if (Global::shared_config.async_events & (SharedConfig::ASYNC_XEVENTS_BEG | SharedConfig::ASYNC_XEVENTS_END)) {
         xlibEventQueueList.unlock();
     }
@@ -493,7 +493,7 @@ void frameBoundary(std::function<void()> draw, RenderHUD& hud)
     syncControllerEvents();
 
     /* Wait for events to be processed by the game */
-#ifdef __unix__
+#ifdef __linux__
     if (Global::shared_config.async_events & SharedConfig::ASYNC_XEVENTS_BEG)
         xlibEventQueueList.waitForEmpty();
 #endif
@@ -536,7 +536,7 @@ static void pushQuitEvent(void)
         sdlEventQueue.insert(&ev);
     }
 
-#ifdef __unix__
+#ifdef __linux__
     if (XlibGameWindow::get() == 0)
         return;
 
@@ -619,7 +619,7 @@ static void receive_messages(std::function<void()> draw, RenderHUD& hud)
         int message = receiveMessageNonBlocking();
         if (message < 0) {
             perfTimer.switchTimer(PerfTimer::WaitTimer);
-#ifdef __unix__
+#ifdef __linux__
             /* We need to answer to ping messages from the window manager,
              * otherwise the game will appear as unresponsive. */
             pushNativeXlibEvents();

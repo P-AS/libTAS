@@ -46,6 +46,7 @@
 
 ### Changed
 
+* Use `#ifdef __linux__` instead of `#ifdef __unix__` for platform-specific code
 * Include all SDL2 needed definitions
 * Try to support games calling vk functions directly
 * When both SDL2 and SDL3 functions exist with same name
