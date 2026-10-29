@@ -64,9 +64,11 @@ void ScreenCapture_GL::initScreenSurface()
     glProcs.GetError();
 
     /* Generate FBO and RBO */
-    GLint draw_buffer, read_buffer;
+    GLint draw_buffer, read_buffer, texture;
     GL_CALL(GetIntegerv, (GL_DRAW_FRAMEBUFFER_BINDING, &draw_buffer));
     GL_CALL(GetIntegerv, (GL_READ_FRAMEBUFFER_BINDING, &read_buffer));
+    /* Games and wined3d keep track of their bindings, so restore them */
+    GL_CALL(GetIntegerv, (GL_TEXTURE_BINDING_2D, &texture));
 
     GLint default_fb_color_encoding = 0;
     GL_CALL(BindFramebuffer, (GL_FRAMEBUFFER, 0));
@@ -92,6 +94,7 @@ void ScreenCapture_GL::initScreenSurface()
     GL_CALL(TexParameteri, (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
     GL_CALL(FramebufferTexture2D, (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, screenTex, 0));
 
+    GL_CALL(BindTexture, (GL_TEXTURE_2D, texture));
     GL_CALL(BindFramebuffer, (GL_DRAW_FRAMEBUFFER, draw_buffer));
     GL_CALL(BindFramebuffer, (GL_READ_FRAMEBUFFER, read_buffer));
 

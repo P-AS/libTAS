@@ -28,6 +28,9 @@
 #include "ScreenCapture_XShm.h"
 #include "logging.h"
 #include "global.h"
+#ifdef __linux__
+#include "wine/winehook.h"
+#endif
 
 namespace libtas {
 
@@ -43,6 +46,14 @@ int ScreenCapture::init()
     }
     
     if (!impl) {
+#ifdef __linux__
+        /* Wine flushes the GDI surfaces of windows with XShmPutImage, while
+         * games drawing with OpenGL show their frames with GL swaps */
+        if (isWineGame() && (Global::game_info.video & GameInfo::OPENGL)) {
+            impl = new ScreenCapture_GL();
+        }
+        else
+#endif
         if (Global::game_info.video & GameInfo::VDPAU) {
             impl = new ScreenCapture_VDPAU();
         }
@@ -105,6 +116,20 @@ void ScreenCapture::resize(int w, int h)
     if (impl) {
         impl->resize(w, h);
     }
+}
+
+void ScreenCapture::setDrawnSize(int w, int h)
+{
+    int cur_w = 0, cur_h = 0;
+    getDimensions(cur_w, cur_h);
+    if ((cur_w == w) && (cur_h == h))
+        return;
+
+    /* Set up again in the frame boundary, like after a new context, instead
+     * of resizing our GL objects in the middle of the swap of the game */
+    fini();
+    width = w;
+    height = h;
 }
 
 bool ScreenCapture::isInited()

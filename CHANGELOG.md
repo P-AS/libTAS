@@ -173,6 +173,8 @@
   listing audio devices
 * Wine: fix keyboard inputs and hotkeys not working with a window manager,
   which could not give the focus to a paused game
+* Wine: fix the OSD not showing for OpenGL games, and the OSD and screen
+  capture using the size of another window
 
 ## [1.4.8] - 2026-05-14
 ### Added

@@ -364,6 +364,17 @@ void glXSwapBuffers( Display *dpy, XID drawable )
     /* Games may map other windows after the one they draw to, so make sure
      * that the window we draw to is the game window */
     XlibGameWindow::setDrawn(getDrawableTopLevelWindow(drawable));
+
+    /* Wine windows are resized by the window manager or by Wine without
+     * going through our hooks, so follow the size of the drawable */
+    if (drawableWindows.count(drawable)) {
+        LINK_GL_POINTER(XQueryDrawable);
+        unsigned int width = 0, height = 0;
+        glProcs.XQueryDrawable(dpy, drawable, GLX_WIDTH, &width);
+        glProcs.XQueryDrawable(dpy, drawable, GLX_HEIGHT, &height);
+        if (width && height)
+            ScreenCapture::setDrawnSize(width, height);
+    }
     /* Start the frame boundary and pass the function to draw */
     static RenderHUD_GL renderHUD;
     frameBoundary([&] () {

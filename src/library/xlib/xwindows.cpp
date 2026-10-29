@@ -513,8 +513,15 @@ Status XGetWindowAttributes(Display* display, Window w, XWindowAttributes* windo
     if (ret == 0)
         return ret;
 
-    /* Update the window size */
-    ScreenCapture::getDimensions(window_attributes_return->width, window_attributes_return->height);
+    /* Update the size of the game window. Other windows keep their own size.
+     * Wine queries the geometry of its windows to keep track of them, and
+     * draws into child windows of other sizes, so leave its windows alone. */
+    bool fake_size = (w == XlibGameWindow::get());
+#ifdef __linux__
+    fake_size = fake_size && !isWineGame();
+#endif
+    if (fake_size)
+        ScreenCapture::getDimensions(window_attributes_return->width, window_attributes_return->height);
 
     /* Change the window position to stored coords */
     XlibGameWindow::getCoords(w, &window_attributes_return->x, &window_attributes_return->y);
