@@ -50,6 +50,11 @@ int AutoDetect::arch(Context *context)
 
 void AutoDetect::game_libraries(Context *context)
 {
+    /* Only native executables have libraries for ldd to check */
+    int gameArch = extractBinaryType(context->gameexecutable) & BT_TYPEMASK;
+    if (gameArch != BT_ELF32 && gameArch != BT_ELF64)
+        return;
+
     /* Build a command to parse the first missing library from the game executable,
      * look at game directory and sub-directories for it */
     std::ostringstream oss_ml;
@@ -87,11 +92,7 @@ void AutoDetect::game_libraries(Context *context)
     /* Try to download common missing libraries */
     if (context->config.allow_downloads != 1)
         return;
-    
-    int gameArch = extractBinaryType(context->gameexecutable) & BT_TYPEMASK;
-    if (gameArch != BT_ELF32 && gameArch != BT_ELF64)
-        return;
-    
+
     missing_lib = queryCmd(oss_ml.str());
 
     while (! missing_lib.empty()) {
@@ -255,6 +256,10 @@ int AutoDetect::game_engine(Context *context)
 
     /* Check for Godot:
      * Look at symbols inside the game executable and count `godot_*` */
+    int gameType = extractBinaryType(context->gameexecutable) & BT_TYPEMASK;
+    if (gameType != BT_ELF32 && gameType != BT_ELF64)
+        return ENGINE_UNKNOWN;
+
     std::ostringstream oss;
     oss << "readelf -WsC " << context->gameexecutable << " | grep godot_ | wc -l ";
 

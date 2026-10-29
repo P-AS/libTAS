@@ -131,6 +131,7 @@
   implement, as games crashed when calling it
 * Fix a crash when passing a non-numeric value such as true to the --set
   command-line option
+* Don't run ldd and readelf on Windows executables, which printed errors
 
 ## [1.4.8] - 2026-05-14
 ### Added
