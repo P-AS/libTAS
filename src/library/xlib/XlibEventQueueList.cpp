@@ -55,17 +55,27 @@ std::shared_ptr<XlibEventQueue> XlibEventQueueList::getQueue(Display* display)
 
 int XlibEventQueueList::insert(Display* display, XEvent* event)
 {
+    int ret = 0;
     for (auto queue: eventQueueList)
-        if (queue->display == display)
-            return queue->insert(event);
+        if (queue->display == display) {
+            ret = queue->insert(event);
+            break;
+        }
 
-    return 0;
+    /* Queued events own a copy of the data */
+    if (event->type == GenericEvent)
+        freeXIEventData(&event->xcookie);
+    return ret;
 }
 
 void XlibEventQueueList::insert(XEvent* event)
 {
     for (auto queue: eventQueueList)
         queue->insert(event);
+
+    /* Queued events own a copy of the data */
+    if (event->type == GenericEvent)
+        freeXIEventData(&event->xcookie);
 }
 
 bool XlibEventQueueList::waitForEmpty()
