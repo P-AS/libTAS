@@ -598,6 +598,10 @@ the game config, not in the movie.
   compositor gave a restarted `:42` a portrait 1270x1403 screen, and Wine
   reports the modes of that screen, so a game whose config stores 1280x720
   refused to start. Check `xdpyinfo | grep dimensions` before blaming libTAS.
+  Under niri, make the window floating and size it:
+  `niri msg action toggle-window-floating --id <id>` and
+  `set-window-width`/`set-window-height` (ids from `niri msg --json windows`,
+  title `Xwayland on :42`). `test-sonic-generations.sh` does it (`TEST_SIZE`).
 - Killing a Wine game with SIGKILL can leave its windows on the test display
   (same names as the next run's), so `xdotool search --name` may pick a dead
   one. Restart the test Xwayland, or check that only one window matches.

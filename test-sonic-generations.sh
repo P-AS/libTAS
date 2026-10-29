@@ -17,6 +17,8 @@
 #   PROTON_DIR  [~/Steam/steamapps/common/Proton 11.0]
 #   TEST_DIR    [~/.local/share/libTAS-test/sonic-generations]
 #   TEST_DISPLAY [:42]
+#   TEST_SIZE   [1600x1000] size of the test display. Under niri, its window
+#               is made floating at that size; otherwise resize it yourself.
 #
 # See the Proton section of wine.md for why each setup step is needed.
 
@@ -27,6 +29,7 @@ GAME_DIR="${GAME_DIR:-$HOME/.local/share/Steam/steamapps/common/Sonic Generation
 PROTON_DIR="${PROTON_DIR:-$HOME/Steam/steamapps/common/Proton 11.0}"
 TEST_DIR="${TEST_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/libTAS-test/sonic-generations}"
 TEST_DISPLAY="${TEST_DISPLAY:-:42}"
+TEST_SIZE="${TEST_SIZE:-1600x1000}"
 STEAM_CLIENT_DIR="${STEAM_CLIENT_DIR:-$HOME/.local/share/Steam}"
 APPID=71340
 
@@ -78,11 +81,28 @@ if [ $RESTART_X -eq 1 ]; then
 fi
 if ! DISPLAY=$TEST_DISPLAY xdpyinfo >/dev/null 2>&1; then
     echo "Starting rootful Xwayland on $TEST_DISPLAY"
-    Xwayland $TEST_DISPLAY -geometry 1600x1200 -decorate -noreset >"$TEST_DIR/xwayland.log" 2>&1 &
+    Xwayland $TEST_DISPLAY -geometry $TEST_SIZE -decorate -noreset >"$TEST_DIR/xwayland.log" 2>&1 &
     for _ in $(seq 1 20); do
         DISPLAY=$TEST_DISPLAY xdpyinfo >/dev/null 2>&1 && break
         sleep 0.5
     done
+fi
+
+# A tiling compositor sizes the rootful Xwayland window, and so the X screen,
+# to whatever fits its layout. Under niri, make it floating at TEST_SIZE.
+if [ -n "$NIRI_SOCKET" ] && command -v niri >/dev/null; then
+    niri_id=$(niri msg --json windows | python3 -c '
+import json, sys
+for w in json.load(sys.stdin):
+    if w.get("title") == "Xwayland on " + sys.argv[1]:
+        print(w["id"], "floating" if w.get("is_floating") else "tiled")
+        break' "$TEST_DISPLAY")
+    if [ -n "$niri_id" ]; then
+        [ "${niri_id#* }" = "tiled" ] && niri msg action toggle-window-floating --id "${niri_id% *}"
+        niri msg action set-window-width --id "${niri_id% *}" "${TEST_SIZE%x*}"
+        niri msg action set-window-height --id "${niri_id% *}" "${TEST_SIZE#*x}"
+        sleep 0.5
+    fi
 fi
 
 # Wine reports the modes of the X screen, and the game refuses to start if
