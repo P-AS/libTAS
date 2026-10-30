@@ -516,6 +516,14 @@ the environment or the env overrides. Proton then starts the game from its
   through XRandR, which we fake, and the game draws 1280x720 into a 1280x720
   window. Without a custom resolution, fullscreen games still fill the
   screen.
+- That was not enough on a display larger than the custom resolution: Wine
+  takes the monitor size and display modes from its `explorer.exe` process,
+  where libtas is loaded but not initialized, so the game still drew a
+  1600-wide picture into the 1280x720 window (cropped, centered at x=800).
+  The launcher now sets `LIBTAS_WINE_SCREEN_SIZE=WxH`, `wine_should_init()`
+  copies it into `screen_width`/`screen_height` in the processes that are not
+  the game, and our `dlsym()` hook returns our `XRR*` functions there even in
+  native mode, as winex11 loads libXrandr with `dlopen()` (`c61bd8c8`).
 
 ### Sonic Generations
 
@@ -597,6 +605,42 @@ game directory, all from the game itself rather than libTAS:
   tid: Operation not permitted`, then `wine client error:19c: write: Bad file
   descriptor`, then Xlib exited on `BadIDChoice` (`X_CreateGC`). That
   `BadIDChoice` was the separate Xlib id bug above.
+- **Asynchronous reads across a load** (Sonic Generations, Proton 11.0):
+  loading a state in a stage sometimes ended on `free(): double free detected
+  in tcache 2`, then every thread aborting (`terminate called recursively`,
+  `ThreadManager.cpp:377 ... threadExit ... Bad file descriptor`). About one
+  load in three or four. Wine's SIGABRT handler turns the abort into a Windows
+  exception and ends the thread, so neither gdb on the core nor coredumpctl
+  shows the culprit; a temporary SIGABRT handler in our `sigaction()` wrapper
+  that prints `backtrace()` before chaining to Wine's showed `free()` called
+  from `NtReadFile` (`ntdll.so`), on a Wine thread. Likely cause: an
+  overlapped read was in flight when the state was saved. `NtReadFile`
+  allocates its async request and frees it on completion, and wineserver and
+  the other Wine processes (`winedevice.exe`, which serves HID devices) are
+  not part of the savestate, so a read completed after the save is completed
+  and freed again after the load. The reader is probably the xinput HID
+  thread (`wine_xinput_hid`), which polls controllers with overlapped
+  `ReadFile` on devices of `winebus.sys` in `winedevice.exe`. Testing
+  `WINEDLLOVERRIDES=winebus.sys=d` (no HID devices, so no such reads);
+  libtas does not give controller input to Windows games yet, so nothing is
+  lost.
+- **Suspend signal in 32-bit code** (WoW64): Wine runs the 32-bit code of the
+  game with `%fs` loaded with a selector for its 32-bit TEB. Our suspend
+  signal (`SIGXFSZ`) landing there made `stopThisThread()` crash on its first
+  TLS access (`GlobalNative` → `__tls_get_addr`, SIGSEGV, "Got wrong message
+  after state loading"), randomly, as only a thread caught in 32-bit code
+  crashed. The handler is now `suspendSignalHandler()`, which, like Wine's
+  `init_handler`, puts the `%fs` base back on the glibc thread block (found
+  by tid in the thread list, as TLS and `pthread_self()` read `%fs`) when it
+  differs, and reloads the selector before returning. It compares the base,
+  not the selector: the 64-bit code of Wine keeps the 32-bit selector with
+  the base already on the thread block, and reloading the selector there
+  broke stack canaries (`*** stack smashing detected ***` after a save). The
+  wrapper has no stack protector, as the canary is read through `%fs`
+  (`0ed49871`).
+  With this and `winebus.sys=d`, 115 saves and 62 loads in a stage of Sonic
+  Generations without a crash (before: about one load in three or four).
+  Not tested yet: the same without `winebus.sys=d`.
 
 ## Timing compatibility with Hourglass
 
@@ -692,6 +736,30 @@ the game config, not in the movie.
   `i686-w64-mingw32-gcc ... -ld3d9` program calling `GetAdapterIdentifier` and
   `EnumAdapterModes` and run it under the same conditions as the game.
 
+### Tracing waits and threads
+
+- `WINEDEBUG=+server` (Proton keeps an existing `WINEDEBUG`) logs every
+  wineserver request with the calling Windows thread id: thread creation
+  (`new_thread`, `init_thread` gives the unix tid to match gdb threads),
+  `suspend_thread`/`resume_thread`, `create_file`, `close_handle`,
+  `terminate_thread` with the exit code. Writes to regular files and ntsync
+  waits don't go through wineserver. The trace is large (hundreds of MB per
+  minute), filter it with `grep -a -v` on noisy pairs.
+- Sonic Generations has two threads suspending and resuming each other about
+  120 times per second for its whole life; a thread found in `wait_suspend`
+  is usually one of them, not a hang.
+- A game frozen in `XFilterEvent()`/`_XLockDisplay()`: print
+  `dpy->lock->locking_thread` in gdb (libX11 has debug info through
+  debuginfod) and look for that pthread in `thread apply all bt`. This found
+  the OSD event queue deadlock with `wine_dinput_wor`, which calls `XFlush()`
+  with the display locked (`4332d336`).
+- winedbg crashes when attaching to a game under libtas.
+- `-n` turns fast-forward on; add `-s fastforward=false` to keep the real
+  speed (`e7c21d5f`).
+- The virtual Steam client of Windows games logs to `<datadir>/steam_api.log`
+  with the log level of the game (Steam category) (`2f840ced`): use level
+  Debug or Trace to see which Steam calls a game makes.
+
 ## Open problems
 
 - The Windows steam_api.dll replacement has no access to libtas inputs, so
@@ -703,14 +771,24 @@ the game config, not in the movie.
 - After loading a state, the stdout of the test program was not output anymore
   (probably related to pipe recreation).
 - Clickteam games may also enumerate other directories for their own files.
-- The display modes that Wine reports come from the real X display, and the
-  "Screen resolution" setting of libTAS (`screen_width`/`screen_height`) does
-  not change them: Wine collects them in its `explorer.exe` desktop process,
-  where libTAS is not initialized (d3d9 still lists 41 modes and the real
-  current mode under libTAS). Games that check their saved resolution
-  (Sonic Generations) fail on a smaller or rotated display, and the modes are
-  not deterministic across machines. See [Proton](#proton) for what the
-  setting does there.
+- Without a custom screen resolution, the display modes that Wine reports come
+  from the real X display (Wine collects them in its `explorer.exe` process).
+  Games that check their saved resolution (Sonic Generations) fail on a
+  smaller or rotated display, and the modes are not deterministic across
+  machines. With a custom resolution, `explorer.exe` gets the fake XRandR
+  screen too (see [Proton](#proton)), not yet verified for other games.
+- Other Wine processes (wineserver, `winedevice.exe`, `explorer.exe`) are not
+  savestated, so any game state they hold (pending async I/O, HID devices of
+  `winebus.sys`, xinput polling) can disagree with the game after a load.
+  See "Asynchronous reads across a load" in Savestates.
+- Sonic Generations stays on "Saving..." after the title screen with the
+  virtual Steam client (it gets past it with the Steam client of Proton,
+  `virtual_steam=false`). The save thread writes `sonic.sav` and exits, and
+  the main thread sees it exit; the game makes no Steam call during the save
+  that the replacement steam_api.dll logs (it calls `SteamUser()` and
+  `SteamUserStats()` every frame from the start). Sending `UserStatsStored_t`
+  from `StoreStats()` and the real app id in callbacks did not help (the game
+  never calls `StoreStats()` there).
 - Proton launch (`dc47524b`) is only tested with Proton 11.0 and Sonic
   Generations. The seccomp SIGSYS forwarding of that commit is untested.
 - Loading a savestate under openbox once did nothing (1 run out of 4, not
