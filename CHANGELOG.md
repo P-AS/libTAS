@@ -55,6 +55,8 @@
   option
 * Add a fastforward setting to the --set command-line option, so that
   non-interactive runs can start without fast-forward
+* Wine: write the logs of the virtual Steam client to steam_api.log in the
+  data directory, with the log level of the game
 
 ### Changed
 
