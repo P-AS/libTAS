@@ -378,8 +378,17 @@ void *dlsym(void *handle, const char *name) __THROW {
 #endif
         }
         else {
-            ret = orig::dlsym(handle, name);            
+            ret = orig::dlsym(handle, name);
         }
+
+        /* The other processes of Wine (explorer.exe) get the custom screen
+         * resolution, and Wine loads XRandR with dlopen() */
+        if (!safe && Global::shared_config.screen_width && (strncmp(name, "XRR", 3) == 0)) {
+            void* addr = find_sym(name);
+            if (addr)
+                ret = addr;
+        }
+
         recurs_count--;
         return ret;
     }

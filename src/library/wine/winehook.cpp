@@ -21,9 +21,11 @@
 
 #include "logging.h"
 #include "GlobalState.h"
+#include "global.h"
 #include "general/dlhook.h"
 
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <strings.h>
@@ -108,6 +110,18 @@ bool wine_should_init(int argc, char** argv)
 
     if (strcasecmp(exe, game) != 0) {
         LOG(LL_INFO, LCF_WINE, "Skipping libtas init in process %s %s", argc > 0 ? argv[0] : "", exe);
+
+        /* Wine reads the display modes and the monitor size in its
+         * explorer.exe desktop process, so our XRandR hooks must describe
+         * the custom screen resolution there too, or the game is given the
+         * size of the real screen */
+        const char* screen_size;
+        NATIVECALL(screen_size = getenv("LIBTAS_WINE_SCREEN_SIZE"));
+        int width, height;
+        if (screen_size && (sscanf(screen_size, "%dx%d", &width, &height) == 2)) {
+            Global::shared_config.screen_width = width;
+            Global::shared_config.screen_height = height;
+        }
 
         /* Don't propagate our library to the children of the other Windows
          * programs that wine starts. Keep it in the processes that lead to
