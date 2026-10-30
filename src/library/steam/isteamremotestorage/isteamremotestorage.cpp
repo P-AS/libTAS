@@ -153,7 +153,7 @@ struct ISteamRemoteStorage *SteamAPI_SteamRemoteStorage_v016(void)
 
 bool STEAM_CALL ISteamRemoteStorage_FileWrite( void* iface, const char *pchFile, const void *pvData, int cubData )
 {
-    LOGTRACE_SIMPLE(LCF_STEAM);
+    LOGTRACE(LCF_STEAM, "%s call with file %s and size %d", __func__, pchFile ? pchFile : "(null)", cubData);
 
     if (!pchFile || cubData < 0)
         return false;
@@ -166,18 +166,23 @@ bool STEAM_CALL ISteamRemoteStorage_FileWrite( void* iface, const char *pchFile,
     /* We don't use the native `open` function, so that we handle the
      * "prevent writing to disk" feature without extra work. */
     int fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_BINARY, 0666);
-    if (fd < 0)
+    if (fd < 0) {
+        LOG(LL_WARN, LCF_STEAM, "FileWrite: could not open %s", path.c_str());
         return false;
+    }
 
     if (Utils::writeAll(fd, pvData, cubData) != cubData) {
+        LOG(LL_WARN, LCF_STEAM, "FileWrite: could not write %s", path.c_str());
         close(fd);
         return false;
     }
 
     if (close(fd) < 0) {
+        LOG(LL_WARN, LCF_STEAM, "FileWrite: could not close %s", path.c_str());
         return false;
     }
 
+    LOGTRACE(LCF_STEAM, "%s returns true", __func__);
     return true;
 }
 
@@ -424,16 +429,20 @@ bool STEAM_CALL ISteamRemoteStorage_GetQuota( void* iface, uint64_t *pnTotalByte
     return true;
 }
 
+/* Report the cloud as enabled, as it is for most Steam users, so that games
+ * save through ISteamRemoteStorage, which stores the files in our remote
+ * storage folder. Sonic Generations stays on its saving screen if it is told
+ * that the cloud is disabled, and writes its save to the game folder instead. */
 bool STEAM_CALL ISteamRemoteStorage_IsCloudEnabledForAccount(void* iface)
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
-    return false;
+    return true;
 }
 
 bool STEAM_CALL ISteamRemoteStorage_IsCloudEnabledForApp(void* iface)
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
-    return false;
+    return true;
 }
 
 void STEAM_CALL ISteamRemoteStorage_SetCloudEnabledForApp( void* iface, bool bEnabled )
