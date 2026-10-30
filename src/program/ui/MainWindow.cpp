@@ -449,7 +449,11 @@ MainWindow::MainWindow(Context* c) : QMainWindow(), context(c)
     /* We must start the game in non-interactive mode */
     if (!context->interactive) {
         slotPause(false);
-        slotFastForward(true);
+        /* Fast-forward by default, unless set on the command line */
+        if (context->config.cli_overridden_keys.count("fastforward"))
+            slotFastForward(context->config.sc.fastforward);
+        else
+            slotFastForward(true);
         slotLaunch(false);
     }
     
