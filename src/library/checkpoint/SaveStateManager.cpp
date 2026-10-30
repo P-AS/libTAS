@@ -53,6 +53,9 @@
 #include <algorithm> // std::find
 #include <sys/mman.h>
 #include <sys/syscall.h> // syscall, SYS_gettid
+#ifdef __x86_64__
+#include <asm/prctl.h> // ARCH_SET_FS
+#endif
 #include <sys/wait.h> // waitpid
 #ifdef __unix__
 #include <xcb/xproto.h> // xcb_get_input_focus_reply, xcb_get_input_focus
@@ -242,6 +245,47 @@ void SaveStateManager::initCheckpointThread()
     }
 }
 
+/* Wine runs the 32-bit code of WoW64 games with %fs loaded with a segment
+ * selector for its 32-bit TEB, instead of having its base on the thread block
+ * of glibc. A suspend signal received there made the first access to thread
+ * local storage crash (__tls_get_addr in stopThisThread()). Like the signal
+ * handlers of Wine, point %fs back to the thread block, found by tid as TLS
+ * and pthread_self() cannot be used yet, and load the selector back before
+ * returning to the game. No stack protector here, as its canary is read
+ * through %fs. */
+__attribute__((no_stack_protector))
+static void suspendSignalHandler(int signum)
+{
+#if defined(__x86_64__) && defined(__linux__)
+    /* The 64-bit code of Wine can keep the 32-bit selector in %fs while its
+     * base is already on the thread block, so compare the base itself */
+    uint16_t fs_sel;
+    asm volatile ("movw %%fs,%0" : "=r" (fs_sel));
+    bool fs_changed = false;
+    if (fs_sel) {
+        unsigned long fs_base = 0;
+        syscall(SYS_arch_prctl, ARCH_GET_FS, &fs_base);
+        pid_t tid = syscall(SYS_gettid);
+        for (ThreadInfo* thread = ThreadManager::getThreadList(); thread; thread = thread->next) {
+            if (thread->real_tid == tid) {
+                if (fs_base != static_cast<unsigned long>(thread->pthread_id)) {
+                    syscall(SYS_arch_prctl, ARCH_SET_FS, thread->pthread_id);
+                    fs_changed = true;
+                }
+                break;
+            }
+        }
+    }
+#endif
+
+    SaveStateManager::stopThisThread(signum);
+
+#if defined(__x86_64__) && defined(__linux__)
+    if (fs_changed)
+        asm volatile ("movw %0,%%fs" : : "r" (fs_sel));
+#endif
+}
+
 void SaveStateManager::initThreadFromChild(ThreadInfo* thread)
 {
     sigset_t mask;
@@ -252,7 +296,7 @@ void SaveStateManager::initThreadFromChild(ThreadInfo* thread)
     struct sigaction sigsuspend;
     sigfillset(&sigsuspend.sa_mask);
     sigsuspend.sa_flags = SA_RESTART;
-    sigsuspend.sa_handler = stopThisThread;
+    sigsuspend.sa_handler = suspendSignalHandler;
     {
         GlobalNative gn;
         MYASSERT(sigaction(sig_suspend_threads, &sigsuspend, nullptr) == 0)

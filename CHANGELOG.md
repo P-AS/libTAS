@@ -190,6 +190,8 @@
   the display lock (Sonic Generations with the Steam client of Proton)
 * Wine: apply the custom screen resolution to the display size seen by Wine,
   so that fullscreen games are no longer drawn for the real screen and cropped
+* Wine: fix random crashes when saving or loading a state while a thread of a
+  32-bit game runs its own code (WoW64)
 
 ## [1.4.8] - 2026-05-14
 ### Added
