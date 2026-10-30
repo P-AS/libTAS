@@ -101,14 +101,18 @@ void RenderHUD::newFrame()
     ScreenCapture::getDimensions(w, h);
     GlobalNative gn;
 
-    /* Events read by other threads */
+    /* Events read by other threads. Take them out of the queue before giving
+     * them to ImGui, which locks the display (XFilterEvent()): another thread
+     * can hold the display lock while queueing an event (Wine calls XFlush()
+     * with the display locked), so holding the queue mutex here deadlocks. */
+    std::vector<XEvent> events;
     {
         std::lock_guard<std::mutex> lock(queuedXlibEventsMutex);
-        for (XEvent& event : queuedXlibEvents)
-            if (ImGui_ImplXlib_ProcessEvent(&event))
-                userInputs();
-        queuedXlibEvents.clear();
+        events.swap(queuedXlibEvents);
     }
+    for (XEvent& event : events)
+        if (ImGui_ImplXlib_ProcessEvent(&event))
+            userInputs();
 
     ImGui_ImplXlib_NewFrame(XlibGameWindow::get(), w, h);
     ImGui::NewFrame();

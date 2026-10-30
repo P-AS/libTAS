@@ -186,6 +186,8 @@
   connections, such as Wine games while dragging the mouse
 * Give X events to the OSD only from the main thread, as games may read them
   from other threads
+* Fix a freeze when another thread queues X events for the OSD while holding
+  the display lock (Sonic Generations with the Steam client of Proton)
 
 ## [1.4.8] - 2026-05-14
 ### Added
