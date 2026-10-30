@@ -203,7 +203,7 @@ env -u WAYLAND_DISPLAY QT_QPA_PLATFORM=xcb DISPLAY=:42 \
     WINEDLLOVERRIDES="d3dcompiler_47=n,b;winebus.sys=d" \
     /path/to/libTAS/build/src/program/libTAS \
     -s use_proton=true -s "proton_path=$PROTON" -s opengl_soft=true \
-    -s virtual_steam=false \
+    -s game_specific_sync=64 \
     SonicGenerations.exe
 ```
 
@@ -215,9 +215,15 @@ can be added before `SonicGenerations.exe`.
   savestate can crash the game, because a controller read in progress when the
   state was saved gets completed twice. libTAS does not give controller inputs
   to Windows games yet, so nothing is lost.
-- `virtual_steam=false` uses the Steam client of Proton, so Steam must be
-  running. With the virtual Steam client of libTAS, the game stays on its
-  first "Saving..." screen after the title screen.
+- Keep the virtual Steam client of libTAS (the default setting). The Steam
+  client of Proton (`-s virtual_steam=false`) talks to the real Steam process
+  in real time, so two runs of the same movie play differently, and a movie
+  recorded with it does not stay in sync. Movies must be recorded with the
+  virtual Steam client.
+- `game_specific_sync=64` is the "Idle Threads Sync" option, in the
+  game-specific settings of libTAS. It makes the loadings of the game play the
+  same way on every run. Record your movies with it enabled too: a movie
+  recorded without it does not stay in sync with it, and the other way around.
 
 The game starts paused before its first frame, so its window stays black until
 you press Pause.
@@ -250,5 +256,7 @@ On the game window:
 * Under software rendering the game runs at about 25 frames per second in real
   time.
 * Only Proton 11.0 has been tested.
-* The game has been tested up to its title screen and in its menus. Stage
-  loading and time tracking are not verified yet.
+* The first stage plays the same way on repeated runs of a movie (same game
+  timer and position at frame 1500 in 6 of 6 runs), but a rare divergence in
+  the first 30 frames remains (about 1 run in 10 to 20), and about 0.1% of the
+  pixels of a frame differ between runs. Later stages have not been checked.

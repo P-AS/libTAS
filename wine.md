@@ -555,6 +555,56 @@ game directory, all from the game itself rather than libTAS:
   the game directory (DirectInput scancodes, Return is Start).
 - With software rendering it runs at about 25 frames per second in real time.
 
+## Determinism of Windows games
+
+What it took to make runs of the same movie play the same way in Sonic
+Generations (Proton 11.0), found by tracing the main thread (`logging_level`
+Trace with only the Wine, wait, sleep and time-set categories, then compare the
+lines of the main thread between runs, ignoring addresses, thread ids, the
+`sleep for` real-time duration and `processXlibEvents with N events`).
+
+- **Use the virtual Steam client.** With the real one (`virtual_steam=false`),
+  `Steam_BGetCallback` of `steamclient.so` (called by `SteamAPI_RunCallbacks`)
+  talks to the real Steam process and does `nanosleep(1 ms)` in real time, and
+  nearly every pair of runs differed by frame 11-36. A movie recorded with the
+  real Steam client does not play the same with the virtual one (loadings take
+  a different number of frames) and is not reproducible with the real one.
+- **Steam Cloud must be reported as enabled** in the virtual Steam client,
+  otherwise the game stays on its first "Saving..." screen (after the title
+  screen). With the cloud disabled, the game writes `sonic.sav` to its
+  folder, then waits forever (the save thread exits normally, and the game
+  does not call the Steam API during the wait); the real client reports the
+  cloud as enabled, and the game saves with `FileWrite("sonic.sav")` and
+  never writes the file itself (`ISteamRemoteStorage`, no `sonic.sav` in the
+  wineserver trace). `IsCloudEnabledForAccount/ForApp` now return true.
+- **Idle Threads sync** (`game_specific_sync` bit `0x40`, "Idle Threads Sync"
+  in the game-specific settings): loading threads poll with `Sleep()`, and
+  the main thread polls them with `Sleep()` and QPC loops. Before this, each
+  run did a different amount of work in the background between two frames.
+  The `Sleep()` of the other threads (`NtDelayExecution`) only ends when the
+  game time has advanced by the duration, and the main thread waits for the
+  other threads to be idle before its `Sleep()`/`Sleep(0)` and its frame
+  boundaries. "Idle" is decided from `/proc/self/task/<tid>/wchan` (ntsync,
+  futex, sleep, select...); a thread that is still busy after 100 ms is
+  logged at warning level (thread id, name and wait channel) and no longer
+  waited for. A sleeping thread is released if the main thread is blocked on
+  a wait outside a frame boundary, to avoid a deadlock. Without this option,
+  even with the virtual Steam client, 2 runs out of 5 differed in the first 60
+  frames.
+- Tried and not the cause: audio (`audio_disabled=true` did not change the
+  divergence), and the number of X events (the count in `processXlibEvents`
+  varies but the rest of the trace stays identical).
+- The count of non-draw frames of the first 260 frames varies between
+  configurations (127 to 130 here) and is not meaningful by itself; compare
+  the list of frames instead. A Lua script that logs `movie.currentFrame()`
+  when `movie.isDraw() == 0`, and pauses at a fixed frame with
+  `runtime.playPause()` to compare screenshots, is enough to check that runs
+  stay in sync.
+- Games with several threads can reach a frame boundary from different
+  threads: the first stage of Sonic Generations draws from the main thread
+  most of the time, and from another thread at a few frames (for example 233
+  and 553 of the test movie), without changing the sequence of frames.
+
 ## Savestates
 
 - Wine reserves tens of GB of address space, which made savestates take 15 s.
@@ -781,14 +831,11 @@ the game config, not in the movie.
   savestated, so any game state they hold (pending async I/O, HID devices of
   `winebus.sys`, xinput polling) can disagree with the game after a load.
   See "Asynchronous reads across a load" in Savestates.
-- Sonic Generations stays on "Saving..." after the title screen with the
-  virtual Steam client (it gets past it with the Steam client of Proton,
-  `virtual_steam=false`). The save thread writes `sonic.sav` and exits, and
-  the main thread sees it exit; the game makes no Steam call during the save
-  that the replacement steam_api.dll logs (it calls `SteamUser()` and
-  `SteamUserStats()` every frame from the start). Sending `UserStatsStored_t`
-  from `StoreStats()` and the real app id in callbacks did not help (the game
-  never calls `StoreStats()` there).
+- Idle Threads sync is only checked on Sonic Generations, with the virtual
+  Steam client: a rare fork remains in the first ~30 frames (about 1 run in
+  10-20, at the boundary between two frames in the loading of the title).
+  Runs of the first stage match in game time and position at frame 1500
+  (6 of 6), but not pixel for pixel (about 0.1% of the pixels differ).
 - Proton launch (`dc47524b`) is only tested with Proton 11.0 and Sonic
   Generations. The seccomp SIGSYS forwarding of that commit is untested.
 - Loading a savestate under openbox once did nothing (1 run out of 4, not
