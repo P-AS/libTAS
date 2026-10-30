@@ -188,6 +188,8 @@
   from other threads
 * Fix a freeze when another thread queues X events for the OSD while holding
   the display lock (Sonic Generations with the Steam client of Proton)
+* Wine: apply the custom screen resolution to the display size seen by Wine,
+  so that fullscreen games are no longer drawn for the real screen and cropped
 
 ## [1.4.8] - 2026-05-14
 ### Added

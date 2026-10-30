@@ -218,6 +218,17 @@ void GameThread::set_env_variables(Context *context, int gameArch)
             setenv("WINEPREFIX", wineprefix.c_str(), 1);
         }
 
+        /* Wine takes the display modes and the monitor size from its
+         * explorer.exe process, where libtas is not initialized, so give it
+         * the custom screen resolution there */
+        if (context->config.sc.screen_width) {
+            std::string screen_size = std::to_string(context->config.sc.screen_width) + "x" + std::to_string(context->config.sc.screen_height);
+            setenv("LIBTAS_WINE_SCREEN_SIZE", screen_size.c_str(), 1);
+        }
+        else {
+            unsetenv("LIBTAS_WINE_SCREEN_SIZE");
+        }
+
         /* We need to delay libtas hooking for wine process, whose first
          * image execs another one. The game started by the steam.exe of
          * Proton has a single image. */
