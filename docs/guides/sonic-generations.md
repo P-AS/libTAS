@@ -172,7 +172,27 @@ mkdir -p "$SAVEDIR"
 head -n 2 "$TEST/game/DefaultInput.cfg" > "$SAVEDIR/PlayerInput.cfg"
 ```
 
-## 5. Start libTAS
+## 5. Optional: the Direct3D 11 mod
+
+The GenerationsD3D11 mod (Direct3D 11 renderer) goes in the `mods` folder of
+the game directory:
+
+```
+mkdir -p "$TEST/game/mods"
+cp -rp GenerationsD3D11 "$TEST/game/mods/"
+```
+
+Set `DisplayMode` in `mods/GenerationsD3D11/GenerationsD3D11.ini`: `0` is
+borderless, `1` borderless fullscreen, `2` windowed.
+
+The mod ships its own `D3DCompiler_47.dll`. Wine needs the override
+`d3dcompiler_47=n,b` to load it instead of its built-in one, which is why the
+launch command below sets `WINEDLLOVERRIDES`. This is the only override the
+mod's files need on their own. Its `d3d9.dll`, `d3d11.dll` and `dxgi.dll`
+imports are Wine's built-in DLLs, and `ShaderTranslator.dll` imports
+`mscoree.dll` (.NET), which Proton may not provide, so this is not verified.
+
+## 6. Start libTAS
 
 From the libTAS source directory, start libTAS with your own configuration, on
 the game display, with Proton:
@@ -180,14 +200,24 @@ the game display, with Proton:
 ```
 cd "$TEST/game"
 env -u WAYLAND_DISPLAY QT_QPA_PLATFORM=xcb DISPLAY=:42 \
+    WINEDLLOVERRIDES="d3dcompiler_47=n,b;winebus.sys=d" \
     /path/to/libTAS/build/src/program/libTAS \
     -s use_proton=true -s "proton_path=$PROTON" -s opengl_soft=true \
+    -s virtual_steam=false \
     SonicGenerations.exe
 ```
 
 `-s` settings are not saved to your libTAS configuration. `opengl_soft` must
 stay on, as it matches the adapter of `GraphicsConfig.cfg`. Other libTAS options
 can be added before `SonicGenerations.exe`.
+
+- `winebus.sys=d` disables Wine's controller support. Without it, loading a
+  savestate can crash the game, because a controller read in progress when the
+  state was saved gets completed twice. libTAS does not give controller inputs
+  to Windows games yet, so nothing is lost.
+- `virtual_steam=false` uses the Steam client of Proton, so Steam must be
+  running. With the virtual Steam client of libTAS, the game stays on its
+  first "Saving..." screen after the title screen.
 
 The game starts paused before its first frame, so its window stays black until
 you press Pause.
