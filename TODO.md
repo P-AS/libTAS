@@ -22,3 +22,9 @@ Ideas and planned work for this fork of libTAS.
 ## Testing
 
 - [ ] End-to-end tests (see upstream PR #733 for current progress)
+
+## Debugging
+
+- [x] Log the Windows steam_api.dll to a file (`<datadir>/steam_api.log`,
+  following the log level of the game), as GUI games have no stderr under
+  Wine

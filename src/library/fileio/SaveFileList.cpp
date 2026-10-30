@@ -116,6 +116,11 @@ bool isSaveFile(const char *file)
     if (!file)
         return false;
 
+    /* Log file of our steam_api.dll for Windows games */
+    const char* steamlog = getenv("LIBTAS_STEAM_LOG_UNIX_FILE");
+    if (steamlog && (strcmp(file, steamlog) == 0))
+        return false;
+
     /* Check if file is a dev file */
     GlobalNative gn;
     struct stat filestat;

@@ -57,12 +57,20 @@ void steamdll_log(LogLevel ll, const char* file, int line, const char* fmt, ...)
     if (ll > log_level)
         return;
 
-    fprintf(stderr, "[libTAS steam_api] %s: ", LL_NAMES[ll]);
+    /* GUI programs have no stderr under Wine, so libtas gives us a file */
+    static FILE* out = [] {
+        const char* path = getenv("LIBTAS_STEAM_LOG_FILE");
+        FILE* f = path ? fopen(path, "a") : nullptr;
+        return f ? f : stderr;
+    }();
+
+    fprintf(out, "[libTAS steam_api] %s: ", LL_NAMES[ll]);
     va_list args;
     va_start(args, fmt);
-    vfprintf(stderr, fmt, args);
+    vfprintf(out, fmt, args);
     va_end(args);
-    fprintf(stderr, "\n");
+    fprintf(out, "\n");
+    fflush(out);
 }
 
 ssize_t Utils::writeAll(int fd, const void *buf, size_t count)

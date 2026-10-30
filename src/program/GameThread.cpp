@@ -22,7 +22,9 @@
 #include "utils.h"
 #include "Context.h"
 #include "../shared/SharedConfig.h"
+#include "../shared/lcf.h"
 
+#include <algorithm> // std::replace
 #include <string>
 #include <sstream>
 #include <iostream>
@@ -270,6 +272,21 @@ void GameThread::set_env_variables(Context *context, int gameArch)
             remotestorage /= context->gamename;
             setenv("LIBTAS_STEAM_USER_DATA_PATH", context->config.steamuserdir.c_str(), 1);
             setenv("LIBTAS_STEAM_REMOTE_STORAGE", remotestorage.c_str(), 1);
+
+            /* Its logs follow the log level of the game, and go to a file
+             * as Windows GUI programs have no stderr. The unix path tells
+             * libtas not to keep that file in memory as a savefile. */
+            const SharedConfig& sc = context->config.sc;
+            unsigned int steam_level = LL_WARN;
+            if ((sc.logging_include_flags & LCF_STEAM) && !(sc.logging_exclude_flags & LCF_STEAM))
+                steam_level = sc.logging_level;
+            setenv("LIBTAS_STEAM_LOG_LEVEL", std::to_string(steam_level).c_str(), 1);
+
+            std::filesystem::path steamlog = context->config.datadir / "steam_api.log";
+            std::string winpath = "Z:" + steamlog.string();
+            std::replace(winpath.begin(), winpath.end(), '/', '\\');
+            setenv("LIBTAS_STEAM_LOG_FILE", winpath.c_str(), 1);
+            setenv("LIBTAS_STEAM_LOG_UNIX_FILE", steamlog.c_str(), 1);
         }
     }
     else {
