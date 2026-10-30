@@ -1,5 +1,20 @@
 # Agent instructions
 
+## macOS Development
+
+Before working on **anything macOS-related**, read `macos.md` first. It
+documents known issues, design decisions, debugging findings, and open
+problems accumulated during macOS port work (especially the dlopen/dlsym
+hook implementation). It prevents re-solving already-resolved problems
+and documents pitfalls unique to macOS (dyld behavior, Mach-O formats,
+ARM64 alignment, etc.).
+
+When you fix a Wine problem, make a design choice, find a limitation, or
+learn something worth knowing (including debugging techniques), add it to
+`macos.md` in the matching section. Include the commit hash when the fix
+lands. Keep the "Open problems" section current: add what you could not
+solve and remove what you fixed.
+
 ## Changelog
 
 Every change you make must be recorded in `CHANGELOG.md`, in the same commit

@@ -1,178 +1,307 @@
-# macOS dlopen/dlsym Hook Implementation — Investigation & Work Log
+# macOS Support — Design Decisions, Known Issues & Workarounds
 
-## Objective
-Get Sonic Robo Blast 2 (SRB2 v2.2.15) running through libTAS on macOS using `DYLD_INSERT_LIBRARIES` by fixing symbol resolution for dlopen hooks.
+> **Read this file before any macOS-related work.** It documents problems
+> found, how they were fixed, design choices, debugging findings, and
+> what is still open. Update it whenever you learn something new.
 
 ## Environment
+
 - macOS 27.2 (26B123), Apple Silicon (arm64e)
-- SRB2: native arm64, SDL2, uses dlopen/dlsym — crashes during init
-- All changes uncommitted
+- Target: SRB2 v2.2.15 (native arm64, SDL2, uses dlopen/dlsym)
+- Injection: `DYLD_INSERT_LIBRARIES`
+- Build: CMake with native macOS support (`805cc6fb`)
 
-## Key Decisions & Findings
+---
 
-### dlopen_from vs dlsym
-- **dlopen_from**: Weak function from dyld that bypasses inserted library scope — works for dlopen
-- **RTLD_DEFAULT does NOT bypass** the hooked library on macOS
-- **No equivalent `_dl_sym` on macOS** — cannot get original `dlsym` from within hook
-- **dlopen_from(RTLD_NOLOAD) crashes** with SIGILL during early dyld init — cannot use during init
-- **dlopen_from crashes with SIGILL** when called during symbol resolution — needs fallback to mmap-based parsing
+## Architecture & Design Decisions
 
-### getenv Wrapper
-- `getenv` wrapper uses `_NSGetEnviron()` directly, no `link_function`
-- On macOS, `getenv()` calls `link_function` which calls `dlsym` which calls `find_sym` — infinite recursion
-- `_NSGetEnviron()` accessed via `#include <crt_externs.h>`
+### Hook Activation Guard — `hooks_enabled` (thread_local)
 
-### Symbol Resolution Architecture
-- `find_sym` uses `getenv_direct_call()` to avoid recursion (from dlreal.cpp)
-- `find_sym` has recursion guard: `finding_sym` thread-local pointer
-- `g_resolve_depth` thread-local recursion guard prevents `open` → `resolve_native_symbol` → `find_symbol_in_file` → `open` loop
-- `hooks_enabled` thread-local flag controls when hooks activate (true after constructor 250)
-- Constructor priorities: 150 = `collect_headers_before_init`, 250 = enable hooks + `libtas::init`
+Hooks must not activate during early libTAS init, before libc is fully
+initialized. Hooks activate only after `hooks_enabled` is set to true
+in `enable_hooks()` at constructor priority 250. Priority 150 runs
+`collect_headers_before_init`.
 
-### Raw Syscalls
-- `open` wrapper with init fallback uses raw syscalls to bypass hooked open
-- `syscall` function is NOT hooked (it's in libsystem_kernel.dylib)
-- `SYS_open=5`, `SYS_fstat64=339`, `SYS_close=6` on macOS arm64
-- Raw syscalls used in `find_symbol_in_file` to open library files from disk
+```
+priority 150: collect_headers_before_init
+priority 250: enable_hooks() → hooks_enabled = true
+```
 
-### native_strcmp
-- Used in symbol resolution to avoid hooked `strcmp`
-- Only compares ASCII strings byte-by-byte
-- Critical for Mach-O symbol table iteration without recursion
+**Commit: 78f50111**
 
-## Mach-O Symbol Resolution Details
+### `dlopen_from` — Bypassing Inserted Library Scope
 
-### parse_in_memory — Runtime Header Parsing
-Parses Mach-O headers at runtime addresses (from `_dyld_get_image_header()`):
-- Load commands start at `hdr + sizeof(struct mach_header_64)` = 32 bytes offset
-- Uses `memcpy` for all field reads on ARM64 to avoid SIGBUS from unaligned access
-- Symbol addresses computed as `section.addr + n_value` where section.addr is already virtual address
-- `struct nlist_64` fields accessed directly via `memcpy`
+`dlopen_from` is a **weak function from dyld** that bypasses the scope
+of inserted libraries. It works for dlopen on macOS where `dlsym`
+resolution is more complicated.
 
-### find_symbol_in_file — mmap'd File Parsing
-Parses Mach-O files from disk using mmap'd memory:
+- **Does work**: `dlopen_from(path, mode)` for normal dlopen
+- **Does NOT work**: `dlopen_from(RTLD_DEFAULT, ...)` — undefined
+- **Crashes**: `dlopen_from(RTLD_NOLOAD)` with SIGILL during early dyld init
+- **Crashes**: `dlopen_from` called during symbol resolution (SIGILL)
 
-1. **Fat binary handling**: All `fat_arch` fields are BIG-ENDIAN in the file
-   - `cputype`, `cpusubtype`, `align`, `offset`, `size` all need `OSSwapBigToHostInt32()`
-   - Verified with Python: x86_64 at offset 0x4000, arm64 at 0x20000
+`RTLD_DEFAULT` does **not** bypass the hooked library on macOS — it
+still resolves through the injected libTAS library.
 
-2. **Section parsing**: section.addr in mmap'd file is NOT the same as runtime vmaddr
-   - mmap'd `__text` section.addr = 0x870 (file-relative, NOT vmaddr)
-   - Runtime `__text` section.addr = 0x180586958 (actual vmaddr)
-   - The mmap'd file offset and section.addr are FILE OFFSETS, not virtual addresses
+**No equivalent `_dl_sym` exists on macOS** — cannot get the original
+`dlsym` from within a hook. Must use a different strategy.
 
-3. **Address formula problem**: Cannot convert mmap'd section.addr to runtime addresses
-   - Tested: `slide + mmap_sa + nv` → WRONG (0x1d46ac38 vs actual 0x19d9f8764)
-   - Tested: `slide + runtime_section.addr + nv` → WRONG (0x19d9f0d20 vs actual 0x19d9f8764)
-   - Tested: `runtime_hdr + nv` → WRONG (0x19d9f03c8 vs actual 0x19d9f8764)
-   - The mmap'd file doesn't contain enough information to compute runtime addresses
+**Commit: 78f50111**
 
-### _pthread_self Verification
-Tested with `/usr/lib/system/libsystem_pthread.dylib`:
-- Actual dlsym result: 0x19d9f8764
-- nm reports: `_pthread_self = 0x23c8` (N_SECT entry, sect=1)
-- Also found: `_pthread_self.cold.1 = 0xab68` (cold variant, must skip)
-- `_pthread_self_is_exiting_np = 0x7cac`
-- File: contains x86_64, arm64, arm64e, arm64e.x1 slices (via `lipo -info`)
+### getenv Bypass — `getenv_direct_call()`
 
-### dyld Runtime Info
-- `_dyld_get_image_header()` returns valid runtime pointer (hdr=0x19d9ee000)
-- dyld slide = 0x1d468000
-- `__TEXT` vmaddr = 0x180586000 (from runtime header)
-- `__text` section.addr = 0x180586958 (from runtime header)
-- `hdr - slide = 0x180586000` = matches `__TEXT` vmaddr
+On macOS, `getenv()` is hooked and calls `link_function` → `dlsym` →
+`find_sym`, causing infinite recursion.
 
-### Fat Binary Field Sizes
-`struct fat_arch` on arm64 macOS is 20 bytes:
-- cputype: uint32_t (BE)
-- cpusubtype: uint32_t (BE)
-- offset: uint32_t (BE)
-- size: uint32_t (BE)
-- align: uint32_t (BE)
+**Fix**: Use `_NSGetEnviron()` directly from `crt_externs.h` to access
+the environment pointer without going through the hooked `getenv`.
+This is implemented in `dlreal.cpp` as `getenv_direct_call()`.
 
-## Files Modified
+```cpp
+#include <crt_externs.h>
+// _NSGetEnviron() returns environ* directly
+```
 
-### src/library/general/dlhook.cpp (core changes)
-- Added `native_strcmp()` and `native_strstarts()` — avoid hooked strcmp
-- Added `parse_in_memory()` — parse Mach-O headers at runtime addresses
-- Added `find_symbol_in_file()` — mmap file, parse fat binary, find symbols
-- Added `resolve_path_symbol()` — try multiple system library paths
-- Added `resolve_native_symbol()` — file-based symbol resolution for native calls
-- Added `resolve_libsymbol()` — dlopen_from(RTLD_NOLOAD) + fallback for game libraries
-- Added `getenv_direct_call()` usage in find_sym
-- Added `g_resolve_depth` recursion guard (thread_local)
-- Added `hooks_enabled` flag (thread_local, set true at constructor 250)
-- Modified `get_dlfct_symbols()`: macOS now sets orig::dlopen = nullptr, orig::dlsym = nullptr
-- Modified `dlopen()`: uses `dlopen_from` weak symbol on macOS
-- Modified `dlsym()`: uses `find_sym()` path on macOS for native mode
-- Modified `find_sym()`: uses `getenv_direct_call()`, handles macOS path
+The wrapper iterates environment variables manually.
+
+**Commit: 78f50111**
+
+### Recursion Guards — `finding_sym` + `g_resolve_depth`
+
+Two layered guards prevent infinite recursion in symbol resolution:
+
+1. **`finding_sym`** (thread_local pointer): Set in `find_sym()` before
+   attempting resolution. Checked at the top of `find_sym()` — if
+   non-null, returns immediately to break `dlsym` → `find_sym` loops.
+
+2. **`g_resolve_depth`** (thread_local int): Prevents `open` →
+   `resolve_native_symbol` → `find_symbol_in_file` → `open` loops.
+   File-based symbol resolution calls `open()` to read library files
+   from disk.
+
+**Commit: 78f50111**
+
+### `native_strcmp` — Avoiding Hooked strcmp
+
+Symbol resolution iterates Mach-O symbol tables byte-by-byte. A hooked
+`strcmp` would cause recursion. `native_strcmp()` compares ASCII
+strings byte-by-byte using raw memory reads — no function call
+abstraction, no libc dependency.
+
+Only compares ASCII strings (Mach-O symbol names are always ASCII).
+
+**Commit: 78f50111**
+
+### Raw Syscalls for File I/O
+
+`open` is hooked. Raw syscalls bypass the hook to open library files
+for symbol table parsing:
+
+| Syscall    | Number (macOS arm64) |
+|------------|---------------------|
+| `SYS_open` | 5                   |
+| `SYS_fstat64` | 339              |
+| `SYS_close` | 6                  |
+
+The `syscall` function itself is NOT hooked — it lives in
+`libsystem_kernel.dylib`.
+
+**Commit: 78f50111**
+
+### Mach-O Runtime Parsing — `memcpy` for Unaligned Access
+
+On ARM64, unaligned memory accesses cause SIGBUS. All Mach-O field
+reads must use `memcpy` into a local variable before use, even for
+naturally-aligned fields. This applies to both runtime header parsing
+(`parse_in_memory`) and file parsing (`find_symbol_in_file`).
+
+**Commit: 78f50111**
+
+### Fat Binary — Big-Endian Field Ordering
+
+Universal binaries (fat Mach-O) store `fat_arch` fields in **big-endian**
+byte order in the file, regardless of the host CPU's endianness. All
+fields need `OSSwapBigToHostInt32()`:
+
+- `cputype`, `cpusubtype`, `align`, `offset`, `size` — all uint32_t BE
+- `struct fat_arch` is 20 bytes on arm64
+
+Verified with Python analysis and C tests against known fat binaries.
+
+**Commit: 78f50111**
+
+### Symbol Name — Leading Underscore Convention
+
+Mach-O string tables prefix all C symbol names with an underscore.
+Lookup must try `_`-prefixed variants:
+
+```
+pthread_self  →  _pthread_self  (in libsystem_pthread.dylib)
+```
+
+`resolve_path_symbol()` tries both variants automatically.
+
+**Commit: 78f50111**
+
+---
+
+## Resolved Problems
+
+### _NSGetExecutablePath Crash on macOS
+`/proc/self/exe` does not exist on macOS. Crash during init when
+libTAS tried to read the executable path.
+
+**Fix**: Use `_NSGetExecutablePath()` (macOS API) instead of
+`readlink("/proc/self/exe", ...)`.
+
+**Commit: 61f96ab6**
+
+### `#ifdef __unix__` → `#ifdef __linux__`
+Several files used `__unix__` which is true on macOS, causing
+compilation errors or runtime issues. All Linux-specific code must be
+wrapped in `__linux__`.
+
+**Fix**: Replaced `__unix__` with `__linux__` in 12 files. Wrapped
+X11/XCB functions in `SaveStateManager.cpp`.
+
+**Commits: c9640e24, 0f0ba0b9**
+
+### build.sh — AppImage Step on macOS
+The AppImage build step failed on macOS (no `appimagetool`).
+
+**Fix**: Skip AppImage step on non-Linux.
+
+**Commit: b8b2f861**
+
+### Infinite Recursion in find_sym
+`find_sym()` called `getenv()` which was hooked, triggering
+`dlsym` → `find_sym` → infinite loop.
+
+**Fix**: `getenv_direct_call()` using `_NSGetEnviron()` bypasses the
+wrapper entirely.
+
+**Commit: 78f50111**
+
+### Symbol Resolution via _dyld_get_image_header()
+Runtime Mach-O header parsing works correctly:
+- `_dyld_get_image_header()` returns valid runtime pointers
+- `hdr - slide = __TEXT vmaddr` (verified)
+- Section `.addr` in runtime headers is already the correct virtual address
+- Combined with dyld slide, addresses compute correctly
+
+**Working formula**: `runtime_section.addr + n_value` gives correct
+runtime addresses for loaded libraries.
+
+**Commit: 78f50111**
+
+### mmap'd File Parsing — Big-Endian fat_arch
+Fat binary file parsing initially failed due to incorrect byte-order
+handling of `fat_arch` fields.
+
+**Fix**: All `fat_arch` fields are big-endian in the file. Applied
+`OSSwapBigToHostInt32()` to each field.
+
+**Commit: 78f50111**
+
+---
+
+## Open Problems
+
+### File-Based Address Resolution Cannot Produce Runtime Addresses
+
+When parsing Mach-O files from disk via mmap, `section.addr` values in
+the mapped memory are **file offsets** (e.g., 0x870), not virtual
+memory addresses (e.g., 0x180586958). There is no reliable formula to
+convert file offsets to runtime addresses.
+
+Tested and rejected:
+1. `slide + mmap_section.addr + n_value` — wrong (0x1d46ac38 vs 0x19d9f8764)
+2. `slide + runtime_section.addr + n_value` — wrong (off by 0x4ad8)
+3. `runtime_hdr + n_value` — wrong
+4. `slide + text_vmaddr + section_vm_offset + n_value` — off by 0x4ad8
+
+**Current workaround**: Use `_dyld_get_image_header()` for loaded
+libraries (where section.addr is already the correct vmaddr). File-based
+parsing serves as fallback for name-only resolution.
+
+**Unresolved** since 78f50111.
+
+### dlopen_from Crashes with RTLD_NOLOAD
+
+`dlopen_from(RTLD_NOLOAD, path)` crashes with SIGILL when called during
+early dyld initialization. Cannot be used for all symbol resolution.
+
+**Workaround**: Fall back to file-based Mach-O parsing for libraries
+not yet loaded. Use `_dyld_get_image_header()` for already-loaded
+libraries.
+
+**Unresolved** since 78f50111.
+
+### No Original dlsym Equivalent
+
+macOS has no `_dl_sym` or similar function to retrieve the original
+(unhooked) `dlsym`. All symbol resolution must be implemented manually
+via Mach-O parsing.
+
+**Unresolved** — this is a fundamental platform limitation.
+
+---
+
+## File Layout
+
+### src/library/general/dlhook.cpp
+Core symbol resolution. See macos.md individual sections for details.
+
+- `native_strcmp()` / `native_strstarts()` — avoid hooked strcmp
+- `parse_in_memory()` — parse Mach-O at runtime addresses
+- `find_symbol_in_file()` — mmap file, parse fat binary, find symbols
+- `resolve_path_symbol()` — try multiple system library paths
+- `resolve_native_symbol()` — file-based symbol resolution
+- `resolve_libsymbol()` — dlopen_from(RTLD_NOLOAD) + fallback
+- `g_resolve_depth` — recursion guard (thread_local)
+- `hooks_enabled` — hook activation flag (thread_local)
 
 ### src/library/general/dlhook.h
-- Added `extern thread_local bool hooks_enabled`
-- Added `resolve_native_symbol(const char *name)` declaration
-- Added `resolve_libsymbol(const char *name, const char *library_hint)` declaration
+Declarations for `resolve_native_symbol`, `resolve_libsymbol`,
+`hooks_enabled`.
 
 ### src/library/hook.cpp
-- Modified `link_function()`: macOS now uses `resolve_libsymbol()` + `resolve_native_symbol()`
-- Removed old TASK_DYLD_INFO-based library scanning (replaced by Mach-O parsing)
-- Added `#ifdef __APPLE__` guards around macOS-specific paths
+`link_function()` — macOS uses `resolve_libsymbol()` +
+`resolve_native_symbol()`. Removed old TASK_DYLD_INFO-based scanning.
 
 ### src/library/fileio/posixiowrappers.cpp
-- Modified `open()`: added `hooks_enabled` check for init-time fallback
-- During init, calls `resolve_native_symbol("open")` as fallback
-- Uses `dlopen_from` bypass when available
+`open()` — hooks_enabled check + init fallback to
+`resolve_native_symbol("open")`. Uses dlopen_from bypass.
 
 ### src/library/general/localewrappers.cpp
-- Modified `getenv()`: uses `_NSGetEnviron()` directly on macOS
-- Iterates environment variables manually to avoid hook recursion
+`getenv()` — uses `_NSGetEnviron()` directly on macOS.
+
+### src/library/general/dlreal.cpp
+`getenv_direct_call()` — uses `_NSGetEnviron()` to bypass hooked
+getenv. No link_function dependency.
+
+### src/library/general/dlreal.h
+Declaration for `getenv_direct_call()`.
 
 ### src/dyld_func_lookup_helper/dyld_func_lookup_helper.cpp
-- Added documentation explaining macOS symbol resolution strategy
+Documentation explaining macOS symbol resolution strategy.
 
 ### src/library/CMakeLists.txt
-- Added `general/dlreal.cpp` to build sources
+Added dlreal.cpp to build sources.
 
-### New files: src/library/general/dlreal.cpp, dlreal.h
-- Provides `getenv_direct_call()` using `_NSGetEnviron()`
-- Bypasses the getenv wrapper for safe environment access during symbol resolution
+---
 
-## Address Formula Investigation (Unresolved)
+## Debugging Techniques Worth Remembering
 
-We discovered that mmap'd file section.addr values are file offsets, not virtual addresses. This makes it impossible to compute runtime addresses from file parsing alone.
-
-### Data points:
-| Source | section.addr | Note |
-|--------|-------------|------|
-| mmap'd file | 0x870 | file offset |
-| Runtime (dyld) | 0x180586958 | virtual address |
-| dyld slide | 0x1d468000 | |
-| __TEXT vmaddr (runtime) | 0x180586000 | |
-
-### Tested formulas (all failed):
-1. `slide + mmap_sa + n_value` → 0x1d46ac38 (expected 0x19d9f8764)
-2. `slide + runtime_sa + n_value` → 0x19d9f0d20 (expected 0x19d9f8764)
-3. `runtime_hdr + n_value` → 0x19d9f03c8 (expected 0x19d9f8764)
-4. `slide + text_vmaddr + section_vm_offset + n_value` → still off by 0x4ad8
-
-### Key insight:
-The `section.addr` field in the Mach-O file represents the **file offset** of the section data, not its virtual memory address. This is because the file is thin (the __TEXT segment starts at file offset 0x0 with vmaddr 0x0). The actual vmaddr is determined by the dyld slide at load time.
-
-### Working approach:
-Use `_dyld_get_image_header()` which returns the **runtime** Mach-O header where section.addr is already the correct virtual address. Combined with the dyld slide, we can compute addresses correctly. The fallback for libraries not yet loaded is limited — file-based parsing cannot produce runtime addresses.
-
-## Test Programs Created
-- `/tmp/test_slide16.c` through `/tmp/test_slide24.c` — progressive experiments
-- Each tested different combinations of slide, section.addr, and n_value
-- Key verification: fat_arch fields are big-endian (confirmed by Python and C tests)
-- Key verification: `nm -n` output matches Mach-O n_value for N_SECT symbols
-
-## Current Limitations
-1. **File-based symbol resolution cannot produce runtime addresses** — the mmap'd file lacks vmaddr information
-2. **dlopen_from crashes** during early dyld init — cannot use for all symbol resolution
-3. **Symbol resolution works via runtime headers** when libraries are loaded (`_dyld_get_image_header()` + slide)
-4. **The formula `slide + text_vmaddr + nv`** gives wrong results because section.addr in file is offset, not vmaddr
-
-## Potential Next Steps (if needed)
-1. Use `_dyld_get_image_header()` for ALL symbol resolution (requires library to be loaded)
-2. Compute slide from `header_ptr - text_vmaddr` for loaded libraries
-3. For unloaded libraries, accept that symbol resolution may fail and rely on lazy binding
+- **fat_arch fields are big-endian**: Confirmed via Python analysis
+  and C tests against `/usr/lib/system/*.dylib` fat binaries.
+- **_pthread_self in libsystem_pthread.dylib**: N_SECT entry (type=0xf),
+  sect=1 (__text), n_value=0x23c8. Also has cold variants (e.g.,
+  `_pthread_self.cold.1`) that must be skipped during lookup.
+- **nm -n output matches Mach-O n_value**: Verified `nm -n` output
+  against parsed Mach-O symbol tables.
+- **lipo -info confirms fat binary slices**: Use `lipo -info` to see
+  available architectures in a universal binary.
+- **Runtime section.addr offsets**: `struct mach_header_64` = 32 bytes
+  before load commands. On arm64, vmaddr is at offset 16 (u64), nsects
+  at offset 64 (u32), sections at offset 72 from load command start.
