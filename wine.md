@@ -491,9 +491,9 @@ the environment or the env overrides. Proton then starts the game from its
   libraries, Godot detection, symbol addresses), which printed `Not an ELF
   file` and `not a dynamic executable` for Windows games; they are skipped
   for non-ELF executables (`429835df`).
-- `test-sonic-generations.sh` sets up and runs Sonic Generations through
-  Proton 11.0 in a rootful Xwayland with openbox, with the user's libTAS
-  config and the setup described below.
+- Running Sonic Generations through Proton 11.0 (rootful Xwayland with
+  openbox, its own game directory and prefix, the user's libTAS config) is
+  documented for users in `docs/guides/sonic-generations.md`.
 - A prefix created by another Proton (here GE-Proton 11 from a Flatpak Steam)
   has its system dlls as symlinks into that Proton (`/run/host/...`), and
   does not start with another one (`could not load kernel32.dll`). Use a new
@@ -627,7 +627,7 @@ the game config, not in the movie.
   `set-window-width`/`set-window-height` (ids from `niri msg --json windows`,
   title `Xwayland on :42`). niri keeps the position of the tile, which can
   leave the floating window partly off screen: also run `center-window`.
-  `test-sonic-generations.sh` does it (`TEST_SIZE`).
+  `docs/guides/sonic-generations.md` does it (step 1).
 - Killing a Wine game with SIGKILL can leave its windows on the test display
   (same names as the next run's), so `xdotool search --name` may pick a dead
   one. Restart the test Xwayland, or check that only one window matches.
