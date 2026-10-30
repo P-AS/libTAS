@@ -75,6 +75,7 @@ bool Config::applyCliSetting(const std::string& key, const std::string& value)
 
     /* SharedConfig fields – key names match QSettings keys in save()/load() */
     if      (key == "speed_divisor")            sc.speed_divisor = intValue();
+    else if (key == "fastforward")              sc.fastforward = boolValue();
     else if (key == "fastforward_mode")         sc.fastforward_mode = intValue();
     else if (key == "fastforward_render")       sc.fastforward_render = intValue();
     else if (key == "logging_status")           sc.logging_status = intValue();

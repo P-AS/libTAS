@@ -53,6 +53,8 @@
   client of Proton, in WoW64 mode and with wined3d
 * Add the Proton, game and directory settings to the --set command-line
   option
+* Add a fastforward setting to the --set command-line option, so that
+  non-interactive runs can start without fast-forward
 
 ### Changed
 
