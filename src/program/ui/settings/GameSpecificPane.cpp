@@ -55,6 +55,7 @@ void GameSpecificPane::initLayout()
     syncUnityLoads = new ToolTipCheckBox("Unity Loads");
     syncUnityReads = new ToolTipCheckBox("Unity Reads");
     syncUnityVideo = new ToolTipCheckBox("Unity Video");
+    syncIdleThreads = new ToolTipCheckBox("Idle Threads");
 
     syncGroupBox = new QGroupBox(tr("Sync settings"));
     QVBoxLayout *syncLayout = new QVBoxLayout;
@@ -64,6 +65,7 @@ void GameSpecificPane::initLayout()
     syncLayout->addWidget(syncUnityLoads);
     syncLayout->addWidget(syncUnityReads);
     syncLayout->addWidget(syncUnityVideo);
+    syncLayout->addWidget(syncIdleThreads);
     syncGroupBox->setLayout(syncLayout);
 
     /* Create the main layout */
@@ -87,6 +89,7 @@ void GameSpecificPane::initSignals()
     connect(syncUnityLoads, &QAbstractButton::clicked, this, &GameSpecificPane::saveConfig);
     connect(syncUnityReads, &QAbstractButton::clicked, this, &GameSpecificPane::saveConfig);
     connect(syncUnityVideo, &QAbstractButton::clicked, this, &GameSpecificPane::saveConfig);
+    connect(syncIdleThreads, &QAbstractButton::clicked, this, &GameSpecificPane::saveConfig);
 }
 
 void GameSpecificPane::initToolTips()
@@ -133,6 +136,14 @@ void GameSpecificPane::initToolTips()
     "to be prepared before continuing. This is useful for games that use videos "
     "to display cutscenes, as it prevents the game from continuing while the video "
     "is still decoding.");
+
+    syncIdleThreads->setTitle("Idle Threads Sync");
+    syncIdleThreads->setDescription("Wine games only. The sleeps of threads other "
+    "than the main thread only end when the game advances frames, and before the "
+    "main thread sleeps, polls the time or advances a frame, it waits for the other "
+    "threads to be idle. Thanks to that, what loading threads do between two frames "
+    "does not depend on the speed of the machine, and runs of a movie stay in sync "
+    "during loadings.");
 }
 
 void GameSpecificPane::showEvent(QShowEvent *event)
@@ -151,6 +162,7 @@ void GameSpecificPane::loadConfig()
     syncUnityLoads->setChecked(context->config.sc.game_specific_sync & SharedConfig::GC_SYNC_UNITY_LOADS);
     syncUnityReads->setChecked(context->config.sc.game_specific_sync & SharedConfig::GC_SYNC_UNITY_READS);
     syncUnityVideo->setChecked(context->config.sc.game_specific_sync & SharedConfig::GC_SYNC_UNITY_VIDEO);
+    syncIdleThreads->setChecked(context->config.sc.game_specific_sync & SharedConfig::GC_SYNC_IDLE_THREADS);
 }
 
 void GameSpecificPane::saveConfig()
@@ -167,6 +179,7 @@ void GameSpecificPane::saveConfig()
     context->config.sc.game_specific_sync |= syncUnityLoads->isChecked()? SharedConfig::GC_SYNC_UNITY_LOADS : 0;
     context->config.sc.game_specific_sync |= syncUnityReads->isChecked()? SharedConfig::GC_SYNC_UNITY_READS : 0;
     context->config.sc.game_specific_sync |= syncUnityVideo->isChecked()? SharedConfig::GC_SYNC_UNITY_VIDEO : 0;
+    context->config.sc.game_specific_sync |= syncIdleThreads->isChecked()? SharedConfig::GC_SYNC_IDLE_THREADS : 0;
 
     context->config.sc_modified = true;
 }

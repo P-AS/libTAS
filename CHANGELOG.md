@@ -57,6 +57,9 @@
   non-interactive runs can start without fast-forward
 * Wine: write the logs of the virtual Steam client to steam_api.log in the
   data directory, with the log level of the game
+* Add an "Idle Threads" sync option for Wine games, that makes loadings play
+  the same way on every run: the sleeps of other threads end when the game
+  advances frames, and the main thread waits for them to be idle
 
 ### Changed
 

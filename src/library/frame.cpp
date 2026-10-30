@@ -185,7 +185,11 @@ void frameBoundary(std::function<void()> draw, RenderHUD& hud)
     if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_CELESTE) {
         ThreadSync::detWait();
     }
-    
+
+    if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_IDLE_THREADS) {
+        DeterministicTimer::get().waitForIdleThreads();
+    }
+
     /* Update the deterministic timer, sleep if necessary */
     DeterministicTimer& detTimer = DeterministicTimer::get();
     TimeHolder timeIncrement = detTimer.enterFrameBoundary();

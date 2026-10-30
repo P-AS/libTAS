@@ -151,6 +151,13 @@ void ThreadManager::setCheckpointThread()
     unlockList();
 }
 
+pid_t ThreadManager::getMainThreadTid()
+{
+    if (!main_pthread_id)
+        return 0;
+    return getThreadTid(main_pthread_id);
+}
+
 bool ThreadManager::isMainThread()
 {
     /* Check if main thread has been set */
