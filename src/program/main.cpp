@@ -321,10 +321,15 @@ int main(int argc, char **argv)
         }
     }
     if (context.libtaspath.empty()) {
-        std::filesystem::path binpath = std::filesystem::read_symlink("/proc/self/exe");
+        std::filesystem::path binpath;
 #ifdef __linux__
+        binpath = std::filesystem::read_symlink("/proc/self/exe");
         context.libtaspath = binpath.parent_path() / "libtas.so";
 #elif defined(__APPLE__) && defined(__MACH__)
+        char path[PATH_MAX];
+        uint32_t size = sizeof(path);
+        _NSGetExecutablePath(path, &size);
+        binpath = path;
         context.libtaspath = binpath.parent_path() / "libtas.dylib";
 #endif
     }

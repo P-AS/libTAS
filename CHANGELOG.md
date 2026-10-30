@@ -76,6 +76,7 @@
 
 ### Fixed
 
+* Fix `_NSGetExecutablePath` crash on macOS instead of `/proc/self/exe`
 * Skip freeing cursors that were not loaded
 * Fix sound mixing for uncontrolled time
 * Fix concurrent access to action queue causing a crash in libTAS
