@@ -64,6 +64,9 @@ void setCheckpointThread();
 /* Get the thread tid of another thread */
 pid_t getThreadTid(pthread_t pthread_id);
 
+/* Return the real tid of the main thread, or 0 */
+pid_t getMainThreadTid();
+
 /* Get the ThreadInfo struct from the thread id, or null if not there */
 ThreadInfo* getThread(pthread_t pthread_id);
 

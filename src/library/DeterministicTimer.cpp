@@ -35,6 +35,11 @@
 #endif
 
 #include <sched.h> // sched_yield()
+#include <fcntl.h> // open
+#include <unistd.h> // read, close
+#include <cstring> // strstr
+#include <dirent.h> // opendir
+#include <sys/syscall.h> // SYS_gettid
 #include <stdint.h>
 
 /* Number of time call to generate a warning */
@@ -248,6 +253,129 @@ void DeterministicTimer::startThreadedDelay()
     }
 
     thread->startingFrameDelay = framecount;
+}
+
+#ifdef __linux__
+/* Read a file of /proc/self/task/<tid>/, returns its length or -1 */
+static ssize_t readThreadFile(pid_t tid, const char* name, char* buf, size_t size)
+{
+    char path[64];
+    snprintf(path, sizeof(path), "/proc/self/task/%d/%s", tid, name);
+    int fd;
+    NATIVECALL(fd = open(path, O_RDONLY));
+    if (fd < 0)
+        return -1;
+    ssize_t n;
+    NATIVECALL(n = read(fd, buf, size - 1));
+    NATIVECALL(close(fd));
+    if (n >= 0)
+        buf[n] = '\0';
+    return n;
+}
+
+/* Is the thread blocked on a synchronization object (a Wine wait or a futex),
+ * according to its wait channel */
+static bool isThreadBlockedOnWait(pid_t tid)
+{
+    char wchan[64];
+    if (!tid || (readThreadFile(tid, "wchan", wchan, sizeof(wchan)) <= 0))
+        return false;
+    return strstr(wchan, "ntsync") || strstr(wchan, "futex") || strstr(wchan, "pipe_read");
+}
+
+/* Is the thread idle: blocked on a wait or sleeping, and not running or
+ * reading a file */
+static bool isThreadIdle(pid_t tid)
+{
+    char wchan[64];
+    ssize_t n = readThreadFile(tid, "wchan", wchan, sizeof(wchan));
+    if (n < 0)
+        return true; // thread has exited
+    if (n == 0)
+        return false;
+
+    static const char* const waits[] = {"ntsync", "futex", "pipe_read",
+        "unix_stream_read", "poll_schedule", "do_select", "do_epoll_wait",
+        "hrtimer_nanosleep", "do_sigtimedwait", "sigsuspend"};
+    for (const char* w : waits)
+        if (strstr(wchan, w))
+            return true;
+    return false;
+}
+
+/* Returns the tid of a thread of the process that is not idle, or 0 */
+static pid_t findBusyThread(pid_t self)
+{
+    DIR* dir;
+    NATIVECALL(dir = opendir("/proc/self/task"));
+    if (!dir)
+        return 0;
+
+    pid_t busy = 0;
+    struct dirent* entry;
+    while (!busy && (entry = readdir(dir))) {
+        pid_t tid = atoi(entry->d_name);
+        if ((tid > 0) && (tid != self) && !isThreadIdle(tid))
+            busy = tid;
+    }
+    NATIVECALL(closedir(dir));
+    return busy;
+}
+#endif
+
+void DeterministicTimer::waitForIdleThreads()
+{
+#ifdef __linux__
+    pid_t self;
+    NATIVECALL(self = syscall(SYS_gettid));
+    struct timespec start, now;
+    NATIVECALL(clock_gettime(CLOCK_MONOTONIC, &start));
+
+    mainWaitingForThreads = true;
+    while (pid_t busy = findBusyThread(self)) {
+        NATIVECALL(clock_gettime(CLOCK_MONOTONIC, &now));
+        int64_t waited = (now.tv_sec - start.tv_sec) * 1000000000LL + (now.tv_nsec - start.tv_nsec);
+        if (waited > 100000000LL) {
+            char comm[32] = "", wchan[64] = "";
+            readThreadFile(busy, "comm", comm, sizeof(comm));
+            readThreadFile(busy, "wchan", wchan, sizeof(wchan));
+            comm[strcspn(comm, "\n")] = '\0';
+            LOG(LL_WARN, LCF_WAIT, "Thread %d (%s, wchan %s) still busy after 100 ms", busy, comm, wchan);
+            break;
+        }
+        struct timespec pause = {0, 100000};
+        NATIVECALL(nanosleep(&pause, nullptr));
+    }
+    mainWaitingForThreads = false;
+#endif
+}
+
+void DeterministicTimer::waitDeterministicDelay(struct timespec delayTicks)
+{
+#ifdef __linux__
+    TimeHolder deadline;
+    {
+        std::lock_guard<std::mutex> lock(ticks_mutex);
+        deadline = ticks + delayTicks;
+    }
+
+    pid_t main_tid = ThreadManager::getMainThreadTid();
+    while (!Global::is_exiting) {
+        {
+            std::lock_guard<std::mutex> lock(ticks_mutex);
+            if (!(ticks < deadline))
+                break;
+        }
+
+        /* The main thread may be waiting for us (end of a loading), and
+         * would never advance the time */
+        if (!insideFrameBoundary && !mainWaitingForThreads && isThreadBlockedOnWait(main_tid))
+            break;
+
+        struct timespec pause = {0, 200000};
+        NATIVECALL(nanosleep(&pause, nullptr));
+    }
+#endif
 }
 
 void DeterministicTimer::endThreadedDelay(struct timespec delayTicks)

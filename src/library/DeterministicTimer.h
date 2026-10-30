@@ -25,6 +25,7 @@
 #include <time.h>
 
 #include <mutex>
+#include <atomic>
 
 namespace libtas {
 /* A timer that gives deterministic values, at least in the main thread.
@@ -72,6 +73,19 @@ public:
 
     /* Called when a non-main thread ends a wait call. */
     void endThreadedDelay(struct timespec delayTicks);
+
+    /* Block a non-main thread until the timer has advanced by the delay,
+     * which only happens when the main thread advances frames, or until the
+     * main thread is itself blocked on a wait outside of a frame boundary */
+    void waitDeterministicDelay(struct timespec delayTicks);
+
+    /* Wait until the other threads of the game are idle (sleeping or blocked
+     * on a wait), so that what they do between two points of the main thread
+     * does not depend on how fast the machine is */
+    void waitForIdleThreads();
+
+    /* Set by the main thread while it waits for other threads to be idle */
+    std::atomic<bool> mainWaitingForThreads{false};
 
     /* Flush the accumulated timer delay. Used when game is exiting */
 	void flushDelay();

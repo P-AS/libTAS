@@ -258,6 +258,7 @@ struct __attribute__((packed, aligned(8))) SharedConfig {
         GC_SYNC_UNITY_LOADS = 0x08,
         GC_SYNC_UNITY_READS = 0x10,
         GC_SYNC_UNITY_VIDEO = 0x20,
+        GC_SYNC_IDLE_THREADS = 0x40, // wait for other threads to be idle at each frame
     };
 
     /* Game-specific timing settings */

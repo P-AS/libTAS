@@ -28,6 +28,8 @@
 #include "logging.h"
 #include "DeterministicTimer.h"
 #include "general/sleepwrappers.h"
+#include "checkpoint/ThreadManager.h"
+#include "global.h"
 #include "../shared/SharedConfig.h"
 
 #include <cstdint>
@@ -184,6 +186,12 @@ static uint32_t NtDelayExecution(unsigned char alertable, const int64_t *timeout
     if (timeout && (*timeout == 0))
         DeterministicTimer::get().getTicks(SharedConfig::TIMETYPE_GETTICKCOUNT);
 
+    /* A main thread that spins with Sleep(0) waits for other threads */
+    if (timeout && (*timeout == 0) &&
+        (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_IDLE_THREADS) &&
+        ThreadManager::isMainThread())
+        DeterministicTimer::get().waitForIdleThreads();
+
     /* Infinite sleep, yield, and alertable sleeps which can be interrupted
      * by APCs are left to wine */
     if (!timeout || (*timeout == 0) || alertable) {
@@ -206,6 +214,19 @@ static uint32_t NtDelayExecution(unsigned char alertable, const int64_t *timeout
     ts.tv_nsec = (ticks % TICKSPERSEC) * 100;
 
     LOGTRACE(LCF_WINE | LCF_SLEEP, "%s call - sleep for %d.%09d sec", __func__, ts.tv_sec, ts.tv_nsec);
+
+    /* Threads that poll with Sleep(), such as loading threads, would do an
+     * amount of work per frame that depends on the speed of the machine */
+    if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_IDLE_THREADS) {
+        if (!ThreadManager::isMainThread()) {
+            DeterministicTimer::get().waitDeterministicDelay(ts);
+            return STATUS_SUCCESS;
+        }
+
+        /* The main thread polls with Sleep() for other threads to be done */
+        DeterministicTimer::get().waitForIdleThreads();
+    }
+
     transfer_sleep(ts, nullptr);
     return STATUS_SUCCESS;
 }
