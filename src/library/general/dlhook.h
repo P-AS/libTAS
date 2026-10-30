@@ -83,6 +83,15 @@ void *find_sym(const char* name);
 OVERRIDE void *dlopen(const char *file, int mode) __THROW;
 OVERRIDE void *dlsym(void *handle, const char *name) __THROW;
 
+#if defined(__APPLE__) && defined(__MACH__)
+/* Flag controlling whether hooks are active (set true after init completes). */
+extern thread_local bool hooks_enabled;
+/* Resolve a symbol by directly parsing Mach-O headers (bypasses hooked dlsym). */
+void *resolve_native_symbol(const char *name);
+/* Resolve a symbol in a library loaded by the game. */
+void *resolve_libsymbol(const char *name, const char *library_hint);
+#endif
+
 }
 
 #endif

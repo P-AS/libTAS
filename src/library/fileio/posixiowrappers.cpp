@@ -24,6 +24,7 @@
 
 #include "logging.h"
 #include "hook.h"
+#include "general/dlhook.h"
 #include "Utils.h"
 #include "global.h"
 #include "GlobalState.h"
@@ -38,6 +39,10 @@
 #include <cstdarg>
 #include <cstring>
 #include <unistd.h>
+#ifdef __APPLE__
+#include <dlfcn.h>
+extern "C" void *dlopen_from(const char *, int, void *) __attribute__((weak));
+#endif
 
 namespace libtas {
 
@@ -67,6 +72,35 @@ int open (const char *file, int oflag, ...)
         va_start(arg_list, oflag);
         mode = va_arg(arg_list, mode_t);
         va_end(arg_list);
+    }
+
+    /* During libTAS init, hooks aren't enabled yet.
+     * Just call the game's wrapped version (which is the system open). */
+    if (!hooks_enabled) {
+        /* On macOS during init, orig_open is null (link_function hasn't
+         * resolved it yet). Try to get it from resolve_native_symbol,
+         * which now uses native_strcmp (no hook recursion). */
+        if (!orig::open) {
+            orig::open = (int(*)(const char*, int, ...))resolve_native_symbol("open");
+        }
+        if (orig::open)
+            return orig::open(file, oflag, mode);
+        /* Absolute fallback: call via dlopen_from bypass */
+#ifdef __APPLE__
+        if (dlopen_from) {
+            void *libsystem = dlopen_from("/usr/lib/system/libsystem_c.dylib",
+                                          RTLD_LAZY | RTLD_NOLOAD, nullptr);
+            if (libsystem) {
+                void *open_ptr = resolve_native_symbol("open");
+                if (open_ptr) {
+                    int (*real_open)(const char*, int, ...) =
+                        (int(*)(const char*, int, ...))open_ptr;
+                    return real_open(file, oflag, mode);
+                }
+            }
+        }
+#endif
+        return -1;
     }
 
     if (GlobalState::isNative())

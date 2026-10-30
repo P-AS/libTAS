@@ -26,6 +26,9 @@
 
 #include <array>
 #include <cstring>
+#ifdef __APPLE__
+#include <crt_externs.h>
+#endif
 
 namespace libtas {
 
@@ -81,6 +84,24 @@ static char* mutable_config_locale()
 
 char *getenv (const char *name) __THROW
 {
+#ifdef __APPLE__
+    /* On macOS, link_function can't resolve "getenv" because all paths
+     * go through our hooked dlsym (which calls find_sym with recursion guard
+     * that returns null). Use _NSGetEnviron() to access the environment
+     * directly, bypassing the hook entirely. */
+    char ***envp = _NSGetEnviron();
+    if (envp && *envp && name) {
+        char **env = *envp;
+        size_t namelen = strlen(name);
+        for (char **ep = env; *ep != nullptr; ep++) {
+            if (strncmp(*ep, name, namelen) == 0 && (*ep)[namelen] == '=') {
+                char *result = strdup(*ep + namelen + 1);
+                if (result) return result;
+            }
+        }
+    }
+    return nullptr;
+#else
     RETURN_IF_NATIVE(getenv, (name), nullptr);
 
     LOGTRACE(LCF_LOCALE, "%s called with name %s", __func__, name);
@@ -91,6 +112,7 @@ char *getenv (const char *name) __THROW
         }
     }
     RETURN_NATIVE(getenv, (name), nullptr);
+#endif
 }
 
 }

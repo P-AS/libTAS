@@ -113,6 +113,7 @@ set(LIBTAS_COMMON_SOURCES
     fileio/stdiowrappers.cpp
     fileio/URandom.cpp
     general/dlhook.cpp
+    general/dlreal.cpp
     general/glibwrappers.cpp
     general/localewrappers.cpp
     general/mallocwrappers.cpp

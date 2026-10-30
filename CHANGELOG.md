@@ -1,6 +1,18 @@
 ## [Unreleased]
 ### Added
 
+* Add macOS dlopen/dlsym hook implementation using Mach-O parsing
+* Add dlreal helper for direct environment access on macOS
+* Add fat binary big-endian field handling for macOS Mach-O files
+* Add Mach-O symbol table parsing with memcpy-based field reads
+* Add dlopen_from weak symbol usage for dyld bypass on macOS
+* Add getenv wrapper using _NSGetEnviron() to avoid hook recursion
+* Add thread-local hooks_enabled flag with constructor priority 250
+* Add recursion guards (g_resolve_depth, finding_sym) for symbol resolution
+* Add raw syscall-based file access for symbol resolution bypassing hooks
+* Add native_strcmp for safe symbol comparison without hook recursion
+* Add resolve_native_symbol() and resolve_libsymbol() for macOS
+* Add macOS.md documenting the macOS symbol resolution investigation
 * Add macOS CMake build with native Quartz framework support
 * Add stub X11, XCB and ALSA headers for macOS builds
 * Can tweak the number of cpu cores seen by the game

@@ -38,6 +38,34 @@ void* link_function(void** function, const char* source, const char* library, co
         return *function;
 
     /* First try to link it from the global namespace */
+#if defined(__APPLE__) && defined(__MACH__)
+    /* On macOS, the regular dlsym path goes through our hook which fails.
+     * Use direct Mach-O symbol table parsing to find the symbol. */
+    if (library != nullptr) {
+        /* Try to resolve in a specific library first */
+        *function = resolve_libsymbol(source, library);
+        if (*function != nullptr) {
+            LOG(LL_DEBUG, LCF_HOOK, "Imported from mach lib %s symbol %s function : %p", library, source, *function);
+            if (library)
+                add_lib(library);
+            return *function;
+        }
+    }
+
+    /* Fallback to libsystem_c.dylib for standard library functions */
+    *function = resolve_native_symbol(source);
+    if (*function != nullptr) {
+        Dl_info info;
+        int res = dladdr(*function, &info);
+        if (res != 0) {
+            LOG(LL_DEBUG, LCF_HOOK, "Imported symbol %s function : %p (from %s)", source, *function, info.dli_fname);
+        }
+        else {
+            LOG(LL_DEBUG, LCF_HOOK, "Imported symbol %s function : %p", source, *function);
+        }
+        return *function;
+    }
+#else
 #ifdef __linux__
     if (version)
         *function = dlvsym(RTLD_NEXT, source, version);
@@ -57,12 +85,13 @@ void* link_function(void** function, const char* source, const char* library, co
         }
         return *function;
     }
+#endif
 
     if (library != nullptr) {
 
         /* If it did not succeed, try to link using a matching library
-         * loaded by the game.
-         */
+         * loaded by the game. (Linux only - macOS uses resolve_libsymbol above) */
+#ifndef __APPLE__
         std::string libpath = find_lib(library);
 
         void* handle;
@@ -95,50 +124,8 @@ void* link_function(void** function, const char* source, const char* library, co
                 return *function;
             }
         }
-    }
-    
-#if defined(__APPLE__) && defined(__MACH__)
-    /* Look at all loaded libraries and find a matched library */
-    /* From: https://blog.lse.epita.fr/2017/03/14/playing-with-mach-os-and-dyld.html */
-    if (library != nullptr) {
-        /* Get DYLD task infos */
-        struct task_dyld_info dyld_info;
-        mach_msg_type_number_t count = TASK_DYLD_INFO_COUNT;
-        kern_return_t ret;
-        ret = task_info(mach_task_self(), TASK_DYLD_INFO, (task_info_t)&dyld_info, &count);
-        if (ret != KERN_SUCCESS) {
-            LOG(LL_ERROR, LCF_HOOK, "Could not get task info");
-            return nullptr;
-        }
-        
-        /* Get image array's size and address */
-        mach_vm_address_t image_infos = dyld_info.all_image_info_addr;
-        struct dyld_all_image_infos *infos;
-        infos = reinterpret_cast<struct dyld_all_image_infos*>(image_infos);
-        uint32_t image_count = infos->infoArrayCount;
-        const struct dyld_image_info *image_array = infos->infoArray;
-        
-        /* Find the library among loaded libraries */
-        for (int i = 0; i < image_count; ++i) {
-            struct dyld_image_info image = image_array[i];
-            
-            if (strstr(image.imageFilePath, library)) {
-                /* We found a matching library. Load the library and look at symbol */
-                void* handle;
-                NATIVECALL(handle = dlopen(image.imageFilePath, RTLD_NOLOAD | RTLD_LAZY));
-                    
-                if (handle != NULL) {
-                    NATIVECALL(*function = dlsym(handle, source));
-                    dlclose(handle);
-                    if (*function != nullptr) {
-                        LOG(LL_DEBUG, LCF_HOOK, "Imported from mach lib %s symbol %s function: %p", image.imageFilePath, source, *function);
-                        return *function;
-                    }
-                }
-            }
-        }
-    }
 #endif
+    }
 
     LOG(LL_ERROR, LCF_HOOK, "Could not import symbol %s", source);
 
