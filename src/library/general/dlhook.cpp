@@ -385,21 +385,40 @@ extern "C" void *dlopen_from(const char *file, int mode, void *callerAddr) __att
  * Uses dlopen_from to get handles and find_sym for libTAS functions. */
 static void *find_sym_native(void *handle, const char *name) {
 #ifdef __APPLE__
-    /* For RTLD_DEFAULT, search through the default scope using
-     * dlopen_from to get handles to libraries.
-     * For Vulkan procs, find_sym handles it via vk_find_my_proc.
-     * For other symbols, we fall through and return nullptr. */
     if (handle == RTLD_DEFAULT) {
-        /* Try Vulkan procs first */
-        void *addr = find_sym(name);
+        /* Try Vulkan procs first (idempotent check). */
+        void *addr = find_sym(name, handle);
         if (addr)
             return addr;
-        /* For other symbols on macOS, return nullptr since we can't
-         * call the original dlsym. The game may not need these. */
+        /* Fall back to native symbol resolution. */
+        void *sym = resolve_native_symbol(name);
+        if (sym)
+            return sym;
+        /* Also try common system libraries. */
+        sym = resolve_libsymbol(name, nullptr);
+        if (sym)
+            return sym;
         return nullptr;
     }
-    /* For non-RTLD_DEFAULT handles, we'd need the library path.
-     * For now, just return nullptr. */
+    /* Non-RTLD_DEFAULT handle — it's the Mach-O header pointer
+     * returned by dlopen_from. Try to match it against loaded
+     * dyld images and parse that image's symbol table. */
+    {
+        uint32_t count = _dyld_image_count();
+        for (uint32_t i = 0; i < count; i++) {
+            const struct mach_header *raw_hdr =
+                _dyld_get_image_header(i);
+            const struct mach_header_64 *hdr =
+                reinterpret_cast<const struct mach_header_64*>(raw_hdr);
+            if (hdr && hdr->magic == MH_MAGIC_64 &&
+                hdr == reinterpret_cast<const struct mach_header_64*>(handle)) {
+                void *sym = parse_in_memory(hdr, name);
+                if (sym)
+                    return sym;
+                break; /* Found the image but symbol not in it. */
+            }
+        }
+    }
     return nullptr;
 #else
     (void)handle;
@@ -659,7 +678,7 @@ LIBTAS_NO_IPA void *dlopen(const char *file, int mode) __THROW {
  * hook calls link_function which calls dlsym which calls find_sym. */
 static thread_local const char* finding_sym = nullptr;
 
-void *find_sym(const char *name) {
+void *find_sym(const char *name, void *handle) {
 
     /* First try one of our own Vulkan functions, because they cannot be found using dlsym. */
     void *addr = vk_find_my_proc(name);
@@ -699,44 +718,72 @@ void *find_sym(const char *name) {
 
 #ifdef __APPLE__
     /* On macOS, orig::dlsym is null (we use dlopen_from for dlopen).
-     * We need to resolve the symbol differently. Use the main executable
-     * handle obtained via dlopen_from and call the original dlsym directly. */
+     * We scan loaded dyld images to find symbols.
+     * handle == nullptr means RTLD_DEFAULT — scan all libraries.
+     * handle != nullptr means a specific library — skip libTAS
+     * symbols and let find_sym_native() handle library-scoped lookup. */
     if (!orig::dlsym) {
-        /* Get handle to main executable */
-        void *main_handle = dlopen_from(nullptr, RTLD_LAZY | RTLD_NOLOAD, nullptr);
-        if (main_handle) {
-            /* Try to resolve the symbol through the library handle.
-             * On macOS, we can use dlsym with the library handle directly
-             * by calling through dlopen_from. However, since dlopen_from
-             * is for dlopen (not dlsym), we need a different approach.
-             * 
-             * The original dlsym can be found by using the main executable's
-             * symbol table. But for now, if the Vulkan check above found
-             * the symbol, return it. Otherwise return nullptr. */
-            (void)main_handle;
-            (void)libtaslib;
-            (void)libtasstr;
-        }
-        /* If we can't find the symbol through standard means, return
-         * whatever we have (likely null or from vk_find_my_proc). */
-        finding_sym = nullptr;
-        return addr;
-    }
-#endif
-
-    addr = orig::dlsym(libtaslib, name);
-    if (dlerror() == nullptr) {
-        Dl_info info;
-        int res = dladdr(addr, &info);
-        if (res != 0) {
-            std::string libpath = info.dli_fname;
-            bool fromLibtas = false;
-            fromLibtas = libpath.length() >= libtasstr.length() &&
-                libpath.compare(libpath.length()-libtasstr.length(), libtasstr.length(), libtasstr) == 0;
-            if (!fromLibtas) {
-                finding_sym = nullptr;
-                return nullptr;
+        uint32_t count = _dyld_image_count();
+        bool found = false;
+        for (uint32_t i = 0; i < count; i++) {
+            const struct mach_header *raw_hdr =
+                _dyld_get_image_header(i);
+            const struct mach_header_64 *hdr =
+                reinterpret_cast<const struct mach_header_64*>(raw_hdr);
+            if (!hdr || hdr->magic != MH_MAGIC_64)
+                continue;
+            void *sym = parse_in_memory(hdr, name);
+            if (sym) {
+                found = true;
+                /* For RTLD_DEFAULT (handle == nullptr):
+                 * In native mode, return any symbol (library or libTAS).
+                 * In Wine mode, only return libTAS symbols.
+                 * For specific library handles (handle != nullptr):
+                 * skip libTAS symbols — let find_sym_native() handle it. */
+                if (handle == nullptr) {
+                    if (GlobalState::isNative()) {
+                        finding_sym = nullptr;
+                        return sym;
+                    }
+                    const char *imgname = _dyld_get_image_name(i);
+                    if (imgname && strstr(imgname, "libtas.so") != nullptr) {
+                        finding_sym = nullptr;
+                        return sym;
+                    }
+                }
             }
+        }
+        /* Not found (or we skipped libTAS for specific handle). */
+        if (!found && handle == nullptr) {
+            finding_sym = nullptr;
+            return nullptr;
+        }
+        /* For specific library handle, fall through to find_sym_native().
+         * We set addr = nullptr so dlsym() falls through to find_sym_native. */
+        addr = nullptr;
+    }
+    else
+#endif
+    {
+        /* Original path for Linux and macOS fallback. */
+        std::string libpath;
+        addr = orig::dlsym(libtaslib, name);
+        if (dlerror() == nullptr) {
+            Dl_info info;
+            int res = dladdr(addr, &info);
+            if (res != 0) {
+                libpath = info.dli_fname;
+                bool fromLibtas = false;
+                fromLibtas = libpath.length() >= libtasstr.length() &&
+                    libpath.compare(libpath.length()-libtasstr.length(), libtasstr.length(), libtasstr) == 0;
+                if (!fromLibtas) {
+                    finding_sym = nullptr;
+                    return nullptr;
+                }
+            }
+        }
+        else {
+            libpath = "";
         }
     }
 
@@ -772,14 +819,14 @@ void *dlsym(void *handle, const char *name) __THROW {
             /* On macOS, get handle via dlopen_from and call find_sym.
              * Since we can't call the real dlsym, we rely on find_sym
              * to provide the libTAS-defined functions. */
-            ret = find_sym(name);
+            ret = find_sym(name, handle);
 #else
             ret = orig::dlsym(handle, name);
 #endif
         }
         else {
 #ifdef __APPLE__
-            ret = find_sym(name);
+            ret = find_sym(name, handle);
 #else
             ret = orig::dlsym(handle, name);
 #endif
@@ -851,7 +898,7 @@ void *dlsym(void *handle, const char *name) __THROW {
      * some arithmetic pointer shenanigan?
      */
 
-    void *addr = find_sym(name);
+    void *addr = find_sym(name, handle);
 
 #ifdef __APPLE__
     /* On macOS, orig::dlsym may be null (we use dlopen_from for dlopen).

@@ -48,6 +48,27 @@ still resolves through the injected libTAS library.
 
 **Commit: 78f50111**
 
+### `find_sym()` — Dyld Image Scanning with Handle-Aware Resolution
+
+On macOS, `orig::dlsym` is always null (we use `dlopen_from` for dlopen).
+The original `find_sym()` simply returned nullptr without trying to
+resolve any symbols. This broke SRB2's dlopen/dlsym usage.
+
+**Fix**: Scan all loaded dyld images (`_dyld_get_image_header()` +
+`_dyld_get_image_name()`) and parse their Mach-O symbol tables via
+`parse_in_memory()` (already uses `memcpy` for ARM64 alignment safety).
+
+- **`handle == nullptr` (RTLD_DEFAULT)**: Scan all loaded images.
+  - Native mode: return any found symbol (library or libTAS).
+  - Wine mode: only return libTAS symbols (hook interception).
+- **`handle != nullptr` (specific library)**: Skip libTAS symbols
+  and set addr = nullptr, letting `find_sym_native()` handle library-scoped
+  lookup by matching the handle against loaded dyld images.
+
+`find_sym()` signature changed: `void *find_sym(const char *name, void *handle = nullptr)`.
+
+**Commit: a96eeb47**
+
 ### getenv Bypass — `getenv_direct_call()`
 
 On macOS, `getenv()` is hooked and calls `link_function` → `dlsym` →
@@ -260,9 +281,14 @@ Core symbol resolution. See macos.md individual sections for details.
 - `resolve_libsymbol()` — dlopen_from(RTLD_NOLOAD) + fallback
 - `g_resolve_depth` — recursion guard (thread_local)
 - `hooks_enabled` — hook activation flag (thread_local)
+- `find_sym(handle)` — scans `_dyld_get_image_header()` for RTLD_DEFAULT;
+  matches handle against dyld images for library-scoped dlsym
+- `find_sym_native(handle)` — for non-RTLD_DEFAULT, matches handle to
+  a dyld image and parses that image's symbol table
 
 ### src/library/general/dlhook.h
-Declarations for `resolve_native_symbol`, `resolve_libsymbol`,
+Declarations for `find_sym()` (now takes `void *handle` parameter for
+library-scoped resolution), `resolve_native_symbol`, `resolve_libsymbol`,
 `hooks_enabled`.
 
 ### src/library/hook.cpp
