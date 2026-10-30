@@ -194,6 +194,9 @@
   so that fullscreen games are no longer drawn for the real screen and cropped
 * Wine: fix random crashes when saving or loading a state while a thread of a
   32-bit game runs its own code (WoW64)
+* Steam: report Steam Cloud as enabled in the virtual Steam client, so that
+  games save through the Steam API as they do with the real client (Sonic
+  Generations stayed on its saving screen)
 
 ## [1.4.8] - 2026-05-14
 ### Added
