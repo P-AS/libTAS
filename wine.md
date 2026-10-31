@@ -239,7 +239,7 @@ then presented by the game thread.
   size and format of the capture with those of its muxer at each frame, and
   starts again if they differ (in the same file during the first 30 frames,
   as a new segment after). The video then starts a few frames (7 in the test)
-  after the first frame of the game. Found by encoding with `-d`, with
+  after the first frame of the game (`98eef6d7`). Found by encoding with `-d`, with
   `TMPDEBUG` logs of the backend and the drawable size at each swap.
 - Wine sets the title of SRB2's window to "FluidSynth...", cosmetic.
 - SRB2's default window is 2560x1415 (from its own config), larger than a small
