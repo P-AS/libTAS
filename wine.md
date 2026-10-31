@@ -320,6 +320,41 @@ then presented by the game thread.
   - Without a window manager both problems are hidden: tests that set the
     focus with `xdotool windowfocus` (`XSetInputFocus`) passed. Test with
     openbox and `xdotool windowactivate`.
+- **Cannot click back into the game, nor on libTAS** (Sonic Generations,
+  openbox): after clicking another window, clicking the game window did not
+  give it the focus again, and clicks on a window below the game (libTAS)
+  did nothing either. `xwininfo -root -tree` showed an InputOnly
+  override-redirect window without properties, mapped over the game and
+  created by the game's X connection: the window that winex11 maps over the
+  clipping rectangle and passes to `XGrabPointer()` to confine the cursor
+  while the game clips it. Our `XGrabPointer()` is emulated (it only reads the
+  geometry of the window), and `_NET_ACTIVE_WINDOW` is reported as the game
+  window while another window is active (see above), so Wine never releases
+  the clipping, and the window catches the real clicks: the window manager
+  does not manage it, so it never focuses anything. `xdotool windowunmap` on it
+  was enough to get the focus back with one click, which found the cause. Wine
+  games no longer map that window (`isWineClipWindow()` in `XMapWindow()` and
+  `XMapRaised()`: InputOnly and override-redirect). 8 of 8 clicks back on the
+  game worked, from the xterm and from libTAS, keys reach the game (the
+  Pause hotkey stops and resumes the frames). In recording mode (`o` hotkey
+  on a copy of the movie): real keys and pointer are recorded while the game
+  has the focus, nothing while the xterm has it, and a key held while the
+  focus leaves is not left pressed. Test with `xdotool mousemove
+  --sync X Y click 1`: the real pointer of the rootful Xwayland is moved by
+  the user's mouse too, which made single-click tests fail at random.
+  - Checked with a test game that really confines the cursor (32-bit OpenGL
+    window, `ClipCursor()` to a 320x240 rectangle set again every 30 frames,
+    as Windows drops it when the window is not the foreground one; it draws
+    `GetCursorPos`, `WM_MOUSEMOVE` and `GetClipCursor` as text, read back
+    with `tesseract` on a screenshot, since libTAS rewrites the window title
+    and a GUI program has no stdout). The game's `WM_MOUSEMOVE` coordinates
+    stay inside the rectangle for 8 of 8 real pointer positions, with and
+    without the fix. After `ClipCursor(NULL)`, `GetClipCursor()` is the whole
+    screen again in both, and `GetCursorPos()` follows the pointer with the
+    fix, but was off by (-481,-261) without it. `WM_MOUSEMOVE` coordinates
+    stay clamped to the old rectangle after the release in both (cause not
+    found). Needs a clean display: a killed run leaves its clip window mapped
+    (`kill -9` on a Wine process left one over the test rectangle).
 - **Crash when dragging the mouse** (`free(): unaligned chunk detected in
   tcache 2`, `double free or corruption`): while a button is held, Wine
   enables XInput2 raw events, and libTAS generates `XI_RawMotion` events

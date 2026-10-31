@@ -208,6 +208,9 @@
   format of another screen capture backend (Sonic Generations)
 * Encode: start again when the screen capture changes its size or pixel format
   after the video started, instead of writing frames that do not match it
+* Wine: fix clicks on the game window or on a window below it doing nothing
+  after focusing another window, as the window that Wine maps to clip the
+  cursor stayed over the game (Sonic Generations)
 
 ## [1.4.8] - 2026-05-14
 ### Added
