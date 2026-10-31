@@ -116,10 +116,20 @@ MainWindow::MainWindow(Context* c) : QMainWindow(), context(c)
     qRegisterMetaType<std::string>("std::string");
 
 #ifdef LIBTAS_INTERIM_COMMIT
+#ifdef LIBTAS_INTERIM_BRANCH
+    QString title = QString("libTAS v%1.%2.%3 - interim %4 %5")
+        .arg(MAJORVERSION).arg(MINORVERSION).arg(PATCHVERSION)
+        .arg(LIBTAS_INTERIM_COMMIT).arg(LIBTAS_INTERIM_BRANCH);
 #ifdef LIBTAS_INTERIM_DATE
-    QString title = QString("libTAS v%1.%2.%3 - interim %4 (%5)").arg(MAJORVERSION).arg(MINORVERSION).arg(PATCHVERSION).arg(LIBTAS_INTERIM_COMMIT).arg(LIBTAS_INTERIM_DATE);
+    title = title + QString(" (%1)").arg(LIBTAS_INTERIM_DATE);
+#endif
 #else
-    QString title = QString("libTAS v%1.%2.%3 - interim %4").arg(MAJORVERSION).arg(MINORVERSION).arg(PATCHVERSION).arg(LIBTAS_INTERIM_COMMIT);
+    QString title = QString("libTAS v%1.%2.%3 - interim %4")
+        .arg(MAJORVERSION).arg(MINORVERSION).arg(PATCHVERSION)
+        .arg(LIBTAS_INTERIM_COMMIT);
+#ifdef LIBTAS_INTERIM_DATE
+    title = title + QString(" (%1)").arg(LIBTAS_INTERIM_DATE);
+#endif
 #endif
 #else
     QString title = QString("libTAS v%1.%2.%3").arg(MAJORVERSION).arg(MINORVERSION).arg(PATCHVERSION);

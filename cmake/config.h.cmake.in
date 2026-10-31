@@ -9,6 +9,12 @@
 /* Git commit hash */
 #cmakedefine LIBTAS_INTERIM_COMMIT "@LIBTAS_INTERIM_COMMIT@"
 
+/* Git branch name (only defined when branch is non-empty) */
+#cmakedefine LIBTAS_INTERIM_BRANCH_DEFINED
+#ifdef LIBTAS_INTERIM_BRANCH_DEFINED
+# define LIBTAS_INTERIM_BRANCH "@LIBTAS_INTERIM_BRANCH@"
+#endif
+
 /* Git commit date */
 #cmakedefine LIBTAS_INTERIM_DATE "@LIBTAS_INTERIM_DATE@"
 

@@ -75,6 +75,8 @@
   file instead of the executable name (#557)
 * Settings given with the --set command-line option are not saved in the
   config files anymore
+* Include the git branch name in the window titlebar alongside the
+  commit hash for interim builds
 
 ### Fixed
 
