@@ -139,6 +139,9 @@
 * Give X events to the OSD only from the main thread, as games may read them
   from other threads
 * Apply OSD font size changes while the game is running
+* Steam: confirm ISteamUserStats::StoreStats() with the stats and achievement
+  stored callbacks and report the game's own id in the stats callbacks (Sonic
+  Generations never showed the button prompt of the results screen)
 
 ## [1.4.8] - 2026-05-14
 ### Added
