@@ -71,7 +71,14 @@ int ScreenCapture::init()
     
     if (impl) {
         int ret = impl->init();
-        if (ret < 0) return ret;
+        if (ret < 0) {
+            /* Pick the backend again at the next try: the game may not have
+             * told us yet which one it uses, and a failed backend would be
+             * kept, and used with its own size and pixel format */
+            delete impl;
+            impl = nullptr;
+            return ret;
+        }
         inited = true;
         return 0;
     }

@@ -54,7 +54,12 @@ AVEncoder::~AVEncoder() {
     fini();
 }
 
+/* Up to this many frames in a segment, a change of the screen capture
+ * restarts the segment instead of starting a new one */
+static const int START_OVER_FRAMES = 30;
+
 void AVEncoder::init() {
+    segment_frames = 0;
     std::ostringstream commandline;
     commandline << "ffmpeg -xerror -hide_banner -y -f nut -i - ";
     commandline << ffmpeg_options;
@@ -127,6 +132,10 @@ void AVEncoder::initMuxer() {
     ScreenCapture::getDimensions(width, height);
 
     int pixfmt = ScreenCapture::getPixelFormat();
+
+    source_width = width;
+    source_height = height;
+    source_pixfmt = pixfmt;
 
     int encode_width = width;
     int encode_height = height;
@@ -208,6 +217,7 @@ void AVEncoder::encodeOneFrame(bool is_draw_frame, TimeHolder frametime) {
             for (int i=0; i<startup_video_frames; i++) {
                 nutMuxer->writeVideoFrame(startup_audio_bytes.data(), pixels_size);
             }
+            segment_frames += startup_video_frames;
         }
         else {
             startup_video_frames++;
@@ -220,6 +230,34 @@ void AVEncoder::encodeOneFrame(bool is_draw_frame, TimeHolder frametime) {
                 startup_audio_frames++;
             }
             return;
+        }
+    }
+
+    /* The screen capture can be set up again with other dimensions or another
+     * pixel format without going through resize(), for example when the game
+     * window is resized or when another capture backend is picked. The pixels
+     * would then not match the muxer, so encode with the new parameters. */
+    int cur_width, cur_height;
+    ScreenCapture::getDimensions(cur_width, cur_height);
+    int cur_pixfmt = ScreenCapture::getPixelFormat();
+    if ((cur_width != source_width) || (cur_height != source_height) || (cur_pixfmt != source_pixfmt)) {
+        LOG(LL_WARN, LCF_DUMP, "Screen capture changed from %dx%d (format %d) to %dx%d (format %d)", source_width, source_height, source_pixfmt, cur_width, cur_height, cur_pixfmt);
+        if (image_scaling && image_scaling->isInited() && (cur_pixfmt == source_pixfmt)) {
+            image_scaling->sourceHasResized(cur_width, cur_height);
+            source_width = cur_width;
+            source_height = cur_height;
+        }
+        else {
+            /* Right after the start, the game may not have settled the video
+             * backend yet and there is nothing worth keeping: start the
+             * segment over instead of splitting the output in two files. */
+            bool start_over = (segment_frames <= START_OVER_FRAMES) && (segment_number > 0);
+            fini();
+            if (start_over)
+                segment_number--;
+            init();
+            if (!ffmpeg_pipe || !nutMuxer)
+                return;
         }
     }
 
@@ -251,6 +289,7 @@ void AVEncoder::encodeOneFrame(bool is_draw_frame, TimeHolder frametime) {
     for (int f=0; f<frames; f++) {
         nutMuxer->writeVideoFrame(pixel_ptr, pixels_size);
     }
+    segment_frames += frames;
 }
 
 void AVEncoder::resize(int width, int height) {

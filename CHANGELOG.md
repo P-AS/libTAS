@@ -142,6 +142,9 @@
 * Steam: confirm ISteamUserStats::StoreStats() with the stats and achievement
   stored callbacks and report the game's own id in the stats callbacks (Sonic
   Generations never showed the button prompt of the results screen)
+* Encode: fix swapped colors and a garbled strip at the bottom of the video
+  when the screen capture backend, size or pixel format changes after the
+  video started, by starting the encode again
 
 ## [1.4.8] - 2026-05-14
 ### Added
