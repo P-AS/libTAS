@@ -200,6 +200,9 @@
 * Steam: report Steam Cloud as enabled in the virtual Steam client, so that
   games save through the Steam API as they do with the real client (Sonic
   Generations stayed on its saving screen)
+* Steam: confirm ISteamUserStats::StoreStats() with the stats and achievement
+  stored callbacks and report the game's own id in the stats callbacks (Sonic
+  Generations never showed the button prompt of the results screen)
 
 ## [1.4.8] - 2026-05-14
 ### Added
