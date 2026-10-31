@@ -334,7 +334,7 @@ then presented by the game thread.
   does not manage it, so it never focuses anything. `xdotool windowunmap` on it
   was enough to get the focus back with one click, which found the cause. Wine
   games no longer map that window (`isWineClipWindow()` in `XMapWindow()` and
-  `XMapRaised()`: InputOnly and override-redirect). 8 of 8 clicks back on the
+  `XMapRaised()`: InputOnly and override-redirect) (`9a318a84`). 8 of 8 clicks back on the
   game worked, from the xterm and from libTAS, keys reach the game (the
   Pause hotkey stops and resumes the frames). In recording mode (`o` hotkey
   on a copy of the movie): real keys and pointer are recorded while the game
@@ -342,8 +342,8 @@ then presented by the game thread.
   focus leaves is not left pressed. Test with `xdotool mousemove
   --sync X Y click 1`: the real pointer of the rootful Xwayland is moved by
   the user's mouse too, which made single-click tests fail at random.
-  - Checked with a test game that really confines the cursor (32-bit OpenGL
-    window, `ClipCursor()` to a 320x240 rectangle set again every 30 frames,
+  - Checked with a test game that really confines the cursor (`utils/cliptest.c`,
+    32-bit OpenGL window, `ClipCursor()` to a 320x240 rectangle set again every 30 frames,
     as Windows drops it when the window is not the foreground one; it draws
     `GetCursorPos`, `WM_MOUSEMOVE` and `GetClipCursor` as text, read back
     with `tesseract` on a screenshot, since libTAS rewrites the window title
