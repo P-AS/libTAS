@@ -223,6 +223,24 @@ then presented by the game thread.
     is no longer faked for Wine games.
   - The GL screen capture setup left its texture bound, while games and
     wined3d track their bindings; it is now restored.
+- **Encoded video with swapped colors and a flipped strip** (Sonic Generations,
+  Proton 11.0, 1280x720 window): the video was 1280x768, red and blue were
+  swapped, and the bottom 48 rows showed a vertically flipped, stale image.
+  The first screen capture setup happens before the game is known to use
+  OpenGL (the first frames come from Wine's GDI flushes), and picked the XShm
+  backend (1280x768 from the XImage of the flush, BGRX), which failed and
+  stayed in `ScreenCapture::impl`, so the next try skipped the backend
+  choice and used it. The encoder then built its muxer from that size and
+  format. When the capture was set up again a frame later with the GL
+  backend (1280x720, RGBA, `ScreenCapture::setDrawnSize()`), nothing told the
+  encoder: RGBA bytes were labelled BGRX (swapped colors) and each frame of
+  720 rows was read as 768, the last 48 rows being the heap behind the
+  buffer. A failed setup now drops the backend, and the encoder compares the
+  size and format of the capture with those of its muxer at each frame, and
+  starts again if they differ (in the same file during the first 30 frames,
+  as a new segment after). The video then starts a few frames (7 in the test)
+  after the first frame of the game. Found by encoding with `-d`, with
+  `TMPDEBUG` logs of the backend and the drawable size at each swap.
 - Wine sets the title of SRB2's window to "FluidSynth...", cosmetic.
 - SRB2's default window is 2560x1415 (from its own config), larger than a small
   test display.
@@ -832,7 +850,11 @@ the game config, not in the movie.
 - The Windows steam_api.dll replacement has no access to libtas inputs, so
   Steam controllers stay neutral in Windows games.
 - SRB2 video dumps are black after the first frame, while the game renders
-  correctly.
+  correctly. Not reproduced since the encoder follows the screen capture
+  (v2.2.15 under Wine, 1280x800, and a native build with `-software`: colors
+  and orientation right, only the intro fades are dark; each is split in two
+  files at the first window resize, from 320x200 to the real size, as
+  before).
 - Directory listings, renames and directory creation for savefiles (see Files).
 - Savestates cannot be loaded across the exit of a Wine thread.
 - After loading a state, the stdout of the test program was not output anymore
