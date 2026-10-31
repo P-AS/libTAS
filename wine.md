@@ -564,7 +564,8 @@ game directory, all from the game itself rather than libTAS:
   only `UserStatsReceived_t` (1101) comes back, with the game id hard-coded to
   105600. The virtual client never sent `UserStatsStored_t` (1102) nor
   `UserAchievementStored_t` (1103), which the real client sends after
-  `StoreStats()`. Now sent, and the id comes from `SteamAppId`. Verified:
+  `StoreStats()`. Now sent, and the id comes from `SteamAppId`
+  (`a24bd09f`). Verified:
   replaying the same movie at normal speed, the game leaves the Results
   screen on the movie's own button presses (frame 6208 on), loads the next
   screen ("Now loading...") and reaches the hub at frame 6532; without the
