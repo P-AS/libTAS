@@ -40,10 +40,28 @@
 #include <fcntl.h>
 #include <dirent.h> 
 #include <string.h>
+#include <stdlib.h>
+#include <string>
+#include <vector>
 
 namespace libtas {
 
 static const char *steamuserstats_version = NULL;
+
+/* Achievements set since the last StoreStats() call */
+static std::vector<std::string> pending_achievements;
+
+/* Game id that the game expects in the callbacks, from the environment that
+ * Steam (and Proton) set. */
+static uint64_t getGameId()
+{
+    const char *id = getenv("SteamAppId");
+    if (!id)
+        id = getenv("SteamGameId");
+    if (id && *id)
+        return strtoull(id, nullptr, 10);
+    return 105600; // TODO
+}
 
 struct ISteamUserStats *SteamUserStats_generic(const char *version)
 {
@@ -140,7 +158,7 @@ bool STEAM_CALL ISteamUserStats_RequestCurrentStats( void* iface )
     LOGTRACE_SIMPLE(LCF_STEAM);
 
     struct UserStatsReceived_t user_stats_received;
-    user_stats_received.m_nGameID = 105600; // TODO
+    user_stats_received.m_nGameID = getGameId();
     user_stats_received.m_eResult = 1; // k_EResultOK
     user_stats_received.m_steamIDUser = 1; // TODO
     
@@ -194,6 +212,13 @@ bool STEAM_CALL ISteamUserStats_GetAchievement( void* iface, const char *pchName
 bool STEAM_CALL ISteamUserStats_SetAchievement( void* iface, const char *pchName )
 {
     LOGTRACE(LCF_STEAM, "%s called with name %s", __func__, pchName);
+    if (pchName) {
+        bool known = false;
+        for (const std::string& name : pending_achievements)
+            known |= (name == pchName);
+        if (!known)
+            pending_achievements.push_back(pchName);
+    }
     return true;
 }
 
@@ -216,6 +241,25 @@ bool STEAM_CALL ISteamUserStats_GetAchievementAndUnlockTime( void* iface, const 
 bool STEAM_CALL ISteamUserStats_StoreStats( void* iface )
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
+
+    /* Like the real client, confirm the storing, otherwise some games wait
+     * for it (Sonic Generations after a stage clear). */
+    for (const std::string& name : pending_achievements) {
+        struct UserAchievementStored_t achievement_stored = {};
+        achievement_stored.m_nGameID = getGameId();
+        achievement_stored.m_bGroupAchievement = false;
+        strncpy(achievement_stored.m_rgchAchievementName, name.c_str(), sizeof(achievement_stored.m_rgchAchievementName) - 1);
+        achievement_stored.m_nCurProgress = 0;
+        achievement_stored.m_nMaxProgress = 0;
+        CCallbackManager::DispatchCallbackOutput(STEAM_CALLBACK_TYPE_USER_STATS_USER_ACHIEVEMENT_STORED, &achievement_stored, sizeof(achievement_stored));
+    }
+    pending_achievements.clear();
+
+    struct UserStatsStored_t user_stats_stored;
+    user_stats_stored.m_nGameID = getGameId();
+    user_stats_stored.m_eResult = 1; // k_EResultOK
+    CCallbackManager::DispatchCallbackOutput(STEAM_CALLBACK_TYPE_USER_STATS_USER_STATS_STORED, &user_stats_stored, sizeof(user_stats_stored));
+
     return true;
 }
 
@@ -261,7 +305,7 @@ SteamAPICall_t STEAM_CALL ISteamUserStats_RequestUserStats( void* iface, CSteamI
     struct UserStatsReceived_t user_stats_received;
     bool io_failure = false;
 
-    user_stats_received.m_nGameID = 105600; // TODO
+    user_stats_received.m_nGameID = getGameId();
     user_stats_received.m_eResult = 1; // k_EResultOK
     user_stats_received.m_steamIDUser = steamIDUser; // TODO
     

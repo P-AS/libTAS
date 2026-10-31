@@ -554,6 +554,22 @@ game directory, all from the game itself rather than libTAS:
   ignored keys. Its first two lines can be taken from `DefaultInput.cfg` of
   the game directory (DirectInput scancodes, Return is Start).
 - With software rendering it runs at about 25 frames per second in real time.
+- **Results screen without its button prompt** (frame 4866 of a movie of the
+  first stage, goal post; Idle Threads and the virtual Steam client on): after
+  the goal the Results screen shows time, rings, score and rank, but the "A"
+  prompt to continue never appears (checked 1500 frames later, the rank still
+  animates, so the game is not frozen), and the inputs of the movie do
+  nothing. In `steam_api.log`, the game calls `SetAchievement` (twice for
+  each of RingCollector and BeginStory) and `StoreStats` several times, and
+  only `UserStatsReceived_t` (1101) comes back, with the game id hard-coded to
+  105600. The virtual client never sent `UserStatsStored_t` (1102) nor
+  `UserAchievementStored_t` (1103), which the real client sends after
+  `StoreStats()`. Now sent, and the id comes from `SteamAppId`. Verified:
+  replaying the same movie at normal speed, the game leaves the Results
+  screen on the movie's own button presses (frame 6208 on), loads the next
+  screen ("Now loading...") and reaches the hub at frame 6532; without the
+  fix it was still on Results at frame 6415. The prompt itself was not
+  captured in a screenshot.
 
 ## Determinism of Windows games
 

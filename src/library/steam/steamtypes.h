@@ -224,6 +224,38 @@ struct __attribute__((packed, aligned(1))) UserStatsReceived_t
 };
 #endif
 
+#ifdef _WIN32
+struct UserStatsStored_t
+{
+    uint64_t m_nGameID;
+    EResult m_eResult;
+};
+
+struct UserAchievementStored_t
+{
+    uint64_t m_nGameID;
+    bool m_bGroupAchievement;
+    char m_rgchAchievementName[128];
+    uint32_t m_nCurProgress;
+    uint32_t m_nMaxProgress;
+};
+#else
+struct __attribute__((packed, aligned(1))) UserStatsStored_t
+{
+    uint64_t m_nGameID __attribute__((aligned(4)));
+    EResult m_eResult __attribute__((aligned(4)));
+};
+
+struct __attribute__((packed, aligned(1))) UserAchievementStored_t
+{
+    uint64_t m_nGameID __attribute__((aligned(4)));
+    bool m_bGroupAchievement;
+    char m_rgchAchievementName[128];
+    uint32_t m_nCurProgress;
+    uint32_t m_nMaxProgress;
+};
+#endif
+
 }
 
 #endif
