@@ -40,7 +40,11 @@ void MemAccess::init(pid_t pid, int addr_size)
 #if defined(__APPLE__) && defined(__MACH__)
     kern_return_t error = task_for_pid(mach_task_self(), pid, &task);
     if (error != KERN_SUCCESS) {
-        std::cerr << "task_for_pid() failed with message " << mach_error_string(error) << std::endl;
+        /* task_for_pid() requires debug entitlements on macOS.
+         * Without them, memory access features (RAM search, etc.) won't work
+         * for unsigned/non-debugged processes. This is expected for most apps. */
+        std::cerr << "task_for_pid() not available on macOS without debug entitlements. "
+                  << "Memory access features will be disabled." << std::endl;
         return;
     }
 #endif

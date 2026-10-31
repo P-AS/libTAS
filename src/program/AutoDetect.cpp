@@ -250,7 +250,11 @@ int AutoDetect::game_engine(Context *context)
     /* Check for Godot:
      * Look at symbols inside the game executable and count `godot_*` */
     std::ostringstream oss;
+#ifdef __APPLE__
+    oss << "nm -g -n " << context->gameexecutable << " 2>/dev/null | grep -c ' godot_'";
+#else
     oss << "readelf -WsC " << context->gameexecutable << " | grep godot_ | wc -l ";
+#endif
 
     std::string godotcount = queryCmd(oss.str());
     if (!godotcount.empty() && (std::strtoul(godotcount.c_str(), nullptr, 10) > 100)) {

@@ -228,6 +228,16 @@ handling of `fat_arch` fields.
 
 ## Open Problems
 
+### Socket Accept Timeout — `initSocketGame()` 30-second limit
+
+On macOS, the game may crash during early initialization (before `initSocketGame()` 
+finishes setting up the socket), causing the program to wait indefinitely on `accept()`.
+
+**Fix**: Added 30-second `SO_RCVTIMEO` timeout to the listening socket. Also removed
+stale socket file before binding, and added error logging for bind/listen failures.
+
+**Commit: c72eeb47**
+
 ### File-Based Address Resolution Cannot Produce Runtime Addresses
 
 When parsing Mach-O files from disk via mmap, `section.addr` values in

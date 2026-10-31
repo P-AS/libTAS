@@ -91,7 +91,11 @@ int MovieFile::extractMovie(const std::filesystem::path& moviefile)
     /* Piping gzip -> tar to avoid gzip warnings on old movie files */
     oss << "gzip -dq < ";
     oss << moviefile;
+#ifdef __APPLE__
+    oss << " | tar -xf - -C ";
+#else
     oss << " | tar -xUf - -C ";
+#endif
     oss << context->config.tempmoviedir;
 
     /* Execute the tar command */
@@ -183,7 +187,11 @@ int MovieFile::saveMovie(const std::filesystem::path& moviefile, uint64_t nb_fra
 
     /* Build the tar command */
     std::ostringstream oss;
+#ifdef __APPLE__
+    oss << "tar -czf ";
+#else
     oss << "tar -czUf ";
+#endif
     oss << moviefile;
     oss << " -C ";
     oss << context->config.tempmoviedir;

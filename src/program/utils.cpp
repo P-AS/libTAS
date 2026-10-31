@@ -205,11 +205,21 @@ uint64_t getSymbolAddress(const char* symbol, const char* file)
         symbol_file = file;
         symbol_addresses.clear();
         
+#ifdef __APPLE__
+        /* macOS: use `nm -g -n` to get global symbols with addresses.
+         * Format: ADDRESS T SYMBOL (or D, B, etc.) */
+        std::ostringstream cmd;
+        cmd << "nm -g -n \"" << file << "\" 2>/dev/null | awk '/[0-9a-fA-F]+ [TDBR]/ { printf \"%s\\n\", $1 \" \" $3 }'";
+
+        std::string outputstr;
+        FILE *output = popen(cmd.str().c_str(), "r");
+#else
         std::ostringstream cmd;
         cmd << "readelf -Ws \"" << file << "\" | awk '{print $2 " " $8}'";
 
         std::string outputstr;
         FILE *output = popen(cmd.str().c_str(), "r");
+#endif
         if (output != NULL) {
             char buf[256];
             while (fgets(buf, 256, output) != nullptr) {

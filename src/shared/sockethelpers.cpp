@@ -111,12 +111,16 @@ bool initSocketGame(void)
 {
     GlobalNative gn;
     
-    /* Check if socket file already exists. If so, it is probably because
-     * the link is already done in another process of the game.
-     * In this case, we just return immediately.
-     */
+    /* Check if socket file already exists. If so, remove it first,
+     * it is probably a stale file from a crashed previous run.
+     * Note: if this is a legitimate second socket init from the same
+     * game process, we skip. */
     struct stat st;
     int result = stat(SOCKET_FILENAME, &st);
+    if (result == 0) {
+        unlink(SOCKET_FILENAME);
+        result = -1;
+    }
     if (result == 0)
         return false;
 
@@ -126,21 +130,36 @@ bool initSocketGame(void)
     const struct sockaddr_un addr = { sizeof(struct sockaddr_un), AF_UNIX, SOCKET_FILENAME };
 #endif
     const int tmp_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (tmp_fd < 0) {
+        LOG(LL_ERROR, LCF_SOCKET, "Couldn't create socket %s", strerror(errno));
+        exit(-1);
+    }
+
     if (bind(tmp_fd, reinterpret_cast<const struct sockaddr*>(&addr), sizeof(struct sockaddr_un)))
     {
         LOG(LL_ERROR, LCF_SOCKET, "Couldn't bind client socket %s", strerror(errno));
+        close(tmp_fd);
         exit(-1);
     }
 
     if (listen(tmp_fd, 1))
     {
         LOG(LL_ERROR, LCF_SOCKET, "Couldn't listen on client socket %s", strerror(errno));
+        close(tmp_fd);
         exit(-1);
     }
 
+    /* Set a 30-second timeout on accept so we don't hang indefinitely
+     * if the program fails to connect. */
+    struct timeval tv;
+    tv.tv_sec = 30;
+    tv.tv_usec = 0;
+    setsockopt(tmp_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
     if ((socket_fd = accept(tmp_fd, NULL, NULL)) < 0)
     {
-        LOG(LL_ERROR, LCF_SOCKET, "Couldn't accept client connection %s", strerror(errno));
+        LOG(LL_ERROR, LCF_SOCKET, "Accept timed out or failed %s", strerror(errno));
+        close(tmp_fd);
         exit(-1);
     }
 
