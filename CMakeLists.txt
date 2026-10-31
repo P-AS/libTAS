@@ -72,6 +72,18 @@ if(NOT LIBTAS_RELEASE_BUILD)
             ERROR_QUIET)
         if(LIBTAS_INTERIM_COMMIT)
             message(STATUS "git commit hash is ${LIBTAS_INTERIM_COMMIT}")
+
+            # Get the current branch name
+            execute_process(
+                COMMAND ${GIT_EXECUTABLE} branch --show-current
+                WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+                OUTPUT_VARIABLE LIBTAS_INTERIM_BRANCH
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+                ERROR_QUIET)
+            if(LIBTAS_INTERIM_BRANCH)
+                message(STATUS "git branch is ${LIBTAS_INTERIM_BRANCH}")
+                set(LIBTAS_INTERIM_BRANCH_DEFINED 1)
+            endif()
         endif()
 
         if(LIBTAS_BUILD_DATE)
