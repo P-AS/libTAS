@@ -203,6 +203,11 @@
 * Steam: confirm ISteamUserStats::StoreStats() with the stats and achievement
   stored callbacks and report the game's own id in the stats callbacks (Sonic
   Generations never showed the button prompt of the results screen)
+* Wine: fix encoded videos of OpenGL games having red and blue swapped and a
+  garbled strip at the bottom, as the encoder started with the size and pixel
+  format of another screen capture backend (Sonic Generations)
+* Encode: start again when the screen capture changes its size or pixel format
+  after the video started, instead of writing frames that do not match it
 
 ## [1.4.8] - 2026-05-14
 ### Added

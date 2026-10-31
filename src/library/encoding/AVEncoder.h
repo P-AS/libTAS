@@ -83,6 +83,15 @@ class AVEncoder {
         uint8_t* pixels = nullptr;
         int pixels_size = 0;
 
+        /* Dimensions and pixel format of the screen capture that the muxer
+         * was set up for */
+        int source_width = 0;
+        int source_height = 0;
+        int source_pixfmt = 0;
+
+        /* Number of video frames written in the current segment */
+        int segment_frames = 0;
+
         int startup_video_frames = 0;
         int startup_audio_frames = 0;
         std::vector<uint8_t> startup_audio_bytes;
