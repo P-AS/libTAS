@@ -163,10 +163,39 @@ static void registerMappedWineWindow(Display *display, Window w)
 #endif
 }
 
+/* Wine confines the cursor with an InputOnly override-redirect window that it
+ * maps over the clipping rectangle and passes to XGrabPointer(). Our
+ * XGrabPointer() does not grab anything, it only reads the geometry of the
+ * window, but the window itself is real: as Wine believes that the game keeps
+ * the foreground (see the _NET_ACTIVE_WINDOW hook), it stays mapped when the
+ * user focuses another window, and then catches the clicks aimed at the game
+ * window or at any window below it, so that the window manager can neither
+ * focus the game nor the other windows. Don't map it. */
+static bool isWineClipWindow(Display *display, Window w)
+{
+#ifdef __linux__
+    if (!isWineGame() || GlobalState::isNative())
+        return false;
+
+    GlobalNative gn;
+    XWindowAttributes attributes;
+    if (!XGetWindowAttributes(display, w, &attributes))
+        return false;
+    return (attributes.c_class == InputOnly) && attributes.override_redirect;
+#else
+    return false;
+#endif
+}
+
 int XMapWindow(Display *display, Window w)
 {
     LOGTRACE(LCF_WINDOW, "%s called with window %d", __func__, w);
     LINK_NAMESPACE_GLOBAL(XMapWindow);
+
+    if (isWineClipWindow(display, w)) {
+        LOG(LL_DEBUG, LCF_WINDOW | LCF_MOUSE, "   not mapping the cursor clipping window %d", w);
+        return 1;
+    }
 
     int ret = orig::XMapWindow(display, w);
 
@@ -188,6 +217,11 @@ int XMapRaised(Display *display, Window w)
 {
     LOGTRACE(LCF_WINDOW, "%s called with window %d", __func__, w);
     LINK_NAMESPACE_GLOBAL(XMapRaised);
+
+    if (isWineClipWindow(display, w)) {
+        LOG(LL_DEBUG, LCF_WINDOW | LCF_MOUSE, "   not mapping the cursor clipping window %d", w);
+        return 1;
+    }
 
     int ret = orig::XMapRaised(display, w);
 
