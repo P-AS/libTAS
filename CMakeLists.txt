@@ -97,6 +97,7 @@ add_subdirectory(src/library)
 if(NOT LIBTAS_I386_LIB_ONLY)
     add_subdirectory(src/program)
     add_subdirectory(src/steamdll)
+    add_subdirectory(src/xinputdll)
 
     install(FILES libTAS.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
     install(FILES libTAS.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)

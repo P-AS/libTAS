@@ -60,6 +60,8 @@
 * Add an "Idle Threads" sync option for Wine games, that makes loadings play
   the same way on every run: the sleeps of other threads end when the game
   advances frames, and the main thread waits for them to be idle
+* Wine: Windows games that use XInput get the controllers of libTAS through
+  our own xinput dlls, which replace the ones of Wine
 
 ### Changed
 

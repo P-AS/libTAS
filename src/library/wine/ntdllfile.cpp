@@ -439,6 +439,41 @@ static uint32_t NtCreateFile(void **handle, uint32_t access, OBJECT_ATTRIBUTES *
     return orig::NtCreateFile(handle, access, attr, io, alloc_size, attributes, sharing, disposition, options, ea_buffer, ea_length);
 }
 
+/* Give the loader one of our dlls, which are installed next to libtas.so,
+ * instead of the file that it asked for. Returns false if wine must open the
+ * original file. */
+static bool openReplacementDll(const char *dll, const std::string &original, void **handle, uint32_t access, OBJECT_ATTRIBUTES *attr, IO_STATUS_BLOCK *io, uint32_t *status)
+{
+    const char *libpath = getenv("LIBTAS_LIBRARY_PATH");
+    if (!libpath)
+        return false;
+    std::string replacement = libpath;
+    size_t slash = replacement.find_last_of('/');
+    replacement.resize((slash == std::string::npos) ? 0 : slash + 1);
+    replacement += dll;
+
+    int fd = open(replacement.c_str(), O_RDONLY | O_CLOEXEC);
+    if (fd < 0) {
+        LOG(LL_ERROR, LCF_STEAM | LCF_WINE, "Could not open %s", replacement.c_str());
+        return false;
+    }
+
+    LOG(LL_INFO, LCF_STEAM | LCF_WINE, "Loading %s instead of %s", replacement.c_str(), original.c_str());
+    *status = orig::wine_server_fd_to_handle(fd, access, attr->Attributes, handle);
+    close(fd);
+    io->Status = *status;
+    io->Information = FILE_OPENED;
+    return true;
+}
+
+/* The last component of the path that is being opened */
+static std::string ntFileName(OBJECT_ATTRIBUTES *attr)
+{
+    std::string ntpath = utf16ToUtf8(attr->ObjectName->Buffer, attr->ObjectName->Length / sizeof(char16_t));
+    size_t sep = ntpath.find_last_of('\\');
+    return ntpath.substr((sep == std::string::npos) ? 0 : sep + 1);
+}
+
 /* The Steam API of a Windows game cannot be hooked from here, so when the
  * virtual Steam client is enabled, the loader gets our own steam_api.dll
  * (built from the sources of the virtual Steam client) instead of the one of
@@ -456,14 +491,12 @@ static bool openSteamApiReplacement(void **handle, uint32_t access, OBJECT_ATTRI
     if (!attr || !attr->ObjectName || !attr->ObjectName->Buffer)
         return false;
 
-    std::string ntpath = utf16ToUtf8(attr->ObjectName->Buffer, attr->ObjectName->Length / sizeof(char16_t));
-    size_t sep = ntpath.find_last_of('\\');
-    const char *name = ntpath.c_str() + ((sep == std::string::npos) ? 0 : sep + 1);
+    std::string name = ntFileName(attr);
 
     const char *dll;
-    if (strcasecmp(name, "steam_api.dll") == 0)
+    if (strcasecmp(name.c_str(), "steam_api.dll") == 0)
         dll = "libtas-steam_api.dll";
-    else if (strcasecmp(name, "steam_api64.dll") == 0)
+    else if (strcasecmp(name.c_str(), "steam_api64.dll") == 0)
         dll = "libtas-steam_api64.dll";
     else
         return false;
@@ -476,27 +509,66 @@ static bool openSteamApiReplacement(void **handle, uint32_t access, OBJECT_ATTRI
     if (unixpath.empty() || (stat(unixpath.c_str(), &st) != 0))
         return false;
 
-    /* Our dlls are installed next to libtas.so */
-    const char *libpath = getenv("LIBTAS_LIBRARY_PATH");
-    if (!libpath)
-        return false;
-    std::string replacement = libpath;
-    size_t slash = replacement.find_last_of('/');
-    replacement.resize((slash == std::string::npos) ? 0 : slash + 1);
-    replacement += dll;
+    return openReplacementDll(dll, unixpath, handle, access, attr, io, status);
+}
 
-    int fd = open(replacement.c_str(), O_RDONLY | O_CLOEXEC);
-    if (fd < 0) {
-        LOG(LL_ERROR, LCF_STEAM | LCF_WINE, "Could not open %s, the virtual Steam client will not work", replacement.c_str());
-        return false;
-    }
+/* Machine of a PE file: 0x14c for 32-bit x86, 0x8664 for 64-bit x86, 0 if
+ * that is not known */
+static uint16_t peMachine(const std::string &path)
+{
+    int fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
+    if (fd < 0)
+        return 0;
 
-    LOG(LL_INFO, LCF_STEAM | LCF_WINE, "Loading %s instead of %s", replacement.c_str(), unixpath.c_str());
-    *status = orig::wine_server_fd_to_handle(fd, access, attr->Attributes, handle);
+    uint16_t machine = 0;
+    uint32_t pe_offset;
+    if ((pread(fd, &pe_offset, sizeof(pe_offset), 0x3c) == sizeof(pe_offset)) &&
+        (pread(fd, &machine, sizeof(machine), pe_offset + 4) != sizeof(machine)))
+        machine = 0;
     close(fd);
-    io->Status = *status;
-    io->Information = FILE_OPENED;
-    return true;
+    return machine;
+}
+
+/* Games get the controllers of libtas through our xinput dlls, instead of the
+ * ones of Wine, which read controllers from a device bus in another process
+ * (see xinput.cpp). Each name gets the dll that has its exports. The program
+ * tells us that we are asked to do it by giving us the file of the state. */
+static bool openXInputReplacement(void **handle, uint32_t access, OBJECT_ATTRIBUTES *attr, IO_STATUS_BLOCK *io, uint32_t options, uint32_t *status)
+{
+    if (!getenv("LIBTAS_XINPUT_SHM"))
+        return false;
+
+    if (!(options & FILE_NON_DIRECTORY_FILE))
+        return false;
+
+    if (!attr || !attr->ObjectName || !attr->ObjectName->Buffer)
+        return false;
+
+    static const char *const names[] = {
+        "xinput1_1", "xinput1_2", "xinput1_3", "xinput1_4", "xinput9_1_0"
+    };
+
+    std::string file = ntFileName(attr);
+    const char *base = nullptr;
+    for (const char *n : names) {
+        size_t len = strlen(n);
+        if ((strncasecmp(file.c_str(), n, len) == 0) && (strcasecmp(file.c_str() + len, ".dll") == 0))
+            base = n;
+    }
+    if (!base)
+        return false;
+
+    GlobalNative gn;
+
+    /* The loader asks for the dll in several places: take it when it exists,
+     * and give a dll of the same architecture */
+    std::string unixpath = ntToUnixPath(attr);
+    uint16_t machine = unixpath.empty() ? 0 : peMachine(unixpath);
+    if (machine == 0)
+        return false;
+
+    std::string dll = std::string("libtas-") + base + ((machine == 0x8664) ? "_64.dll" : ".dll");
+    return openReplacementDll(dll.c_str(), unixpath, handle, access, attr, io, status);
 }
 
 static uint32_t NtOpenFile(void **handle, uint32_t access, OBJECT_ATTRIBUTES *attr, IO_STATUS_BLOCK *io, uint32_t sharing, uint32_t options)
@@ -505,6 +577,8 @@ static uint32_t NtOpenFile(void **handle, uint32_t access, OBJECT_ATTRIBUTES *at
         LOGTRACE(LCF_FILEIO | LCF_WINE, "%s call with access %x", __func__, access);
         uint32_t status;
         if (openSteamApiReplacement(handle, access, attr, io, options, &status))
+            return status;
+        if (openXInputReplacement(handle, access, attr, io, options, &status))
             return status;
         if (openSaveFileHandle(handle, access, attr, io, FILE_OPEN, options, &status))
             return status;

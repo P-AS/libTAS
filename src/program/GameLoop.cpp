@@ -901,6 +901,9 @@ void GameLoop::loopExit()
     /* Unvalidate the game pid */
     context->game_pid = 0;
 
+    /* The file that gave the controllers to the xinput dlls of Windows games */
+    unlink(GameThread::xinputSharedFile(getpid()).c_str());
+
     /* Stop the appimage process */
     if (context->appimage_pid) {
         kill(context->appimage_pid, SIGINT);

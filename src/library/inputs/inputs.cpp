@@ -21,6 +21,9 @@
 
 #include "global.h"
 #include "logging.h"
+#ifdef __linux__
+#include "wine/xinput.h"
+#endif
 
 namespace libtas {
 
@@ -87,6 +90,11 @@ void Inputs::update()
 
     game_ai.misc.flags = ai.misc.flags;
     game_ai.events = ai.events;
+
+#ifdef __linux__
+    /* Windows games get the controllers through the xinput dlls of libtas */
+    WineXInput::update();
+#endif
 
     old_ai = ai;
 }
