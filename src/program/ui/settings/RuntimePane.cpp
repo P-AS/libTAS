@@ -72,11 +72,13 @@ void RuntimePane::initLayout()
 
     writingBox = new ToolTipCheckBox(tr("Prevent writing to disk"));
     steamBox = new ToolTipCheckBox(tr("Virtual Steam client"));
+    steamCloudBox = new ToolTipCheckBox(tr("Steam Cloud enabled"));
     downloadsBox = new ToolTipCheckBox(tr("Allow downloading missing libraries"));
 
     generalLayout->addLayout(localeLayout);
     generalLayout->addWidget(writingBox);
     generalLayout->addWidget(steamBox);
+    generalLayout->addWidget(steamCloudBox);
     generalLayout->addWidget(downloadsBox);
     
     savestateBox = new QGroupBox(tr("Savestates"));
@@ -180,6 +182,7 @@ void RuntimePane::initSignals()
     connect(cpuBox, QOverload<int>::of(&QSpinBox::valueChanged), this, &RuntimePane::saveConfig);
     connect(writingBox, &QAbstractButton::clicked, this, &RuntimePane::saveConfig);
     connect(steamBox, &QAbstractButton::clicked, this, &RuntimePane::saveConfig);
+    connect(steamCloudBox, &QAbstractButton::clicked, this, &RuntimePane::saveConfig);
     connect(downloadsBox, &QAbstractButton::clicked, this, &RuntimePane::saveConfig);
 
     connect(stateIncrementalBox, &QAbstractButton::clicked, this, &RuntimePane::saveConfig);
@@ -224,6 +227,13 @@ void RuntimePane::initToolTips()
     steamBox->setDescription("Implement a dummy Steam client, to be able to "
     "launch Steam games that require a connection to the Steam server. Almost none "
     "of the actual Steam features are implemented in this dummy client.");
+
+    steamCloudBox->setDescription("Tell games that Steam Cloud is enabled, as it "
+    "is for most Steam users, so that they save through the Steam API, which "
+    "the virtual Steam client stores in its remote storage folder. Some games "
+    "(Sonic Generations) write their save themselves when it is disabled. "
+    "Only used with the virtual Steam client."
+    "<br><br><em>If unsure, leave this checked</em>");
 
     downloadsBox->setDescription("Some games may need some old libraries that are "
     "unavailable on newer distributions (e.g. for GameMaker Studio). If checked, libTAS "
@@ -347,6 +357,7 @@ void RuntimePane::loadConfig()
     cpuBox->setValue(context->config.sc.cpu_cores);
     writingBox->setChecked(context->config.sc.prevent_savefiles);
     steamBox->setChecked(context->config.sc.virtual_steam);
+    steamCloudBox->setChecked(context->config.sc.steam_cloud);
     downloadsBox->setChecked(context->config.allow_downloads);
 
     stateIncrementalBox->setChecked(context->config.sc.savestate_settings & SharedConfig::SS_INCREMENTAL);
@@ -389,6 +400,7 @@ void RuntimePane::saveConfig()
 
     context->config.sc.prevent_savefiles = writingBox->isChecked();
     context->config.sc.virtual_steam = steamBox->isChecked();
+    context->config.sc.steam_cloud = steamCloudBox->isChecked();
     context->config.allow_downloads = downloadsBox->isChecked();
 
     context->config.sc.savestate_settings = 0;

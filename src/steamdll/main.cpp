@@ -43,6 +43,9 @@ namespace libtas {
 SharedConfig Global::shared_config = [] {
     SharedConfig sc;
     sc.virtual_steam = true;
+    /* libtas tells us whether the cloud is enabled */
+    const char* cloud = getenv("LIBTAS_STEAM_CLOUD");
+    sc.steam_cloud = !cloud || (atoi(cloud) != 0);
     return sc;
 }();
 

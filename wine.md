@@ -687,14 +687,25 @@ lines of the main thread between runs, ignoring addresses, thread ids, the
   nearly every pair of runs differed by frame 11-36. A movie recorded with the
   real Steam client does not play the same with the virtual one (loadings take
   a different number of frames) and is not reproducible with the real one.
-- **Steam Cloud must be reported as enabled** in the virtual Steam client,
-  otherwise the game stays on its first "Saving..." screen (after the title
-  screen). With the cloud disabled, the game writes `sonic.sav` to its
-  folder, then waits forever (the save thread exits normally, and the game
-  does not call the Steam API during the wait); the real client reports the
-  cloud as enabled, and the game saves with `FileWrite("sonic.sav")` and
-  never writes the file itself (`ISteamRemoteStorage`, no `sonic.sav` in the
-  wineserver trace). `IsCloudEnabledForAccount/ForApp` now return true.
+- **Steam Cloud** is reported as enabled by default (`IsCloudEnabledForAccount`
+  and `ForApp`, `67a8872c`), like for most Steam users, and the `steam_cloud`
+  setting (`-s steam_cloud=false`, "Steam Cloud enabled" in Settings > Runtime)
+  reports it as disabled. The Windows `steam_api.dll` gets it through
+  `LIBTAS_STEAM_CLOUD`. With the cloud enabled the game saves with
+  `FileWrite("sonic.sav")` and never writes the file itself; disabled, it
+  writes `sonic.sav` (42 KB) to its folder (in memory with "Prevent writing to
+  disk"). **The cloud does not decide whether the game gets past its first
+  "Saving..." screen** (the one after the title screen, with the text "This
+  game saves data automatically"): that screen waits for the **A button**.
+  Frame counts at about 120 s of real time, normal speed, no host pad:
+  cloud on or off, Start pressed every 40 frames: stuck on "Saving..." (frames
+  2200 and 2656); cloud on or off, Start and A pressed: the stage starts around
+  frame 1160; cloud off, Start until frame 1300, nothing, then A once at frame
+  1800: the dialog was still there at 1354 and 1708, and the "New Game /
+  Continue" menu showed at 2078. Cloud off with Idle Threads off, and cloud off
+  with "Prevent writing to disk" off, also pass when A is pressed. The earlier
+  conclusion that the cloud was the cause was wrong (those runs only pressed
+  Start). Test scripts must press A there; Start also pauses in a stage.
 - **Idle Threads sync** (`game_specific_sync` bit `0x40`, "Idle Threads Sync"
   in the game-specific settings): loading threads poll with `Sleep()`, and
   the main thread polls them with `Sleep()` and QPC loops. Before this, each

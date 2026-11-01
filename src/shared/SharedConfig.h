@@ -333,6 +333,10 @@ struct __attribute__((packed, aligned(8))) SharedConfig {
     /* Simulates a virtual Steam client */
     bool virtual_steam = false;
 
+    /* Tell games that Steam Cloud is enabled, so that they save through
+     * ISteamRemoteStorage (virtual Steam client only) */
+    bool steam_cloud = true;
+
     /* Force Mesa software OpenGL driver */
     bool opengl_soft = true;
 

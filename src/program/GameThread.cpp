@@ -314,6 +314,7 @@ void GameThread::set_env_variables(Context *context, int gameArch)
             std::filesystem::path remotestorage = context->config.steamuserdir;
             remotestorage /= context->gamename;
             setenv("LIBTAS_STEAM_USER_DATA_PATH", context->config.steamuserdir.c_str(), 1);
+            setenv("LIBTAS_STEAM_CLOUD", context->config.sc.steam_cloud ? "1" : "0", 1);
             setenv("LIBTAS_STEAM_REMOTE_STORAGE", remotestorage.c_str(), 1);
 
             /* Its logs follow the log level of the game, and go to a file

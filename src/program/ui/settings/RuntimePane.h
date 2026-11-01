@@ -55,6 +55,7 @@ private:
     ToolTipSpinBox *cpuBox;
     ToolTipCheckBox* writingBox;
     ToolTipCheckBox* steamBox;
+    ToolTipCheckBox* steamCloudBox;
     ToolTipCheckBox* downloadsBox;
 
     ToolTipCheckBox* stateIncrementalBox;
