@@ -105,6 +105,7 @@ bool Config::applyCliSetting(const std::string& key, const std::string& value)
     else if (key == "openal_soft")              sc.openal_soft = boolValue();
     else if (key == "locale")                   sc.locale = intValue();
     else if (key == "virtual_steam")            sc.virtual_steam = boolValue();
+    else if (key == "steam_cloud")              sc.steam_cloud = boolValue();
     else if (key == "opengl_soft")              sc.opengl_soft = boolValue();
     else if (key == "opengl_quality")           sc.opengl_quality = intValue();
     else if (key == "async_events")             sc.async_events = intValue();
@@ -343,6 +344,7 @@ void Config::save(const std::filesystem::path& gamepath) {
     settings.setValue("audio_bitrate", sc.audio_bitrate);
     settings.setValue("locale", sc.locale);
     settings.setValue("virtual_steam", sc.virtual_steam);
+    settings.setValue("steam_cloud", sc.steam_cloud);
     settings.setValue("openal_soft", sc.openal_soft);
     settings.setValue("opengl_soft", sc.opengl_soft);
     settings.setValue("opengl_quality", sc.opengl_quality);
@@ -568,6 +570,7 @@ void Config::load(const std::filesystem::path& gamepath) {
     sc.openal_soft = settings.value("openal_soft", sc.openal_soft).toBool();
     sc.locale = settings.value("locale", sc.locale).toInt();
     sc.virtual_steam = settings.value("virtual_steam", sc.virtual_steam).toBool();
+    sc.steam_cloud = settings.value("steam_cloud", sc.steam_cloud).toBool();
     sc.async_events = settings.value("async_events", sc.async_events).toInt();
     sc.wait_timeout = settings.value("wait_timeout", sc.wait_timeout).toInt();
     sc.sleep_handling = settings.value("sleep_handling", sc.sleep_handling).toInt();

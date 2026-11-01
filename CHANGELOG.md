@@ -64,6 +64,8 @@
   our own xinput dlls, which replace the ones of Wine, and DirectInput shows
   them as Xbox 360 pads instead of the controllers of the host (fix Sonic
   Generations controllers)
+* Steam: add a setting (`steam_cloud`) to tell games that Steam Cloud is
+  enabled or disabled in the virtual Steam client
 
 ### Changed
 

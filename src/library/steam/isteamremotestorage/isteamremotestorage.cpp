@@ -429,20 +429,21 @@ bool STEAM_CALL ISteamRemoteStorage_GetQuota( void* iface, uint64_t *pnTotalByte
     return true;
 }
 
-/* Report the cloud as enabled, as it is for most Steam users, so that games
- * save through ISteamRemoteStorage, which stores the files in our remote
- * storage folder. Sonic Generations stays on its saving screen if it is told
- * that the cloud is disabled, and writes its save to the game folder instead. */
+/* Report the cloud as enabled by default, as it is for most Steam users, so
+ * that games save through ISteamRemoteStorage, which stores the files in our
+ * remote storage folder. Sonic Generations stays on its saving screen if it
+ * is told that the cloud is disabled, and writes its save to the game folder
+ * instead (see the steam_cloud setting). */
 bool STEAM_CALL ISteamRemoteStorage_IsCloudEnabledForAccount(void* iface)
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
-    return true;
+    return Global::shared_config.steam_cloud;
 }
 
 bool STEAM_CALL ISteamRemoteStorage_IsCloudEnabledForApp(void* iface)
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
-    return true;
+    return Global::shared_config.steam_cloud;
 }
 
 void STEAM_CALL ISteamRemoteStorage_SetCloudEnabledForApp( void* iface, bool bEnabled )
