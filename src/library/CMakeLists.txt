@@ -232,6 +232,7 @@ set(LIBTAS_LIBRARY_SOURCES
     wine/win32u.cpp
     wine/ntdll.cpp
     wine/ntdllfile.cpp
+    wine/xinput.cpp
     xcb/XcbEventQueue.cpp
     xcb/XcbEventQueueList.cpp
     xcb/xcbconnection.cpp

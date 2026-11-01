@@ -382,6 +382,43 @@ then presented by the game thread.
 - Hourglass import: Hourglass records `VK_LBUTTON` as a held key, which the
   importer converts into a pointer button (`95373926`).
 
+### XInput controllers
+
+Wine serves controllers from `winebus.sys` in another process, which libTAS
+does not control and which is not savestated. Windows games now get the
+controllers of libTAS (`controllers` of `Inputs::game_ai`) through our own
+xinput dlls (`src/xinputdll`, one source with a `.def` per version, as old
+games import by ordinal, in 32 and 64-bit):
+
+- The program creates `/dev/shm/libtas-xinput-<pid>` with neutral pads and gives
+  its path in `LIBTAS_XINPUT_SHM`. `Inputs::update()` rewrites the pads of the
+  frame at each boundary (`wine/xinput.cpp`, sequence lock), and the dll maps
+  the file read-only (`wine/xinputshared.h` is shared). Rumble goes nowhere.
+- `NtOpenFile` hook (`openXInputReplacement()`): when the loader opens
+  `xinput1_x.dll` it gets `libtas-xinput1_x[_64].dll` from next to `libtas.so`,
+  chosen by the architecture of the file it asked for. The dlls start with the
+  "Wine builtin DLL" signature, or the loader refuses them.
+- Checked with `utils/xinputtest.c` (32-bit): the dll is the libTAS one, pad 1
+  follows a Lua script (A, D-pad, triggers 255, stick 20000), pads 2-4 return
+  `ERROR_DEVICE_NOT_CONNECTED` (1167). Sonic Generations (imports
+  `XINPUT1_3.dll` ordinals 2 and 3) loads our dll.
+- **Sonic Generations does not use it yet.** It enumerates game controllers
+  with DirectInput (`+dinput`: `EnumDevices`, then a `c_dfDIJoystick2` device
+  for whatever Wine found, here the DualSense of the host, through `hidraw`),
+  and never called `XInputGetState` (our dll logs the first call at log level
+  4 in `steam_api.log`), neither with the host pad (115 s, in a stage) nor with
+  winebus disabled in the prefix (100 s, on the title screen; DirectInput
+  then polls only the keyboard and the mouse). Probably the game only turns to
+  XInput for DirectInput devices that look like Xbox pads (`IG_` in the device
+  path), so libTAS would also need to give DirectInput such a device. Not
+  tested.
+- Host controllers leak into Wine games through DirectInput, which is neither
+  deterministic nor part of the movie. Disabling them in a test prefix:
+  `HKLM\System\CurrentControlSet\Services\winebus` with `DisableHidraw`=1,
+  `DisableInput`=1 and `Enable SDL`=0 (dwords).
+- The XInput dll logs to the file of the virtual Steam client (`steam_api.log`,
+  needs the virtual Steam client and a log level of 4 for the calls).
+
 ## Audio
 
 - libtas makes pulseaudio fail (`pa_mainloop_new()` returns NULL) so that games
@@ -915,4 +952,5 @@ the game config, not in the movie.
 - Loading a savestate under openbox once did nothing (1 run out of 4, not
   reproduced).
 - Sonic Generations: not tested in a stage yet (loading and time-tracking,
-  non-draw frames during gameplay), controllers (XInput) not tested.
+  non-draw frames during gameplay). Its controllers go through DirectInput, so
+  libTAS controllers do not reach it yet (see XInput controllers in Input).

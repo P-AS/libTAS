@@ -23,6 +23,7 @@
 #include "Context.h"
 #include "../shared/SharedConfig.h"
 #include "../shared/lcf.h"
+#include "../library/wine/xinputshared.h"
 
 #include <algorithm> // std::replace
 #include <string>
@@ -31,6 +32,45 @@
 #include <unistd.h> // chdir()
 #include <fcntl.h> // O_RDWR, O_CREAT
 #include <filesystem>
+#include <cstring> // memset
+#include <sys/stat.h> // S_IRUSR
+
+std::string GameThread::xinputSharedFile(pid_t program_pid)
+{
+    return "/dev/shm/libtas-xinput-" + std::to_string(program_pid);
+}
+
+/* Create the file that gives the controllers of libtas to the xinput dlls of
+ * Windows games (see xinputshared.h), with neutral controllers, and give its
+ * path to the game. Does nothing if our dlls are not installed. */
+static void setXInputSharedFile(Context *context)
+{
+    std::filesystem::path dll = context->libtaspath.parent_path() / "libtas-xinput1_3.dll";
+    if (!std::filesystem::exists(dll))
+        return;
+
+    std::string path = GameThread::xinputSharedFile(getppid());
+    int fd = open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    if (fd < 0) {
+        std::cerr << "Could not create " << path << ", controllers will not work in this Windows game" << std::endl;
+        return;
+    }
+
+    XInputShm shm;
+    memset(&shm, 0, sizeof(shm));
+    shm.magic = LIBTAS_XINPUT_SHM_MAGIC;
+    shm.version = LIBTAS_XINPUT_SHM_VERSION;
+    shm.pad_count = std::min<int>(context->config.sc.nb_controllers, LIBTAS_XINPUT_MAX_PADS);
+    for (uint32_t i = 0; i < shm.pad_count; i++) {
+        shm.pads[i].connected = 1;
+        shm.pads[i].packet = 1;
+    }
+    bool ok = (write(fd, &shm, sizeof(shm)) == static_cast<ssize_t>(sizeof(shm)));
+    close(fd);
+
+    if (ok)
+        setenv(LIBTAS_XINPUT_SHM_ENV, path.c_str(), 1);
+}
 
 void GameThread::set_env_variables(Context *context, int gameArch)
 {
@@ -263,6 +303,9 @@ void GameThread::set_env_variables(Context *context, int gameArch)
         int processArch = wineProcessArch(findWinePath(context, gameArch), gameArch);
         if (!proton_script && ((gameArch & BT_TYPEMASK) != BT_PE32P) && (processArch == BT_ELF64))
             setenv("LIBTAS_WINE_RESTART", "1", 1);
+
+        /* Windows games get the controllers of libtas through our xinput dlls */
+        setXInputSharedFile(context);
 
         /* The virtual Steam client of Windows games is a dll that libtas
          * loads instead of the steam_api.dll of the game, and which cannot

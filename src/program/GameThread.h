@@ -22,6 +22,7 @@
 
 #include <list>
 #include <string>
+#include <sys/types.h>
 
 /* Forward declaration */
 struct Context;
@@ -40,6 +41,11 @@ namespace GameThread {
     /* Set all environment variables before launching the game process */
     void set_env_variables(Context *context, int gameArch);
     
+    /* File in which the game gets the controllers of libtas, for the xinput
+     * dlls of Windows games, and that depends on the pid of the program (the
+     * child process gives its parent) */
+    std::string xinputSharedFile(pid_t program_pid);
+
     /* Build the list of all arguments to be passed to `sh` for running the game */
     std::list<std::string> build_arg_list(Context *context, int gameArch);
 }

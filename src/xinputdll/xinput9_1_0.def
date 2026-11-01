@@ -1,0 +1,7 @@
+; Exports of xinput9_1_0.dll (the ordinals are the ones of Microsoft's dll)
+EXPORTS
+XInputGetCapabilities @1
+XInputGetDSoundAudioDeviceGuids @2
+XInputSetState @3
+XInputGetState @4
+LibTASXInputBridge
