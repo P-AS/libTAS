@@ -964,5 +964,7 @@ the game config, not in the movie.
   reproduced).
 - Sonic Generations: not tested in a stage yet (loading and time-tracking,
   non-draw frames during gameplay). Controllers work (see XInput controllers in
-  Input), only tested with Start on the title screen: not with sticks, other
-  buttons, or in a stage.
+  Input): in Green Hill, libTAS controller 1 moves Sonic with the left stick,
+  and A jumps (Lua, frames 1250-1900, timer 10 s, rings collected, hit by a
+  Motobug). Start is the pause button in a stage: only press it in menus (the
+  stage starts around frame 1160 with 6 Start/A presses per second before).
