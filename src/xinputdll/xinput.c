@@ -409,6 +409,258 @@ DWORD WINAPI XInputGetAudioDeviceIds(DWORD index, LPWSTR render, UINT *render_co
     return ERROR_DEVICE_NOT_CONNECTED;
 }
 
+
+/* ---- DirectInput ----
+ *
+ * Games that handle XInput pads and others (Sonic Generations) list the
+ * controllers with DirectInput first, and use XInput for the devices that
+ * are Xbox pads, recognized by their product guid (the vendor and product
+ * ids, then "PIDVID"). Wine gives DirectInput the controllers of the host, so
+ * the game would never see ours, and would read the pads of the host, which
+ * are not in the movie. We patch EnumDevices() of DirectInput 8 in the game:
+ * the game controllers of the host are hidden, and one Xbox 360 pad is
+ * reported for each controller of libtas. */
+
+typedef struct {
+    DWORD dwSize;
+    GUID guidInstance;
+    GUID guidProduct;
+    DWORD dwDevType;
+    CHAR tszInstanceName[MAX_PATH];
+    CHAR tszProductName[MAX_PATH];
+    GUID guidFFDriver;
+    WORD wUsagePage;
+    WORD wUsage;
+} DEVICEINSTANCEA;
+
+typedef struct {
+    DWORD dwSize;
+    GUID guidInstance;
+    GUID guidProduct;
+    DWORD dwDevType;
+    WCHAR tszInstanceName[MAX_PATH];
+    WCHAR tszProductName[MAX_PATH];
+    GUID guidFFDriver;
+    WORD wUsagePage;
+    WORD wUsage;
+} DEVICEINSTANCEW;
+
+typedef BOOL (WINAPI *enum_callback_t)(const void *instance, void *ref);
+typedef HRESULT (WINAPI *enum_devices_t)(void *self, DWORD type, enum_callback_t callback, void *ref, DWORD flags);
+
+#define DI8DEVCLASS_ALL 0
+#define DI8DEVCLASS_GAMECTRL 4
+#define DI8DEVTYPE_JOYSTICK 0x14
+#define DI8DEVTYPE_FIRSTPERSON 0x18
+#define DIDEVTYPE_HID 0x10000
+#define DI8DEVTYPE_GAMEPAD 0x15
+#define DI8DEVTYPEGAMEPAD_STANDARD 2
+#define DIENUM_CONTINUE 1
+#define DIENUM_STOP 0
+
+static const GUID IID_IDirectInput8A_ = { 0xbf798030, 0x483a, 0x4da2, { 0xaa, 0x99, 0x5d, 0x64, 0xed, 0x36, 0x97, 0x00 } };
+static const GUID IID_IDirectInput8W_ = { 0xbf798031, 0x483a, 0x4da2, { 0xaa, 0x99, 0x5d, 0x64, 0xed, 0x36, 0x97, 0x00 } };
+
+static enum_devices_t orig_enum_a, orig_enum_w;
+static DWORD enum_tls = TLS_OUT_OF_INDEXES; /* set while a patched EnumDevices() runs */
+
+struct enum_ctx {
+    enum_callback_t callback;
+    void *ref;
+    BOOL wide;
+    BOOL stopped;
+};
+
+static BOOL is_game_controller(DWORD type)
+{
+    DWORD t = type & 0xff;
+    return (t >= DI8DEVTYPE_JOYSTICK) && (t <= DI8DEVTYPE_FIRSTPERSON);
+}
+
+static BOOL WINAPI filter_callback(const void *instance, void *ref)
+{
+    struct enum_ctx *ctx = ref;
+    DWORD type = ((const DEVICEINSTANCEA *)instance)->dwDevType; /* same offset in both */
+
+    if (is_game_controller(type)) {
+        xlog(LL_DEBUG, "Hiding the DirectInput controller %s", ctx->wide ? "(wide)" : ((const DEVICEINSTANCEA *)instance)->tszProductName);
+        return DIENUM_CONTINUE;
+    }
+
+    BOOL ret = ctx->callback(instance, ctx->ref);
+    if (ret == DIENUM_STOP)
+        ctx->stopped = TRUE;
+    return ret;
+}
+
+static void fake_guids(DWORD index, GUID *instance, GUID *product)
+{
+    static const GUID inst = { 0x4c494254, 0x4153, 0x0001, { 0x80, 0x01, 0, 0, 0x58, 0x49, 0x4e, 0x00 } };
+    *instance = inst;
+    instance->Data4[7] = (BYTE)index;
+    /* Vendor 045e (Microsoft), product 028e (Xbox 360 controller) */
+    product->Data1 = 0x028e045e;
+    product->Data2 = 0;
+    product->Data3 = 0;
+    memcpy(product->Data4, "\0\0PIDVID", 8);
+}
+
+static void report_pads(struct enum_ctx *ctx)
+{
+    static const char name[] = "Controller (XBOX 360 For Windows)";
+
+    for (DWORD i = 0; i < LIBTAS_XINPUT_MAX_PADS; i++) {
+        struct XInputShmPad pad;
+        if (!read_pad(i, &pad))
+            continue;
+
+        union { DEVICEINSTANCEA a; DEVICEINSTANCEW w; } inst;
+        memset(&inst, 0, sizeof(inst));
+        if (ctx->wide) {
+            DEVICEINSTANCEW *w = &inst.w;
+            w->dwSize = sizeof(*w);
+            fake_guids(i, &w->guidInstance, &w->guidProduct);
+            w->dwDevType = DIDEVTYPE_HID | (DI8DEVTYPEGAMEPAD_STANDARD << 8) | DI8DEVTYPE_GAMEPAD;
+            MultiByteToWideChar(CP_ACP, 0, name, -1, w->tszInstanceName, MAX_PATH);
+            MultiByteToWideChar(CP_ACP, 0, name, -1, w->tszProductName, MAX_PATH);
+            w->wUsagePage = 1;
+            w->wUsage = 5;
+        } else {
+            DEVICEINSTANCEA *a = &inst.a;
+            a->dwSize = sizeof(*a);
+            fake_guids(i, &a->guidInstance, &a->guidProduct);
+            a->dwDevType = DIDEVTYPE_HID | (DI8DEVTYPEGAMEPAD_STANDARD << 8) | DI8DEVTYPE_GAMEPAD;
+            strcpy(a->tszInstanceName, name);
+            strcpy(a->tszProductName, name);
+            a->wUsagePage = 1;
+            a->wUsage = 5;
+        }
+
+        xlog(LL_INFO, "Reporting an Xbox 360 pad to DirectInput for controller %lu", (unsigned long)i);
+        if (ctx->callback(&inst, ctx->ref) == DIENUM_STOP)
+            break;
+    }
+}
+
+static HRESULT enum_devices(BOOL wide, void *self, DWORD type, enum_callback_t callback, void *ref, DWORD flags)
+{
+    enum_devices_t orig = wide ? orig_enum_w : orig_enum_a;
+
+    /* The A version may call the W one */
+    if (TlsGetValue(enum_tls))
+        return orig(self, type, callback, ref, flags);
+
+    BOOL gamectrl = (type == DI8DEVCLASS_ALL) || (type == DI8DEVCLASS_GAMECTRL);
+    if (!gamectrl || !callback)
+        return orig(self, type, callback, ref, flags);
+
+    struct enum_ctx ctx = { callback, ref, wide, FALSE };
+    TlsSetValue(enum_tls, (void *)1);
+    HRESULT hr = orig(self, type, filter_callback, &ctx, flags);
+    TlsSetValue(enum_tls, NULL);
+
+    if (SUCCEEDED(hr) && !ctx.stopped)
+        report_pads(&ctx);
+    return hr;
+}
+
+static HRESULT WINAPI enum_devices_a(void *self, DWORD type, enum_callback_t callback, void *ref, DWORD flags)
+{
+    return enum_devices(FALSE, self, type, callback, ref, flags);
+}
+
+static HRESULT WINAPI enum_devices_w(void *self, DWORD type, enum_callback_t callback, void *ref, DWORD flags)
+{
+    return enum_devices(TRUE, self, type, callback, ref, flags);
+}
+
+/* Replace EnumDevices (slot 4) in the table of the object that dinput8 gives */
+static void patch_vtable(HMODULE dinput8, const GUID *iid, void *replacement, enum_devices_t *orig)
+{
+    typedef HRESULT (WINAPI *create_t)(HINSTANCE, DWORD, const GUID *, void **, void *);
+    create_t create = (create_t)(void *)GetProcAddress(dinput8, "DirectInput8Create");
+    void *obj = NULL;
+
+    if (!create || FAILED(create(GetModuleHandleW(NULL), 0x0800, iid, &obj, NULL)) || !obj) {
+        xlog(LL_ERROR, "Could not create a DirectInput object, DirectInput will show the controllers of the host");
+        return;
+    }
+
+    void **vtable = *(void ***)obj;
+    DWORD old;
+    if (VirtualProtect(&vtable[4], sizeof(void *), PAGE_READWRITE, &old)) {
+        if (vtable[4] != replacement) {
+            *orig = (enum_devices_t)vtable[4];
+            vtable[4] = replacement;
+        }
+        VirtualProtect(&vtable[4], sizeof(void *), old, &old);
+    } else {
+        xlog(LL_ERROR, "Could not patch DirectInput (error %lu)", GetLastError());
+    }
+
+    /* Release() */
+    ((ULONG (WINAPI *)(void *))vtable[2])(obj);
+}
+
+static LONG dinput_patched;
+
+static void patch_dinput(HMODULE dinput8)
+{
+    if (InterlockedExchange(&dinput_patched, 1))
+        return;
+
+    patch_vtable(dinput8, &IID_IDirectInput8A_, (void *)enum_devices_a, &orig_enum_a);
+    patch_vtable(dinput8, &IID_IDirectInput8W_, (void *)enum_devices_w, &orig_enum_w);
+    xlog(LL_INFO, "Patched EnumDevices() of DirectInput 8");
+}
+
+typedef struct {
+    USHORT Length;
+    USHORT MaximumLength;
+    PWSTR Buffer;
+} USTR;
+
+typedef struct {
+    ULONG Flags;
+    const USTR *FullDllName;
+    const USTR *BaseDllName;
+    PVOID DllBase;
+    ULONG SizeOfImage;
+} LDR_LOADED_DATA;
+
+typedef VOID (CALLBACK *ldr_notify_t)(ULONG reason, const LDR_LOADED_DATA *data, PVOID context);
+
+static VOID CALLBACK dll_loaded(ULONG reason, const LDR_LOADED_DATA *data, PVOID context)
+{
+    /* 1: loaded */
+    if ((reason == 1) && data->BaseDllName && (data->BaseDllName->Length == 11 * sizeof(WCHAR)) &&
+        (_wcsnicmp(data->BaseDllName->Buffer, L"dinput8.dll", 11) == 0))
+        patch_dinput((HMODULE)data->DllBase);
+}
+
+static void hook_dinput(void)
+{
+    /* Only when the program gave us controllers */
+    if (!getenv(LIBTAS_XINPUT_SHM_ENV))
+        return;
+
+    enum_tls = TlsAlloc();
+    if (enum_tls == TLS_OUT_OF_INDEXES)
+        return;
+
+    HMODULE ntdll = GetModuleHandleA("ntdll.dll");
+    typedef LONG (NTAPI *register_t)(ULONG, ldr_notify_t, PVOID, PVOID *);
+    register_t reg = ntdll ? (register_t)(void *)GetProcAddress(ntdll, "LdrRegisterDllNotification") : NULL;
+    PVOID cookie;
+    if (reg)
+        reg(0, dll_loaded, NULL, &cookie);
+
+    /* Already loaded when the game imports it */
+    HMODULE dinput8 = GetModuleHandleW(L"dinput8.dll");
+    if (dinput8)
+        patch_dinput(dinput8);
+}
+
 /* Not in the dlls of Wine: games and test programs can look for it to know
  * which dll they got */
 DWORD WINAPI LibTASXInputBridge(void)
@@ -418,7 +670,9 @@ DWORD WINAPI LibTASXInputBridge(void)
 
 BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID reserved)
 {
-    if (reason == DLL_PROCESS_ATTACH)
+    if (reason == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(instance);
+        hook_dinput();
+    }
     return TRUE;
 }
