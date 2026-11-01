@@ -402,19 +402,30 @@ games import by ordinal, in 32 and 64-bit):
   follows a Lua script (A, D-pad, triggers 255, stick 20000), pads 2-4 return
   `ERROR_DEVICE_NOT_CONNECTED` (1167). Sonic Generations (imports
   `XINPUT1_3.dll` ordinals 2 and 3) loads our dll.
-- **Sonic Generations does not use it yet.** It enumerates game controllers
-  with DirectInput (`+dinput`: `EnumDevices`, then a `c_dfDIJoystick2` device
-  for whatever Wine found, here the DualSense of the host, through `hidraw`),
-  and never called `XInputGetState` (our dll logs the first call at log level
-  4 in `steam_api.log`), neither with the host pad (115 s, in a stage) nor with
-  winebus disabled in the prefix (100 s, on the title screen; DirectInput
-  then polls only the keyboard and the mouse). Probably the game only turns to
-  XInput for DirectInput devices that look like Xbox pads (`IG_` in the device
-  path), so libTAS would also need to give DirectInput such a device. Not
-  tested.
-- Host controllers leak into Wine games through DirectInput, which is neither
-  deterministic nor part of the movie. Disabling them in a test prefix:
-  `HKLM\System\CurrentControlSet\Services\winebus` with `DisableHidraw`=1,
+- **DirectInput**: Sonic Generations lists controllers with DirectInput
+  (`EnumDevices`, type `DI8DEVCLASS_GAMECTRL`) and only uses XInput for the
+  devices that are Xbox pads. It never called `XInputGetState` with the host
+  DualSense (found by Wine through `hidraw`, then created as a DirectInput
+  joystick), nor with winebus disabled in the prefix. With a virtual Xbox 360
+  pad (`uinput`, 045e:028e) it created no device for that pad and polled
+  XInput. It did not ask raw input or WMI (`+rawinput`, `+wbem`): the choice
+  comes from the enumeration, i.e. the product guid (`028E045E-0000-0000-
+  0000-504944564944`: ids, then "PIDVID"). So the xinput dll patches
+  `EnumDevices` (slot 4 of the vtables of `IDirectInput8A` and `W`, found by
+  creating an object with `DirectInput8Create`) in the game, at its load
+  (`DllMain`, and `LdrRegisterDllNotification` if `dinput8.dll` comes later):
+  the game controllers of the host are not given to the game, and one Xbox 360
+  pad (that guid, type gamepad) is reported for each connected controller of
+  libTAS, after the other devices. It is only done when the game loads one of
+  our xinput dlls and the program gave the file of the pads. Verified: the
+  game polls `XInputGetState(0)` and gets Start pressed by a Lua script
+  (`input.setControllerButton(1, 6, 1)`), leaves "PRESS START" with no
+  keyboard and no host pad, and reaches the autosave message of a new game
+  (frame 2200, normal speed; about 80 s of real time to reach the title).
+  Games that only use DirectInput for controllers still see the host pads.
+- Host controllers no longer reach games that load our xinput dlls. For other
+  games, disable them in a test prefix with
+  `HKLM\System\CurrentControlSet\Services\winebus`: `DisableHidraw`=1,
   `DisableInput`=1 and `Enable SDL`=0 (dwords).
 - The XInput dll logs to the file of the virtual Steam client (`steam_api.log`,
   needs the virtual Steam client and a log level of 4 for the calls).
@@ -952,5 +963,6 @@ the game config, not in the movie.
 - Loading a savestate under openbox once did nothing (1 run out of 4, not
   reproduced).
 - Sonic Generations: not tested in a stage yet (loading and time-tracking,
-  non-draw frames during gameplay). Its controllers go through DirectInput, so
-  libTAS controllers do not reach it yet (see XInput controllers in Input).
+  non-draw frames during gameplay). Controllers work (see XInput controllers in
+  Input), only tested with Start on the title screen: not with sticks, other
+  buttons, or in a stage.

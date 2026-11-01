@@ -61,7 +61,9 @@
   the same way on every run: the sleeps of other threads end when the game
   advances frames, and the main thread waits for them to be idle
 * Wine: Windows games that use XInput get the controllers of libTAS through
-  our own xinput dlls, which replace the ones of Wine
+  our own xinput dlls, which replace the ones of Wine, and DirectInput shows
+  them as Xbox 360 pads instead of the controllers of the host (fix Sonic
+  Generations controllers)
 
 ### Changed
 
