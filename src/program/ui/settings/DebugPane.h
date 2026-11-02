@@ -59,7 +59,8 @@ private:
     QCheckBox* debugSigIntBox;
     QLineEdit* debugStraceEvents;
 
-    QComboBox* logToChoice;
+    QCheckBox* logToConsoleBox;
+    QCheckBox* logToFileBox;
 
     QSlider* logLevelSlider;
     QCheckBox* logPrintAllBox;

@@ -21,6 +21,7 @@
 #include "AutoDetect.h"
 #include "utils.h"
 #include "Context.h"
+#include "LogOutput.h"
 #include "../shared/SharedConfig.h"
 #include "../shared/lcf.h"
 #include "../library/wine/xinputshared.h"
@@ -481,6 +482,11 @@ std::list<std::string> GameThread::build_arg_list(Context *context, int gameArch
 
 void GameThread::launch(Context *context)
 {
+    /* Set where stderr of the game, where the logs go, is redirected. Done
+     * first, as the environment is changed below (TZ is set to UTC, and the
+     * name of the log file has the local time). */
+    LogOutput::redirectStderr(context);
+
     /* Detect the game executable arch and handle 32-bit game on 64-bit arch case */
     int gameArch = AutoDetect::arch(context);
 
@@ -491,27 +497,6 @@ void GameThread::launch(Context *context)
 #ifdef __unix__
     AutoDetect::game_libraries(context);
 #endif
-
-    /* Set where stderr of the game is redirected */
-    int fd;
-    std::filesystem::path logfile = context->gamepath;
-    logfile += ".log";
-    switch(context->config.sc.logging_status) {
-        case SharedConfig::NO_LOGGING:
-            fd = open("/dev/null", O_RDWR, S_IRUSR | S_IWUSR);
-            dup2(fd, 2);
-            close(fd);
-            break;
-        case SharedConfig::LOGGING_TO_FILE:
-            std::cout << "Logging to file: " << logfile << std::endl;
-            fd = open(logfile.c_str(), O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
-            dup2(fd, 2);
-            close(fd);
-            break;
-        case SharedConfig::LOGGING_TO_CONSOLE:
-        default:
-            break;
-    }
 
     /* Build the argument list for running the game */
     std::list<std::string> arg_list = build_arg_list(context, gameArch);

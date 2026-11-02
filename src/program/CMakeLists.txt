@@ -115,6 +115,7 @@ set(LIBTAS_PROGRAM_SOURCES
     GameEventsXcb.cpp
     GameLoop.cpp
     GameThread.cpp
+    LogOutput.cpp
     KeyMapping.cpp
     KeyMappingXcb.cpp
     main.cpp
