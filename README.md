@@ -1,12 +1,16 @@
 ## <img src="https://raw.githubusercontent.com/clementgallet/libTAS/master/libTAS.svg" width="24"/> libTAS
 
-[![Discord](https://img.shields.io/discord/726811446498820198?logo=discord)](https://discord.gg/3MBVAzU)
+[![Discord](https://img.shields.io/discord/1564477467069124620?logo=discord)](https://discord.gg/amFSM2z3fa)
 [![Website](https://img.shields.io/badge/website-blue)](https://clementgallet.github.io/libTAS/)
 
 
-GNU/Linux software to give TAS tools to games. Code originates from [SuperMeatBoyTaser](https://github.com/DeathlyDeep/SuperMeatBoyTaser). It requires a GNU/Linux system with a recent kernel (at least 3.17 for the `memfd_create` syscall). Supported archs are `x86_64`, `x86` and `aarch64`. You will need the Mesa llvm OpenGL driver to support savestates for games using OpenGL.
+GNU/Linux software to give TAS tools to games. Code originates from [SuperMeatBoyTaser](https://github.com/DeathlyDeep/SuperMeatBoyTaser). It requires a GNU/Linux system with a recent kernel (at least 3.17 for the `memfd_create` syscall). Supported archs are `x86_64`, `x86` and `aarch64`. You will need Mesa's llvmpipe OpenGL driver to support savestates for games using OpenGL.
 
-Discord server: https://discord.gg/3MBVAzU
+This is a fork which aims to add modernizations, fix longstanding bugs, and revive support for Windows games through Wine/Proton, among other things. See [TODO.md](TODO.md) and how to [run Windows games through Wine/Proton](#run-windows-games-through-wineproton).
+
+Discord server, for this fork: https://discord.gg/amFSM2z3fa
+
+Discord server, for the original libTAS: https://discord.gg/3MBVAzU
 
 Website: https://clementgallet.github.io/libTAS/ (still in progress)
 
@@ -46,7 +50,7 @@ There are also [automated builds](https://github.com/P-AS/libTAS/actions/workflo
 
 ## Building
 
-An PKGBUILD is available for Arch Linux on the [AUR](https://aur.archlinux.org/packages/libtas/).
+A PKGBUILD is available for Arch Linux on the [AUR](https://aur.archlinux.org/packages/libtas/).
 
 ### Dependencies
 
@@ -112,18 +116,22 @@ Here are the default controls when the game has started:
 
 Note: the game starts up **paused**.
 
-## Run Windows games through Wine
+## Run Windows games through Wine/Proton
 
 > [!IMPORTANT]
-> Wine support is limited and not being actively developed. If possible, you should use a Linux version of your game.
+> Wine/Proton support is experimental. Not all games will work yet. If possible, you should use a native Linux version of your game.
 
 To launch Windows games through Wine, you first need to install Wine on your system (it must be located somewhere in $PATH).
 
+Some Windows Steam games need Proton in order to run. To do this, install Proton through Steam, and under File --> Executable Options, enable Proton and add its path.
+
+In the game executable field, you must set the Windows `.exe` executable (both 32-bit and 64-bit are supported, with 32-bit games using Wine's WoW64 mode). It will detect a Windows executable and launch Wine with the right options.
+
+Games using Direct3D currently run under WineD3D. Support for other translation layers, such as DXVK and VKD3D, have not been added yet.
+
 libTAS blocks the pulseaudio driver of Wine (`winepulse.so`), so that Wine outputs audio through alsa, which libTAS handles.
 
-In the game executable field, you must set the Windows `.exe` executable (both 32-bit and 64-bit are supported, given that you have the wine version for it). It will detect a Windows executable and launch Wine with the right options.
-
-[`wine.md`](wine.md) documents how Windows games run under libTAS: how it is hooked, what was tested, the design choices, and the known limitations in its [Open problems](wine.md#open-problems) section. Read it before reporting a Wine issue.
+For more information, [`wine.md`](wine.md) documents how Windows games run under libTAS: how it is hooked, what was tested, the design choices, and the known limitations in its [Open problems](wine.md#open-problems) section. Read it before reporting a Wine issue.
 
 ## Logo
 
