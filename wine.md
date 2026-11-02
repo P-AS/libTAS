@@ -613,6 +613,28 @@ and 32-bit PE code cannot call our 64-bit unix code anyway.
   Boshy. Native VVVVVV and Shovel Knight still work.
 - The dll has no access to libtas inputs, so Steam controllers stay
   neutral.
+- **SteamController006** (Sonic Mania, crash `Unhandled page fault on read access
+  to 00000030` in the game right after the audio threads start, constant
+  address): `GetISteamController()` ignored the requested version and always
+  returned the old layout of `ISteamController` (up to v005). Version 006
+  adds `ActivateActionSetLayer`, `DeactivateActionSetLayer`,
+  `DeactivateAllActionSetLayers` and `GetActiveActionSetLayers` after
+  `GetCurrentActionSet`, so the game's call of `GetDigitalActionHandle`
+  (slot 12) landed in our `GetAnalogActionData`, which returns a struct and
+  wrote over the object: its vtable pointer was 0 at the next call. The
+  Steam trace showed it: `GetActionSetHandle` followed by
+  `GetAnalogActionData`. `ISteamController006` has the new layout and shares
+  the state of `ISteamController`; versions 6 and later get it. The slots
+  after `GetAnalogActionOrigins` are from memory of the SDK headers and were
+  not checked against a game that calls them. Found by attaching gdb with
+  `catch signal SIGSEGV` conditioned on `$_siginfo._sifields._sigfault.si_addr
+  == (void*)0x30`, dumping the decrypted `.text` of the game
+  (`dump binary memory`, gdb cannot disassemble 32-bit code in a 64-bit
+  Wine process) and disassembling it with `objdump -D -b binary -m i386
+  -M intel --adjust-vma=0x401000`. The strings passed in the sequence
+  (`Controls`, `up`, `down`, `left`, `right`) and the vtable offsets gave
+  away the interface.
+
 - **3 second wait at startup** (Kero Blaster, 180 black non-draw frames):
   the game registers the user stats callbacks, calls `GetAppID()` and
   `BLoggedOn()`, then polls `SteamAPI_RunCallbacks()` with `Sleep(10)` up to
@@ -702,6 +724,29 @@ the environment or the env overrides. Proton then starts the game from its
   copies it into `screen_width`/`screen_height` in the processes that are not
   the game, and our `dlsym()` hook returns our `XRR*` functions there even in
   native mode, as winex11 loads libXrandr with `dlopen()` (`c61bd8c8`).
+
+### Sonic Mania
+
+Steam version (32-bit, Steam DRM wrapper `.bind`, DirectX 9 through wined3d,
+XAudio2 through FAudio), tested with Proton 11.0 in a copy of the game in a
+fake Steam library.
+
+- **Fails immediately with plain Wine** (`use_proton=false`): the DRM stub
+  finds no Steam client and starts `steam://run/584400` through
+  `C:\Program Files (x86)\Steam\Steam.exe`, which does not exist, then the
+  game exits (`WINEDEBUG=+process` shows the `CreateProcess`). Same with an
+  empty `SteamAppId`, so it is not our app id setting. It needs the Proton
+  path with the Steam client running.
+- Crash with Proton: see SteamController006 in [Steam](#steam).
+- It then stops at frame 91, calling `QueryPerformanceCounter` in a loop (libTAS
+  warns `many calls to function QueryPerformanceCounter()`): QPC
+  time-tracking on the main thread (threshold 100) is needed, like Boshy
+  and Cave Story+. Not set in the user's `SonicMania.exe.ini`.
+- With these, the intro, the title screen and the first cutscene render,
+  audio and video have the same length, about 86 non-draw frames at startup.
+- Steam Input actions (`Controls`: `up`, `down`, `left`, `right`,
+  `button1`...) are neutral: our `ISteamController` maps names such as
+  `a`, `b` or `dpup` to the pads, not these.
 
 ### Sonic Generations
 

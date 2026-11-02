@@ -280,7 +280,16 @@ void *STEAM_CALL ISteamClient_GetISteamUnifiedMessages( void *iface, HSteamUser 
 
 ISteamController *STEAM_CALL ISteamClient_GetISteamController( void *iface, HSteamUser hSteamUser, HSteamPipe hSteamPipe, const char *pchVersion )
 {
-    LOGTRACE_SIMPLE(LCF_STEAM);
+    LOGTRACE(LCF_STEAM, "%s called with version %s", __func__, pchVersion ? pchVersion : "(null)");
+
+    /* SteamController006 and later have the action set layers, which shifts
+     * the slots of the methods after them */
+    int version = 0;
+    if (pchVersion && (strncmp(pchVersion, "SteamController", 15) == 0))
+        version = atoi(pchVersion + 15);
+    if (version >= 6)
+        return reinterpret_cast<ISteamController*>(SteamController006());
+
     return SteamController();
 }
 

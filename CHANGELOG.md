@@ -257,6 +257,8 @@
   Blaster)
 * Wine: give the app id of games installed in a Steam library to their Steam
   API without Proton too
+* Steam: add the SteamController006 interface layout, which fixes a crash when
+  a game uses the Steam Controller API (Sonic Mania)
 
 ## [1.4.8] - 2026-05-14
 ### Added

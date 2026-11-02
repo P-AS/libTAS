@@ -18,6 +18,7 @@
  */
 
 #include "isteamcontroller.h"
+#include "steamapi.h"
 
 #include "logging.h"
 #include "inputs/inputs.h"
@@ -254,6 +255,112 @@ void ISteamController::StopAnalogActionMomentum( ControllerHandle_t controllerHa
 
 void ISteamController::TriggerHapticPulse( ControllerHandle_t controllerHandle, ESteamControllerPad eTargetPad, unsigned short usDurationMicroSec ) {
     LOGTRACE_SIMPLE(LCF_STEAM | LCF_JOYSTICK);
+}
+
+
+/* SteamController006: same state as ISteamController, other vtable layout */
+
+static ISteamController& impl()
+{
+    return *SteamController();
+}
+
+bool ISteamController006::Init() { return impl().Init(); }
+bool ISteamController006::Shutdown() { return impl().Shutdown(); }
+void ISteamController006::RunFrame() { impl().RunFrame(); }
+int ISteamController006::GetConnectedControllers( ControllerHandle_t *handlesOut ) { return impl().GetConnectedControllers(handlesOut); }
+bool ISteamController006::ShowBindingPanel( ControllerHandle_t controllerHandle ) { return impl().ShowBindingPanel(controllerHandle); }
+ControllerActionSetHandle_t ISteamController006::GetActionSetHandle( const char *pszActionSetName ) { return impl().GetActionSetHandle(pszActionSetName); }
+void ISteamController006::ActivateActionSet( ControllerHandle_t controllerHandle, ControllerActionSetHandle_t actionSetHandle ) { impl().ActivateActionSet(controllerHandle, actionSetHandle); }
+ControllerActionSetHandle_t ISteamController006::GetCurrentActionSet( ControllerHandle_t controllerHandle ) { return impl().GetCurrentActionSet(controllerHandle); }
+
+void ISteamController006::ActivateActionSetLayer( ControllerHandle_t controllerHandle, ControllerActionSetHandle_t actionSetLayerHandle )
+{
+    LOGTRACE_SIMPLE(LCF_STEAM | LCF_JOYSTICK);
+}
+
+void ISteamController006::DeactivateActionSetLayer( ControllerHandle_t controllerHandle, ControllerActionSetHandle_t actionSetLayerHandle )
+{
+    LOGTRACE_SIMPLE(LCF_STEAM | LCF_JOYSTICK);
+}
+
+void ISteamController006::DeactivateAllActionSetLayers( ControllerHandle_t controllerHandle )
+{
+    LOGTRACE_SIMPLE(LCF_STEAM | LCF_JOYSTICK);
+}
+
+int ISteamController006::GetActiveActionSetLayers( ControllerHandle_t controllerHandle, ControllerActionSetHandle_t *handlesOut )
+{
+    LOGTRACE_SIMPLE(LCF_STEAM | LCF_JOYSTICK);
+    return 0;
+}
+
+ControllerDigitalActionHandle_t ISteamController006::GetDigitalActionHandle( const char *pszActionName ) { return impl().GetDigitalActionHandle(pszActionName); }
+ControllerDigitalActionData_t ISteamController006::GetDigitalActionData( ControllerHandle_t controllerHandle, ControllerDigitalActionHandle_t digitalActionHandle ) { return impl().GetDigitalActionData(controllerHandle, digitalActionHandle); }
+int ISteamController006::GetDigitalActionOrigins( ControllerHandle_t controllerHandle, ControllerActionSetHandle_t actionSetHandle, ControllerDigitalActionHandle_t digitalActionHandle, EControllerActionOrigin *originsOut ) { return impl().GetDigitalActionOrigins(controllerHandle, actionSetHandle, digitalActionHandle, originsOut); }
+ControllerAnalogActionHandle_t ISteamController006::GetAnalogActionHandle( const char *pszActionName ) { return impl().GetAnalogActionHandle(pszActionName); }
+ControllerAnalogActionData_t ISteamController006::GetAnalogActionData( ControllerHandle_t controllerHandle, ControllerAnalogActionHandle_t analogActionHandle ) { return impl().GetAnalogActionData(controllerHandle, analogActionHandle); }
+int ISteamController006::GetAnalogActionOrigins( ControllerHandle_t controllerHandle, ControllerActionSetHandle_t actionSetHandle, ControllerAnalogActionHandle_t analogActionHandle, EControllerActionOrigin *originsOut ) { return impl().GetAnalogActionOrigins(controllerHandle, actionSetHandle, analogActionHandle, originsOut); }
+
+const char *ISteamController006::GetGlyphForActionOrigin( EControllerActionOrigin eOrigin )
+{
+    LOGTRACE_SIMPLE(LCF_STEAM | LCF_JOYSTICK);
+    return "";
+}
+
+const char *ISteamController006::GetStringForActionOrigin( EControllerActionOrigin eOrigin )
+{
+    LOGTRACE_SIMPLE(LCF_STEAM | LCF_JOYSTICK);
+    return "";
+}
+
+void ISteamController006::StopAnalogActionMomentum( ControllerHandle_t controllerHandle, ControllerAnalogActionHandle_t eAction ) { impl().StopAnalogActionMomentum(controllerHandle, eAction); }
+
+ControllerMotionData_t ISteamController006::GetMotionData( ControllerHandle_t controllerHandle )
+{
+    LOGTRACE_SIMPLE(LCF_STEAM | LCF_JOYSTICK);
+    ControllerMotionData_t data = {};
+    data.rotQuatW = 1.0f;
+    return data;
+}
+
+void ISteamController006::TriggerHapticPulse( ControllerHandle_t controllerHandle, ESteamControllerPad eTargetPad, unsigned short usDurationMicroSec ) { impl().TriggerHapticPulse(controllerHandle, eTargetPad, usDurationMicroSec); }
+
+void ISteamController006::TriggerRepeatedHapticPulse( ControllerHandle_t controllerHandle, ESteamControllerPad eTargetPad, unsigned short usDurationMicroSec, unsigned short usOffMicroSec, unsigned short unRepeat, unsigned int nFlags )
+{
+    LOGTRACE_SIMPLE(LCF_STEAM | LCF_JOYSTICK);
+}
+
+void ISteamController006::TriggerVibration( ControllerHandle_t controllerHandle, unsigned short usLeftSpeed, unsigned short usRightSpeed )
+{
+    LOGTRACE_SIMPLE(LCF_STEAM | LCF_JOYSTICK);
+}
+
+void ISteamController006::SetLEDColor( ControllerHandle_t controllerHandle, uint8_t nColorR, uint8_t nColorG, uint8_t nColorB, unsigned int nFlags )
+{
+    LOGTRACE_SIMPLE(LCF_STEAM | LCF_JOYSTICK);
+}
+
+int ISteamController006::GetGamepadIndexForController( ControllerHandle_t ulControllerHandle )
+{
+    LOGTRACE_SIMPLE(LCF_STEAM | LCF_JOYSTICK);
+    if (ulControllerHandle - 1 < ControllerHandle_t(Global::shared_config.nb_controllers))
+        return static_cast<int>(ulControllerHandle - 1);
+    return -1;
+}
+
+ControllerHandle_t ISteamController006::GetControllerForGamepadIndex( int nIndex )
+{
+    LOGTRACE_SIMPLE(LCF_STEAM | LCF_JOYSTICK);
+    if ((nIndex >= 0) && (nIndex < Global::shared_config.nb_controllers))
+        return nIndex + 1;
+    return 0;
+}
+
+ISteamController006 *SteamController006()
+{
+    static ISteamController006 steamcontroller006;
+    return &steamcontroller006;
 }
 
 }

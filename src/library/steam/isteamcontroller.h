@@ -301,6 +301,63 @@ public:
 	virtual void TriggerHapticPulse( ControllerHandle_t controllerHandle, ESteamControllerPad eTargetPad, unsigned short usDurationMicroSec );
 };
 
+struct ControllerMotionData_t
+{
+	// Sensor-fused absolute rotation (will drift in heading)
+	float rotQuatX;
+	float rotQuatY;
+	float rotQuatZ;
+	float rotQuatW;
+
+	// Positional acceleration
+	float posAccelX;
+	float posAccelY;
+	float posAccelZ;
+
+	// Angular velocity
+	float rotVelX;
+	float rotVelY;
+	float rotVelZ;
+};
+
+/* Layout of SteamController006 and later. It adds the action set layers
+ * after GetCurrentActionSet, so the methods after them are at other vtable
+ * slots than in ISteamController. The state is shared with ISteamController. */
+class ISteamController006
+{
+public:
+	virtual bool Init();
+	virtual bool Shutdown();
+	virtual void RunFrame();
+	virtual int GetConnectedControllers( ControllerHandle_t *handlesOut );
+	virtual bool ShowBindingPanel( ControllerHandle_t controllerHandle );
+	virtual ControllerActionSetHandle_t GetActionSetHandle( const char *pszActionSetName );
+	virtual void ActivateActionSet( ControllerHandle_t controllerHandle, ControllerActionSetHandle_t actionSetHandle );
+	virtual ControllerActionSetHandle_t GetCurrentActionSet( ControllerHandle_t controllerHandle );
+	virtual void ActivateActionSetLayer( ControllerHandle_t controllerHandle, ControllerActionSetHandle_t actionSetLayerHandle );
+	virtual void DeactivateActionSetLayer( ControllerHandle_t controllerHandle, ControllerActionSetHandle_t actionSetLayerHandle );
+	virtual void DeactivateAllActionSetLayers( ControllerHandle_t controllerHandle );
+	virtual int GetActiveActionSetLayers( ControllerHandle_t controllerHandle, ControllerActionSetHandle_t *handlesOut );
+	virtual ControllerDigitalActionHandle_t GetDigitalActionHandle( const char *pszActionName );
+	virtual ControllerDigitalActionData_t GetDigitalActionData( ControllerHandle_t controllerHandle, ControllerDigitalActionHandle_t digitalActionHandle );
+	virtual int GetDigitalActionOrigins( ControllerHandle_t controllerHandle, ControllerActionSetHandle_t actionSetHandle, ControllerDigitalActionHandle_t digitalActionHandle, EControllerActionOrigin *originsOut );
+	virtual ControllerAnalogActionHandle_t GetAnalogActionHandle( const char *pszActionName );
+	virtual ControllerAnalogActionData_t GetAnalogActionData( ControllerHandle_t controllerHandle, ControllerAnalogActionHandle_t analogActionHandle );
+	virtual int GetAnalogActionOrigins( ControllerHandle_t controllerHandle, ControllerActionSetHandle_t actionSetHandle, ControllerAnalogActionHandle_t analogActionHandle, EControllerActionOrigin *originsOut );
+	virtual const char *GetGlyphForActionOrigin( EControllerActionOrigin eOrigin );
+	virtual const char *GetStringForActionOrigin( EControllerActionOrigin eOrigin );
+	virtual void StopAnalogActionMomentum( ControllerHandle_t controllerHandle, ControllerAnalogActionHandle_t eAction );
+	virtual ControllerMotionData_t GetMotionData( ControllerHandle_t controllerHandle );
+	virtual void TriggerHapticPulse( ControllerHandle_t controllerHandle, ESteamControllerPad eTargetPad, unsigned short usDurationMicroSec );
+	virtual void TriggerRepeatedHapticPulse( ControllerHandle_t controllerHandle, ESteamControllerPad eTargetPad, unsigned short usDurationMicroSec, unsigned short usOffMicroSec, unsigned short unRepeat, unsigned int nFlags );
+	virtual void TriggerVibration( ControllerHandle_t controllerHandle, unsigned short usLeftSpeed, unsigned short usRightSpeed );
+	virtual void SetLEDColor( ControllerHandle_t controllerHandle, uint8_t nColorR, uint8_t nColorG, uint8_t nColorB, unsigned int nFlags );
+	virtual int GetGamepadIndexForController( ControllerHandle_t ulControllerHandle );
+	virtual ControllerHandle_t GetControllerForGamepadIndex( int nIndex );
+};
+
+ISteamController006 *SteamController006();
+
 }
 
 #endif // ISTEAMCONTROLLER_H
