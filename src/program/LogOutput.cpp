@@ -127,7 +127,7 @@ void redirectStderr(const Context *context)
     std::error_code ec;
     std::filesystem::create_directories(directory(context), ec);
     const std::filesystem::path path = newFilePath(context);
-    int log_fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    int log_fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_APPEND | O_CLOEXEC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (log_fd < 0) {
         std::cerr << "Could not create the log file " << path << ": " << strerror(errno) << std::endl;
         if (!console)
