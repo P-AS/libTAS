@@ -54,14 +54,10 @@ struct __attribute__((packed, aligned(8))) SharedConfig {
     /* Movie framecount */
     uint64_t movie_framecount = 0;
 
-    /* Log status */
-    enum LogStatus {
-        NO_LOGGING,
-        LOGGING_TO_CONSOLE,
-        LOGGING_TO_FILE
-    };
-
-    int logging_status = LOGGING_TO_CONSOLE;
+    /* Where the logs go, independently: the console and/or a log file in the
+     * logs folder of the data directory */
+    bool logging_console = true;
+    bool logging_file = false;
 
     LogLevel logging_level = LL_WARN;
 

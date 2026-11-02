@@ -45,6 +45,8 @@
   option
 * Add a fastforward setting to the --set command-line option, so that
   non-interactive runs can start without fast-forward
+* Add "Open Logs Folder" to the File menu, with an error message when the
+  folder does not exist
 
 ### Changed
 
@@ -77,6 +79,10 @@
   config files anymore
 * Include the git branch name in the window titlebar alongside the
   commit hash for interim builds
+* Logging to the console and to a file are now two separate options, that
+  can both be enabled, and give the same text. Log files are written to the
+  logs folder of the data directory, named after the game executable and
+  the date and time, instead of next to the game executable
 
 ### Fixed
 

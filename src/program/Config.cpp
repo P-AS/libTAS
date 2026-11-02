@@ -78,7 +78,16 @@ bool Config::applyCliSetting(const std::string& key, const std::string& value)
     else if (key == "fastforward")              sc.fastforward = boolValue();
     else if (key == "fastforward_mode")         sc.fastforward_mode = intValue();
     else if (key == "fastforward_render")       sc.fastforward_render = intValue();
-    else if (key == "logging_status")           sc.logging_status = intValue();
+    else if (key == "logging_console")          sc.logging_console = boolValue();
+    else if (key == "logging_file")             sc.logging_file = boolValue();
+    else if (key == "logging_status") { /* Former setting: 0 none, 1 console, 2 file */
+        int status = intValue();
+        sc.logging_console = (status == 1);
+        sc.logging_file = (status == 2);
+        /* The values that this setting gives must not be saved either */
+        cli_overridden_keys.insert("logging_console");
+        cli_overridden_keys.insert("logging_file");
+    }
     else if (key == "logging_level")            sc.logging_level = static_cast<LogLevel>(uintValue());
     else if (key == "logging_include_flags")    sc.logging_include_flags = uintValue();
     else if (key == "logging_exclude_flags")    sc.logging_exclude_flags = uintValue();
@@ -308,7 +317,9 @@ void Config::save(const std::filesystem::path& gamepath) {
     settings.setValue("speed_divisor", sc.speed_divisor);
     settings.setValue("fastforward_mode", sc.fastforward_mode);
     settings.setValue("fastforward_render", sc.fastforward_render);
-    settings.setValue("logging_status", sc.logging_status);
+    settings.setValue("logging_console", sc.logging_console);
+    settings.setValue("logging_file", sc.logging_file);
+    settings.remove("logging_status"); /* Former setting */
     settings.setValue("logging_level", sc.logging_level);
     settings.setValue("logging_include_flags", sc.logging_include_flags);
     settings.setValue("logging_exclude_flags", sc.logging_exclude_flags);
@@ -541,7 +552,14 @@ void Config::load(const std::filesystem::path& gamepath) {
     sc.speed_divisor = settings.value("speed_divisor", sc.speed_divisor).toInt();
     sc.fastforward_mode = settings.value("fastforward_mode", sc.fastforward_mode).toInt();
     sc.fastforward_render = settings.value("fastforward_render", sc.fastforward_render).toInt();
-    sc.logging_status = settings.value("logging_status", sc.logging_status).toInt();
+    if (settings.contains("logging_status")) {
+        /* Former setting: 0 none, 1 console, 2 file */
+        int status = settings.value("logging_status").toInt();
+        sc.logging_console = (status == 1);
+        sc.logging_file = (status == 2);
+    }
+    sc.logging_console = settings.value("logging_console", sc.logging_console).toBool();
+    sc.logging_file = settings.value("logging_file", sc.logging_file).toBool();
     sc.logging_level = settings.value("logging_level", sc.logging_level).toUInt();
     sc.logging_include_flags = settings.value("logging_include_flags", sc.logging_include_flags).toUInt();
     sc.logging_exclude_flags = settings.value("logging_exclude_flags", sc.logging_exclude_flags).toUInt();

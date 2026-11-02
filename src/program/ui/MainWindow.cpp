@@ -43,6 +43,7 @@
 #include "utils.h"
 #include "GameEvents.h"
 #include "GameThread.h"
+#include "LogOutput.h"
 #include "../shared/version.h"
 
 #include <QtWidgets/QFileDialog>
@@ -57,6 +58,8 @@
 #include <QtWidgets/QInputDialog>
 #include <QtWidgets/QApplication>
 #include <QtCore/QTimer>
+#include <QtCore/QUrl>
+#include <QtGui/QDesktopServices>
 
 #include <iostream>
 #include <future>
@@ -622,6 +625,26 @@ void MainWindow::createFileMenu()
     disabledActionsOnStart.append(action);
     action = fileMenu->addAction(tr("Executable Options..."), this, [this] { windowManager->showExecutableWindow(); });
     disabledActionsOnStart.append(action);
+
+    fileMenu->addSeparator();
+    fileMenu->addAction(tr("Open Logs Folder"), this, &MainWindow::slotOpenLogsFolder);
+}
+
+void MainWindow::slotOpenLogsFolder()
+{
+    const std::filesystem::path dir = LogOutput::directory(context);
+
+    std::error_code ec;
+    if (!std::filesystem::is_directory(dir, ec)) {
+        QMessageBox::critical(this, tr("Logs folder"),
+            tr("The logs folder %1 does not exist. It is created when a game is launched with \"Log to file\" enabled in the debug settings.")
+            .arg(QString::fromStdString(dir.string())));
+        return;
+    }
+
+    if (!QDesktopServices::openUrl(QUrl::fromLocalFile(QString::fromStdString(dir.string()))))
+        QMessageBox::critical(this, tr("Logs folder"),
+            tr("Could not open the logs folder %1.").arg(QString::fromStdString(dir.string())));
 }
 
 void MainWindow::createSettingsMenu()
