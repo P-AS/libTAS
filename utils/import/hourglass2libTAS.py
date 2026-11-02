@@ -1,54 +1,97 @@
 #!/usr/bin/env python
 # This script converts tas files from Hourglass format to libTAS input file.
 # Just run ./hourglass2libTAS path/to/tasfile.tas
+#
+# A .wtf file has a 1024-byte header, followed by one 8-byte slot per frame.
+# Each slot holds up to 8 Windows virtual-key codes (VK_*). A slot with fewer
+# than 8 keys is terminated by 0xF0 and padded with zeros, so 0xF0 and 0x00 are
+# not keys. 0x01 (VK_LBUTTON) is the left mouse button, and 0xFF is skipped.
 
-import re
 import sys
 import os
-import math
+from collections import Counter
 
-input_file = open(sys.argv[1], 'rb')
-output_file = open(os.path.dirname(sys.argv[1])+'/inputs' , 'w')
+# Windows virtual-key code -> X11 keysym (hex, as libTAS writes them)
+VK_TO_KEYSYM = {
+    0x08: "ff08",  # VK_BACK        -> BackSpace
+    0x09: "ff09",  # VK_TAB         -> Tab
+    0x0D: "ff0d",  # VK_RETURN      -> Return
+    0x10: "ffe1",  # VK_SHIFT       -> Shift_L
+    0x11: "ffe3",  # VK_CONTROL     -> Control_L
+    0x12: "ffe9",  # VK_MENU (Alt)  -> Alt_L
+    0x14: "ffe5",  # VK_CAPITAL     -> Caps_Lock
+    0x1B: "ff1b",  # VK_ESCAPE      -> Escape
+    0x20: "20",    # VK_SPACE       -> space
+    0x21: "ff55",  # VK_PRIOR       -> Page_Up
+    0x22: "ff56",  # VK_NEXT        -> Page_Down
+    0x23: "ff57",  # VK_END         -> End
+    0x24: "ff50",  # VK_HOME        -> Home
+    0x25: "ff51",  # VK_LEFT        -> Left
+    0x26: "ff52",  # VK_UP          -> Up
+    0x27: "ff53",  # VK_RIGHT       -> Right
+    0x28: "ff54",  # VK_DOWN        -> Down
+    0x2D: "ff63",  # VK_INSERT      -> Insert
+    0x2E: "ffff",  # VK_DELETE      -> Delete
+    0xA0: "ffe1",  # VK_LSHIFT      -> Shift_L
+    0xA1: "ffe2",  # VK_RSHIFT      -> Shift_R
+    0xA2: "ffe3",  # VK_LCONTROL    -> Control_L
+    0xA3: "ffe4",  # VK_RCONTROL    -> Control_R
+    0xA4: "ffe9",  # VK_LMENU       -> Alt_L
+    0xA5: "ffea",  # VK_RMENU       -> Alt_R
+}
+# VK_0..VK_9 are 0x30-0x39, VK_A..VK_Z are 0x41-0x5A (same as ASCII)
+for vk in range(0x30, 0x3A):
+    VK_TO_KEYSYM[vk] = "%x" % vk
+for vk in range(0x41, 0x5B):
+    VK_TO_KEYSYM[vk] = "%x" % (vk + 0x20)  # lowercase letter keysyms
+# VK_F1..VK_F12 are 0x70-0x7B; keysyms XK_F1..XK_F12 are 0xffbe..0xffc9
+for n in range(12):
+    VK_TO_KEYSYM[0x70 + n] = "%x" % (0xffbe + n)
 
-input_keys = [0x0D, 0xA0, 0xA2, 0x1B, 0x20, 0x25, 0x26, 0x27, 0x28, 0x10, 0x11, 0x09, 0x2E] + \
-    list(range(0x30, 0x3A)) + list(range(0x41, 0x5B))
-mapped_keys = ["ff0d", "ffe1", "ffe3", "ff1b", "20", "ff51", "ff52", "ff53", "ff54", "ffe1", "ffe3", "ff09", "ffff"] + \
-    ["30", "31", "32", "33", "34", "35", "36", "37", "38", "39"] + \
-    ["61", "62", "63", "64", "65", "66", "67", "68", "69", "6a", "6b", "6c", "6d", "6e", "6f"] + \
-    ["70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "7a", "7b"]
+VK_END = 0xF0
+VK_LBUTTON = 0x01
+SLOT_SIZE = 8
+HEADER_SIZE = 1024
 
-input_file.seek(1024, 0)
+if len(sys.argv) < 2:
+    sys.exit("Usage: " + sys.argv[0] + " path/to/tasfile.wtf")
 
-byte = input_file.read(1)
-while byte != b"":
-    keyboard_state = ''
-    left_click = False
-    for k in range(8):
-        i = 0
-        if (byte[0] == 0x01):
-            # VK_LBUTTON, left mouse button
-            left_click = True
-        # 0xFF is not a game key, skip it
-        elif (byte[0] != 0 and byte[0] != 0xFF):
-            try:
-                i = input_keys.index(byte[0])
-            except ValueError:
-                print("Unknown VK key " + str(byte[0]))
-            else:
-                keyboard_state += mapped_keys[i] + ':'
-        byte = input_file.read(1)
+unknown = Counter()
 
-    # Remove trailing ':'
-    if keyboard_state:
-        keyboard_state = keyboard_state[:-1]
+with open(sys.argv[1], 'rb') as input_file:
+    data = input_file.read()
 
-    # Write the constructed input line
-    line = '|K' + keyboard_state + '|'
-    if left_click:
-        # The wtf does not store the pointer position, so it is pinned to 0:0
-        line += 'M0:0:A:1....|'
+body = data[HEADER_SIZE:]
 
-    output_file.write(line + '\n')
+with open(os.path.dirname(sys.argv[1]) + '/inputs', 'w') as output_file:
+    for offset in range(0, len(body), SLOT_SIZE):
+        slot = body[offset:offset + SLOT_SIZE]
+        keysyms = []
+        left_click = False
+        for vk in slot:
+            if vk in (0x00, VK_END, 0xFF):
+                # Padding, end-of-list marker, or not a game key
+                continue
+            if vk == VK_LBUTTON:
+                left_click = True
+                continue
+            keysym = VK_TO_KEYSYM.get(vk)
+            if keysym is None:
+                unknown[vk] += 1
+                continue
+            # Several VKs can map to one keysym (e.g. VK_SHIFT and VK_LSHIFT);
+            # write each keysym only once per frame
+            if keysym not in keysyms:
+                keysyms.append(keysym)
 
-input_file.close()
-output_file.close()
+        # Write the constructed input line
+        line = '|K' + ':'.join(keysyms) + '|'
+        if left_click:
+            # The wtf does not store the pointer position, so it is pinned to 0:0
+            line += 'M0:0:A:1....|'
+
+        output_file.write(line + '\n')
+
+for vk, count in sorted(unknown.items()):
+    print("Warning: unmapped VK code 0x%02X (%d occurrences) skipped" % (vk, count),
+          file=sys.stderr)
