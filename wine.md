@@ -957,8 +957,11 @@ the game config, not in the movie.
   accepts the Proton (`use_proton`, `proton_path`), game and directory
   (`savestatedir`, `datadir`, ...) settings. Still use a private copy of the
   config with `XDG_CONFIG_HOME`, since the UI saves other changes.
-  Per-game logging settings override `-s`; edit the copy directly. `logging_status=2` logs to `<game>.log` next to the game.
-  Before `08788282` that file was overwritten from its start without being
+  Per-game logging settings override `-s`; edit the copy directly. `logging_file=true` (with `logging_console=false` to keep the
+  console quiet, or both: the same text goes to both) writes
+  `<datadir>/logs/<game>-YYYY-MM-DD_HH-MM-SS.log`, one file per run (`a6e69e4e`;
+  `logging_status=2` is the former setting). Before `08788282` the old
+  `<game>.log` next to the game was overwritten from its start without being
   truncated, so older logs hold several runs: the newest one is the start of
   the file, up to the first line that begins mid-sentence.
 - When the log goes to a file, it must be opened with `O_APPEND`: loading a
