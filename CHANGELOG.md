@@ -125,6 +125,7 @@
   workflow manually
 * Wine: the main thread becomes the thread that draws the frames when it is
   not the first thread of the game (Rayman 2)
+* Wine: point the README to wine.md for the current state of Windows games
 
 ### Fixed
 

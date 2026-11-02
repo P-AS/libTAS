@@ -123,11 +123,7 @@ libTAS blocks the pulseaudio driver of Wine (`winepulse.so`), so that Wine outpu
 
 In the game executable field, you must set the Windows `.exe` executable (both 32-bit and 64-bit are supported, given that you have the wine version for it). It will detect a Windows executable and launch Wine with the right options.
 
-There are still a lot of issues to fix:
-- "Prevent writing to disk" feature does not work, because Wine delegating to another process (wine server) the file handling (#250)
-- Window focus/unfocus doesn't work sometimes and you cannot move the game window (#262). Try alt-tabbing until you get it back
-- "Virtual Steam client" does not work, because we don't hook the loading of the `steam_api.dll` file (#264)
-- Window repainting (Expose event) does not work, so if you pause the game and drag another window in front of it, it will overwrite what is displayed by the game
+[`wine.md`](wine.md) documents how Windows games run under libTAS: how it is hooked, what was tested, the design choices, and the known limitations in its [Open problems](wine.md#open-problems) section. Read it before reporting a Wine issue.
 
 ## Logo
 
