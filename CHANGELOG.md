@@ -156,6 +156,8 @@
 * Encode: fix swapped colors and a garbled strip at the bottom of the video
   when the screen capture backend, size or pixel format changes after the
   video started, by starting the encode again
+* CI: give the AppImage a PNG icon, as the current linuxdeploy requires one
+
 
 ## [1.4.8] - 2026-05-14
 ### Added
