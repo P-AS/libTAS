@@ -83,6 +83,9 @@
   can both be enabled, and give the same text. Log files are written to the
   logs folder of the data directory, named after the game executable and
   the date and time, instead of next to the game executable
+* build.sh and the CI build do not build an AppImage by default anymore: pass
+  --appimage to build.sh, or enable the appimage input when running the CI
+  workflow manually
 
 ### Fixed
 
