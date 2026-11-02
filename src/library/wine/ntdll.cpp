@@ -232,11 +232,12 @@ static uint32_t NtDelayExecution(unsigned char alertable, const int64_t *timeout
      * starts, and sleep with a backoff whose number of steps depends on the
      * real time that the other process takes. Advancing the game time would
      * change the number of frames before the game starts in each run, so
-     * sleep in real time only. The total is bounded, in case a game really
-     * waits for the time to pass. */
+     * sleep in real time only, unless the game-specific timing asks for the
+     * old behavior. The total is bounded, in case a game really waits for the
+     * time to pass. */
     static const int64_t max_startup_sleep_ns = 20000000000LL;
     static int64_t startup_sleep_ns = 0;
-    if ((Global::shared_config.game_specific_timing & SharedConfig::GC_TIMING_NO_STARTUP_SLEEP) &&
+    if (!(Global::shared_config.game_specific_timing & SharedConfig::GC_TIMING_STARTUP_SLEEP) &&
         ThreadManager::isMainThread() && !XlibGameWindow::get() &&
         (startup_sleep_ns < max_startup_sleep_ns)) {
         startup_sleep_ns += static_cast<int64_t>(ts.tv_sec) * 1000000000LL + ts.tv_nsec;

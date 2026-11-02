@@ -749,12 +749,15 @@ fake Steam library.
   how long that takes in real time. Each step advanced the game time, so it
   made frames. Idle Threads sync did not change it, and "No non-draw frames"
   (applies the delay over later frames) removed the frames but left the game
-  time different. The game-specific timing option "No startup sleep"
-  (`GC_TIMING_NO_STARTUP_SLEEP`, `game_specific_timing=8`) makes the sleeps
-  of the main thread before the game window exists real sleeps that do not
-  advance the game time (bounded to 20 s in total). It is not the default,
-  as it would change the frames of Rayman 2, whose `Sleep(1000)` at frame 15
-  is a fixed wait. Found by logging `addDelay()` with the thread and the
+  time different. The sleeps of the main thread before the game window
+  exists are now real sleeps that do not advance the game time (bounded to
+  20 s in total, `NtDelayExecution` in `wine/ntdll.cpp`). The old behavior
+  is the game-specific timing option "Startup sleep advances time"
+  (`GC_TIMING_STARTUP_SLEEP`, `game_specific_timing=8`), for movies made
+  before. Kero Blaster and Rayman 2 have no sleep before their window, and
+  start the same with and without it; the `Sleep(1000)` at frame 15 of
+  Rayman 2 (see its section) was not seen again, so its movies may need the
+  option. Found by logging `addDelay()` with the thread and the
   main-thread flag, and by sampling the unix stacks of the game process
   (`eu-stack`): the main thread was in `NtDelayExecution` called from
   Windows code, with no `Sleep` call of the game (`+relay` with

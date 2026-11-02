@@ -40,14 +40,14 @@ void GameSpecificPane::initLayout()
     timingCeleste = new ToolTipCheckBox("Celeste");
     timingArmaCwa = new ToolTipCheckBox("Arma Cold War Assault");
     timingNoNondraw = new ToolTipCheckBox("No non-draw frames (Hourglass)");
-    timingNoStartupSleep = new ToolTipCheckBox("No startup sleep (Wine)");
+    timingStartupSleep = new ToolTipCheckBox("Startup sleep advances time (Wine)");
 
     timingGroupBox = new QGroupBox(tr("Timing settings"));
     QVBoxLayout *timingLayout = new QVBoxLayout;
     timingLayout->addWidget(timingCeleste);
     timingLayout->addWidget(timingArmaCwa);
     timingLayout->addWidget(timingNoNondraw);
-    timingLayout->addWidget(timingNoStartupSleep);
+    timingLayout->addWidget(timingStartupSleep);
     timingGroupBox->setLayout(timingLayout);
 
     /* Sync settings */
@@ -85,7 +85,7 @@ void GameSpecificPane::initSignals()
     connect(timingCeleste, &QAbstractButton::clicked, this, &GameSpecificPane::saveConfig);
     connect(timingArmaCwa, &QAbstractButton::clicked, this, &GameSpecificPane::saveConfig);
     connect(timingNoNondraw, &QAbstractButton::clicked, this, &GameSpecificPane::saveConfig);
-    connect(timingNoStartupSleep, &QAbstractButton::clicked, this, &GameSpecificPane::saveConfig);
+    connect(timingStartupSleep, &QAbstractButton::clicked, this, &GameSpecificPane::saveConfig);
     connect(syncCeleste, &QAbstractButton::clicked, this, &GameSpecificPane::saveConfig);
     connect(syncWitness, &QAbstractButton::clicked, this, &GameSpecificPane::saveConfig);
     connect(syncUnityJobs, &QAbstractButton::clicked, this, &GameSpecificPane::saveConfig);
@@ -111,8 +111,12 @@ void GameSpecificPane::initToolTips()
     "is applied over the next drawn frames instead, like Hourglass does. "
     "Required to sync movies imported from Hourglass.");
 
-    timingNoStartupSleep->setTitle("No startup sleep");
-    timingNoStartupSleep->setDescription("Windows games through Wine: the main thread sleeps in real time "
+    timingStartupSleep->setTitle("Startup sleep advances time");
+    timingStartupSleep->setDescription("Windows games through Wine: make the sleeps of the main thread "
+    "before the game window exists advance the game time, which inserts frames. By default they "
+    "only sleep in real time, because wrappers such as the Steam DRM wait there for another process, "
+    "for a duration that changes between runs. Use this to replay movies made before that change.");
+    timingStartupSleep->setDescription("Windows games through Wine: the main thread sleeps in real time "
     "but does not advance the game time while the game has no window yet. Wrappers such as the "
     "Steam DRM wait for another process there, for a duration that changes between runs, "
     "which changes the number of frames before the game starts.");
@@ -165,7 +169,7 @@ void GameSpecificPane::loadConfig()
     timingCeleste->setChecked(context->config.sc.game_specific_timing & SharedConfig::GC_TIMING_CELESTE);
     timingArmaCwa->setChecked(context->config.sc.game_specific_timing & SharedConfig::GC_TIMING_ARMA_CWA);
     timingNoNondraw->setChecked(context->config.sc.game_specific_timing & SharedConfig::GC_TIMING_NO_NONDRAW);
-    timingNoStartupSleep->setChecked(context->config.sc.game_specific_timing & SharedConfig::GC_TIMING_NO_STARTUP_SLEEP);
+    timingStartupSleep->setChecked(context->config.sc.game_specific_timing & SharedConfig::GC_TIMING_STARTUP_SLEEP);
     syncCeleste->setChecked(context->config.sc.game_specific_sync & SharedConfig::GC_SYNC_CELESTE);
     syncWitness->setChecked(context->config.sc.game_specific_sync & SharedConfig::GC_SYNC_WITNESS);
     syncUnityJobs->setChecked(context->config.sc.game_specific_sync & SharedConfig::GC_SYNC_UNITY_JOBS);
@@ -181,7 +185,7 @@ void GameSpecificPane::saveConfig()
     context->config.sc.game_specific_timing |= timingCeleste->isChecked()? SharedConfig::GC_TIMING_CELESTE : 0;
     context->config.sc.game_specific_timing |= timingArmaCwa->isChecked()? SharedConfig::GC_TIMING_ARMA_CWA : 0;
     context->config.sc.game_specific_timing |= timingNoNondraw->isChecked()? SharedConfig::GC_TIMING_NO_NONDRAW : 0;
-    context->config.sc.game_specific_timing |= timingNoStartupSleep->isChecked()? SharedConfig::GC_TIMING_NO_STARTUP_SLEEP : 0;
+    context->config.sc.game_specific_timing |= timingStartupSleep->isChecked()? SharedConfig::GC_TIMING_STARTUP_SLEEP : 0;
 
     context->config.sc.game_specific_sync = 0;
     context->config.sc.game_specific_sync |= syncCeleste->isChecked()? SharedConfig::GC_SYNC_CELESTE : 0;

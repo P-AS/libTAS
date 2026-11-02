@@ -48,7 +48,7 @@ private:
     ToolTipCheckBox *timingCeleste;
     ToolTipCheckBox *timingArmaCwa;
     ToolTipCheckBox *timingNoNondraw;
-    ToolTipCheckBox *timingNoStartupSleep;
+    ToolTipCheckBox *timingStartupSleep;
     ToolTipCheckBox *syncCeleste;
     ToolTipCheckBox *syncWitness;
     ToolTipCheckBox *syncUnityJobs;
