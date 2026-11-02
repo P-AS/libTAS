@@ -90,9 +90,10 @@ because the ptrace scope is 0.
 | Configuration | Result |
 |---|---|
 | default (`sleep_handling=1`) | stuck at frame 0, state 3, `initDraw` never draws |
-| `sleep_handling=2` | frames advance (1400 frames in 26 s, the system thread triggers them with its sleeps), 3 of them draws, then a still picture with a few blue marks (checked over 40 s); state 3, `initDraw` never draws |
+| `sleep_handling=2` | frames advance (1400 frames in 26 s, the system thread triggers them with its sleeps), 3 of them draws, then a still picture with a few blue marks (checked over 40 s); state 3, `initDraw` never runs (the system thread is starved, see below) |
 | `sleep_handling=2` with Idle Threads sync (`game_specific_sync=64`), or native events (`debug_state=2`), or `async_events=3` | same as above |
 | `sleep_handling=0` | `initDraw` runs (`0x89688c4 = 2`), but the frame counter stays at 1 (checked 8 s apart): stuck in state 3 |
+| `sleep_handling=2` with the two changes of the prototype below | works with controlled time: state 4, the intro ("Long ago... Before humanity came into existence."), 59.9 fps, 110 non-draw frames in the first 833; the picture at frame 500 is identical in two runs, at frames 900 and 1300 it is not |
 | `debug_state=1` (uncontrolled time), with or without native events | works: state 4, the intro text ("It is where I belong. Children, please help"), 150 to 250 fps, frame counter counts draws |
 
 Reasons, from the traces:
@@ -102,14 +103,55 @@ Reasons, from the traces:
   thread reaches a frame boundary. The game threads wait for `SDL_GetTicks()`
   to move, and it does not.
 - With `sleep_handling=2` the system thread (`mySleep()`) becomes the main
-  thread and makes frames, but the game still does not leave state 3. The
-  logic thread is in the `OSSleepTicks(500)` loop, and `initDraw` never
-  reaches its drawing branch. Why was not found: its early returns depend on
-  `dsystemFlag()` values (8, `0x10` and 1, kept in memory that I did not
-  read), and which one applies was not checked. This is the open question.
+  thread and makes frames, but `initDraw` never runs. The loop of that thread
+  calls `lamulanaSystemThreadIteration()` (the timer callback when 1000 ms
+  have passed, then `initDraw` every time) and `mySleep(3)`. Reading its
+  variables from the process: `initDraw` is still registered, its marker
+  (`0x89688c4`) is 0 and the thread's own timer (`0x89687ac`) is stuck at
+  1016 ms, so it never finishes an iteration. The cause is in
+  `DeterministicTimer::addDelay()`: it adds the sleep to the game time and to
+  a debt that only the main thread pays, by making frame boundaries (60 per
+  real second, so at most 1 s of game time per real second). In this mode
+  every sleeping thread adds its duration (the logic thread sleeps 500 ms in a
+  loop, the music thread 30 ms, the system thread 3 ms), about 2 to 3 s of
+  debt per real second. The main thread, which here is the system thread, stays
+  in the `while (addedDelay > maxDeferredDelay) frameBoundary()` loop forever
+  (7 stack samples out of 8 in `exitFrameBoundary`) and never runs its own loop.
+- The flags of the game are one word (`0x89687dc`, `dsystemFlag(mask, 0/1/2)`
+  tests, sets and clears): `0x10` (set at the end of the init of `lamulanaMain`)
+  in the stuck runs, `0x14` in the working ones; flag 1 is only set by the
+  reset code and flag 8 by save and error code, so they were not the cause.
 - The trace of the working (uncontrolled) run shows the two drawing threads,
   with `SDL_GetTicks()` called 56 000 times in 766 frames by the thread that
   draws (a spin on the clock), and 1100 `glXMakeCurrent()` pairs.
+
+### Prototype that works with controlled time (not in the tree)
+
+Two changes, both under `sleep_handling=2`, were enough to get the game
+through loading and into its intro with controlled time (saved as a patch,
+not committed, because they were switched by environment variables):
+
+1. In `transfer_sleep()` (`general/sleepwrappers.cpp`), a thread that is not the
+   main thread calls `DeterministicTimer::waitDeterministicDelay(ts)` (it
+   waits until the game time has advanced by the duration of its sleep)
+   instead of `addDelay()`. This is what `ntdll.cpp` already does for the
+   Wine Idle Threads sync. The debt then only comes from the main thread.
+   Alone it deadlocks earlier (state 0): nobody advances the time, because the
+   main thread, until another thread draws, is the first thread.
+2. In `SDL_PollEvent()` (`sdl/sdlevents.cpp`, SDL2 path), after 16
+   consecutive empty polls by the main thread, `addDelay(1 ms)`. The first
+   thread of this game is a pure event pump that spins on `SDL_PollEvent()`, so
+   it is the only thread that can drive the clock before the loading screen
+   draws. libTAS' busy loop detection only counts calls of the time
+   functions.
+
+Result: state 4 and the intro, 60 fps. Determinism is not there yet: pausing
+at a fixed frame with a Lua script (`runtime.playPause()` from `onInput`) and
+comparing screenshots of two runs, frame 500 is identical and frames 900 and
+1300 are not. The three game threads (logic, system, music) still interleave
+freely; the time is shared but each thread's work between two frames is not
+synchronized (the Idle Threads sync of `wine.md` does this for Wine games, in
+`NtDelayExecution` only).
 
 ### Logs were lost: the game reopens stderr
 
@@ -177,13 +219,18 @@ above were told apart.
 
 ## Open problems
 
-- La-Mulana does not leave its loading state with controlled time (see the
-  table above). Next steps: find out which `dsystemFlag()` keeps `initDraw`
-  from drawing under `sleep_handling=2` (read the flag storage in the
-  process), and whether the logic thread waits on the system thread or the
-  other way around; try giving the first thread a frame boundary when it
-  spins on `SDL_PollEvent()` (libTAS' busy loop detection only counts calls
-  to the time functions).
+- La-Mulana: turn the prototype into real options and make it deterministic.
+  Ideas: a sleep mode where the sleeps of other threads wait for the game time
+  (a new `sleep_handling` value, with the UI choice), and an option (or an
+  extension of the busy loop detection) so that repeated empty
+  `SDL_PollEvent()` calls of the main thread let time pass. Then make the
+  threads deterministic: the sleeps of the other threads must end at a
+  deterministic point of the main thread (the Idle Threads sync idea, for
+  native sleeps and condition waits). The SDL3 path of `SDL_PollEvent()` and the
+  case where the first thread stops being the main thread also need handling.
+  Not tested: inputs, savestates, a movie, `sleep_handling=2` with other games
+  (it makes all sleeping threads add to the debt, which is a problem by
+  itself for any game with several sleeping threads).
 - Crash at exit with debug logging: during `_dl_fini`, the OpenAL teardown of
   La-Mulana calls the hooked `pthread_key_delete()`, whose `link_function()`
   logs through `LogWindow::addLog()` into an ImGui text buffer that is already
