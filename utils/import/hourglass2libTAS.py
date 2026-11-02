@@ -22,6 +22,7 @@ VK_TO_KEYSYM = {
     0x10: "ffe1",  # VK_SHIFT       -> Shift_L
     0x11: "ffe3",  # VK_CONTROL     -> Control_L
     0x12: "ffe9",  # VK_MENU (Alt)  -> Alt_L
+    0x13: "ff13",  # VK_PAUSE       -> Pause
     0x14: "ffe5",  # VK_CAPITAL     -> Caps_Lock
     0x1B: "ff1b",  # VK_ESCAPE      -> Escape
     0x20: "20",    # VK_SPACE       -> space
@@ -35,6 +36,7 @@ VK_TO_KEYSYM = {
     0x28: "ff54",  # VK_DOWN        -> Down
     0x2D: "ff63",  # VK_INSERT      -> Insert
     0x2E: "ffff",  # VK_DELETE      -> Delete
+    0xBF: "2f",    # VK_OEM_2 (/)   -> slash
     0xA0: "ffe1",  # VK_LSHIFT      -> Shift_L
     0xA1: "ffe2",  # VK_RSHIFT      -> Shift_R
     0xA2: "ffe3",  # VK_LCONTROL    -> Control_L
