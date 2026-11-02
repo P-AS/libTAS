@@ -43,6 +43,10 @@ bool wine_restart_pending();
 /* Returns if this process is a game launched through wine */
 bool isWineGame();
 
+/* Whether wined3d presents frames from its command stream thread, from the
+ * csmt value of WINE_D3D_CONFIG (on when it is not given) */
+bool wineCsmtEnabled();
+
 /* Store the address range of wine unix ntdll library */
 void register_wine_ntdll(const char* path);
 

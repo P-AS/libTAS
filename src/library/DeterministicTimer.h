@@ -82,7 +82,7 @@ public:
     /* Wait until the other threads of the game are idle (sleeping or blocked
      * on a wait), so that what they do between two points of the main thread
      * does not depend on how fast the machine is */
-    void waitForIdleThreads();
+    void waitForIdleThreads(int64_t timeout_ns = 100000000LL);
 
     /* Set by the main thread while it waits for other threads to be idle */
     std::atomic<bool> mainWaitingForThreads{false};

@@ -55,11 +55,18 @@ void setMainThread();
 /* Set the main thread to the provided thread */
 void setMainThread(pthread_t pthread_id);
 
+/* Called by the frame boundary of a frame that draws (Wine games) */
+void setMainThreadOnDraw();
+
 /* Check if this thread is main thread */
 bool isMainThread();
 
 /* Set the checkpoint thread to this thread */
 void setCheckpointThread();
+
+/* Whether the current thread runs the frame boundaries (true for any thread
+ * before the first frame boundary) */
+bool isFrameThread();
 
 /* Get the thread tid of another thread */
 pid_t getThreadTid(pthread_t pthread_id);

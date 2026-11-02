@@ -87,6 +87,47 @@ namespace libtas {
 static sem_t semNotifyCkptThread;
 static pthread_mutex_t threadResumeLock = PTHREAD_MUTEX_INITIALIZER;
 static volatile bool restoreInProgress = false;
+
+#if defined(__x86_64__) && defined(__linux__)
+#include <linux/futex.h>
+#include <climits>
+#define LIBTAS_FUTEX_RESUME 1
+
+/* Suspended threads wait on this word (0: stay suspended). See
+ * waitForResume(). It is part of the saved memory, where it is always 0, as
+ * threads are suspended while a state is saved. */
+static int resumeFutex = 1;
+
+/* Wait until the checkpoint thread resumes us, without calling any function:
+ * a call would leave its return address on the stack, which state loading
+ * overwrites with the stack of the time of the save. Threads are not always
+ * suspended at the same place of their stack (Wine threads inside a signal
+ * handler of Wine, on their alternate stack), so the padding of the stack
+ * does not always make it match. */
+__attribute__((always_inline)) static inline void waitForResume()
+{
+    while (__atomic_load_n(&resumeFutex, __ATOMIC_ACQUIRE) == 0) {
+        register long rax asm("rax") = SYS_futex;
+        register long rdi asm("rdi") = reinterpret_cast<long>(&resumeFutex);
+        register long rsi asm("rsi") = FUTEX_WAIT_PRIVATE;
+        register long rdx asm("rdx") = 0;
+        register long r10 asm("r10") = 0;
+        asm volatile("syscall"
+                     : "+r"(rax)
+                     : "r"(rdi), "r"(rsi), "r"(rdx), "r"(r10)
+                     : "rcx", "r11", "memory");
+    }
+}
+
+/* Jump to the context saved with the state. Nothing of the current stack
+ * frame is used, as it was overwritten: the thread is found through TLS. */
+__attribute__((noinline, noreturn)) static void resumeRestoredThread()
+{
+    ThreadInfo *thread = ThreadManager::getCurrentThread();
+    setcontext(&thread->savctx);
+    __builtin_unreachable();
+}
+#endif
 static int numThreads;
 static int sig_suspend_threads = SIGXFSZ;
 static int sig_checkpoint = SIGSYS;
@@ -631,6 +672,9 @@ void SaveStateManager::terminateThreads()
 void SaveStateManager::suspendThreads()
 {
     MYASSERT(pthread_mutex_lock(&threadResumeLock) == 0)
+#ifdef LIBTAS_FUTEX_RESUME
+    __atomic_store_n(&resumeFutex, 0, __ATOMIC_RELEASE);
+#endif
 
     /* Terminate threads flagged as such.
      * Halt all other threads - force them to call stopthisthread
@@ -770,6 +814,10 @@ void SaveStateManager::resumeThreads()
     sem_init(&semNotifyCkptThread, 0, 0);
 
     MYASSERT(pthread_mutex_unlock(&threadResumeLock) == 0)
+#ifdef LIBTAS_FUTEX_RESUME
+    __atomic_store_n(&resumeFutex, 1, __ATOMIC_RELEASE);
+    syscall(SYS_futex, &resumeFutex, FUTEX_WAKE_PRIVATE, INT_MAX, nullptr, nullptr, 0);
+#endif
 
     for (int i = 0; i < numThreads; i++) {
         sem_wait(&semNotifyCkptThread);
@@ -852,6 +900,12 @@ void SaveStateManager::stopThisThread(int signum)
              * the most pure sync mechanism underneath, which should translate 
              * mostly has a futex syscall. Thanks to that, the thread stack can
              * be modified by the state loading code without it being bothered */
+#ifdef LIBTAS_FUTEX_RESUME
+            waitForResume();
+            if (restoreInProgress)
+                resumeRestoredThread();
+            (void)current_thread_safe;
+#else
             MYASSERT(pthread_mutex_lock(&threadResumeLock) == 0)
             MYASSERT(pthread_mutex_unlock(&threadResumeLock) == 0)
 
@@ -865,6 +919,7 @@ void SaveStateManager::stopThisThread(int signum)
                 setcontext(&current_thread_safe->savctx);
                 /* NOT REACHED */
             }
+#endif
         }
         else {
             /* After loading a state and recovering the thread context, we can

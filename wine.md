@@ -122,6 +122,15 @@ game computes its timeouts from our deterministic clock. Two consequences:
   `NtUserGetMessage` hook advances time by 1 ms while no message is available,
   and waits 1 ms of real time in between so that other threads can post their
   message (`dc9c10e4`).
+- That loop advanced time at the pace of real time: in Rayman 2, the first
+  thread looped there while the engine thread started, so the number of
+  non-draw frames before the first frame (60 or 75) depended on how long the
+  engine took to start, and runs differed from frame 300 on. The loop now
+  only advances time when the other threads are idle
+  (`waitForIdleThreads()`, here with a 2 s limit), and only on the thread that
+  runs the frame boundaries (`ThreadManager::isFrameThread()`, any thread before
+  the first frame): when another thread presents the frames, the first one
+  just waits for its messages.
 
 ### Time-tracking
 
@@ -137,8 +146,22 @@ section below.
 wined3d presented frames from its command stream (CSMT) thread, so the frame
 boundary made it the main thread, and the game logic thread (which calls
 QPC) became a secondary thread without time-tracking. For Wine games, the main
-thread is never switched away from the first thread (`58152c07`).
+thread was then never switched away from the first thread (`58152c07`).
 "Keep main first thread" in the debug settings does the same for any game.
+
+CSMT is now disabled by default (see below), so games present their frames
+themselves, and the first thread is not always the game thread: Rayman 2 runs
+its engine on a second thread, and the first one only handles window messages
+(it presents one frame at startup). With the first thread kept as main, the
+frame boundary, and so the checkpoint thread, alternated between both threads,
+time-tracking watched the wrong thread, and the message loop of the first
+thread made non-draw frames. Now `ThreadManager::setMainThreadOnDraw()` makes a
+thread the main thread when it draws 30 frames in a row while the main thread
+does not draw. Threads that present a few frames during loadings (Sonic
+Generations, 2 frames at a time) do not take it over. It is not done with CSMT
+enabled, nor with "Keep main first thread". Before this, the generic rule (any
+thread that reaches a frame boundary becomes main) made the main thread of
+Sonic Generations jump to those loading threads and back.
 
 ### CSMT
 
@@ -428,7 +451,33 @@ games import by ordinal, in 32 and 64-bit):
   `HKLM\System\CurrentControlSet\Services\winebus`: `DisableHidraw`=1,
   `DisableInput`=1 and `Enable SDL`=0 (dwords).
 - The XInput dll logs to the file of the virtual Steam client (`steam_api.log`,
-  needs the virtual Steam client and a log level of 4 for the calls).
+  needs the virtual Steam client and a log level of 4 for the calls, with the
+  Steam category).
+- **Only the dinput8.dll of Wine is patched**, recognized by the "Wine builtin
+  DLL" signature of its header. Games can ship their own `dinput8.dll`:
+  Ray2Fix installs Xidi as `dinput8.dll` and `dinput.dll` (loaded with
+  `WINEDLLOVERRIDES=dinput8,dinput=n,b`), which loads Wine's dinput8 from
+  system32, so two modules have that name. The dll looks for Wine's among the
+  loaded modules (`K32EnumProcessModules`) and when one is loaded later.
+
+### DirectInput keyboard
+
+Wine's DirectInput keyboard gets its state from a low-level keyboard hook,
+called from the thread that processes the key events (`keyboard_handle_event`
+in `+dinput`), so the frame on which a game sees a key depends on timing. In
+Rayman 2, which reads the keyboard with `GetDeviceState(256)`, the same Lua
+inputs (Return every 60 frames) were missed or delayed: at frame 560, one run
+was still on the language menu and another on the New Game screen; only 3 of
+about 10 presses got through in one run. The xinput dll now also patches
+`GetDeviceState` (slot 9 of the device table, shared by all devices, found by
+creating a keyboard with `GUID_SysKeyboard`): for a keyboard (`GetDeviceInfo`,
+type `DI8DEVTYPE_KEYBOARD`) read with 256 bytes, it fills the state from
+`GetAsyncKeyState()`, which libtas answers with the keys of the frame, and
+returns `DI_OK` even if the device lost the focus. DIK codes come from
+`MapVirtualKeyW(vk, MAPVK_VK_TO_VSC)`, with the 0x80 bit for the keys whose
+scan code has the E0 prefix (arrows, Insert/Delete/Home/End/Page Up/Down,
+right Ctrl/Alt, keypad divide, Windows keys). Not done: buffered reads
+(`GetDeviceData`), and games that do not load an xinput dll.
 
 ## Audio
 
@@ -820,6 +869,54 @@ lines of the main thread between runs, ignoring addresses, thread ids, the
   With this and `winebus.sys=d`, 115 saves and 62 loads in a stage of Sonic
   Generations without a crash (before: about one load in three or four).
   Not tested yet: the same without `winebus.sys=d`.
+- **Threads resumed on another stack** (Rayman 2): a suspended thread waited in
+  `pthread_mutex_lock()`, and after a load returned from it through a return
+  address on its stack, which the load had overwritten with the stack of the
+  time of the save. The padding of `stopThisThread()` makes the stack pointer
+  the same at save and load, but only when the thread is suspended on the stack
+  that was recorded for it. Under Wine it is not always: the unix side of the
+  main thread runs on a stack that Wine allocated (its kernel stack), not on
+  the one that pthread reports, so it could not be padded (`We don't have enough
+  space left in the stack to pad`) and was suspended 0x580 bytes lower at the
+  load than at the save, then jumped to address 0; and Wine threads are
+  sometimes inside a signal handler of Wine, on their alternate signal stack
+  (the DirectInput worker thread was on its normal stack at the save and on its
+  alternate stack at the load). On x86_64 Linux, suspended threads now wait on
+  a futex word with an inlined `syscall` (no return address on the stack), and
+  after a load jump to their saved context from a new call, finding their
+  thread through TLS (`waitForResume()`, `resumeRestoredThread()`). Padding is
+  kept but no longer needed for this. Trying instead to pad on the stack area
+  that holds the stack pointer (from `/proc/self/maps`) did not work: the area
+  can be merged with memory around it, and the main thread then resumed over
+  an overwritten stack (`*** stack smashing detected ***`).
+  Rayman 2: 11 loads of the same state in 30 s, no crash (before: a crash at
+  the first or second load).
+
+## Rayman 2
+
+GOG version with Ray2Fix 1.4.3 and dgVoodoo2 2.79.3, plain Wine 11.21 (no
+Proton), user guide in `docs/guides/rayman2.md`. Rendering goes Glide
+(dgVoodoo) to Direct3D 11 to wined3d to OpenGL; the engine and the rendering
+run on a second thread; the keyboard is read through DirectInput, and
+controllers through Xidi (`dinput8.dll`/`dinput.dll` of the game folder),
+which reads XInput.
+
+- Non-draw frames: at startup, the game calls `Sleep(1000)` (frame 15), which
+  makes 60 non-draw frames, the same in every run. The ones that varied came
+  from the message loop of the first thread (see Waiting on messages).
+- Savestates crashed at load (see Savestates), and the frame boundary
+  alternated between the first thread and the engine thread (see Main
+  thread).
+- Desyncs: the DirectInput keyboard (see Input), and the startup race above.
+- Results (Lua inputs, normal speed, runs under 30 s): runs paused at frames
+  300 and 1100 give the same picture; a run that saves at frame 600 and loads
+  at frame 900 gives the same picture at frame 1100 as a run that does not
+  load; 11 loads in a row without a crash. The "Idle Threads" sync made runs
+  slower and less deterministic here.
+- Not tested: gameplay in a level, controllers, long movies.
+- Compare screenshots inside the game picture: the window title shows the real
+  frame rate (`fps: 60.0`/`60.1`), and the windows are not always at the same
+  place.
 
 ## Timing compatibility with Hourglass
 
@@ -864,6 +961,10 @@ the game config, not in the movie.
   Before `08788282` that file was overwritten from its start without being
   truncated, so older logs hold several runs: the newest one is the start of
   the file, up to the first line that begins mid-sentence.
+- When the log goes to a file, it must be opened with `O_APPEND`: loading a
+  state restores the file offset of stderr, and later lines overwrote the
+  middle of the file, which looked like the game had stopped right after the
+  load (`LogOutput`, fixed on `next`).
 - Check that the running build has the fixes you expect: a libTAS UI started
   before a rebuild keeps its old binary, and the game loads `libtas.so` as it
   was when the game was started. Compare the build time with the commit times.

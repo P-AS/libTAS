@@ -323,7 +323,7 @@ static pid_t findBusyThread(pid_t self)
 }
 #endif
 
-void DeterministicTimer::waitForIdleThreads()
+void DeterministicTimer::waitForIdleThreads(int64_t timeout_ns)
 {
 #ifdef __linux__
     pid_t self;
@@ -335,12 +335,12 @@ void DeterministicTimer::waitForIdleThreads()
     while (pid_t busy = findBusyThread(self)) {
         NATIVECALL(clock_gettime(CLOCK_MONOTONIC, &now));
         int64_t waited = (now.tv_sec - start.tv_sec) * 1000000000LL + (now.tv_nsec - start.tv_nsec);
-        if (waited > 100000000LL) {
+        if (waited > timeout_ns) {
             char comm[32] = "", wchan[64] = "";
             readThreadFile(busy, "comm", comm, sizeof(comm));
             readThreadFile(busy, "wchan", wchan, sizeof(wchan));
             comm[strcspn(comm, "\n")] = '\0';
-            LOG(LL_WARN, LCF_WAIT, "Thread %d (%s, wchan %s) still busy after 100 ms", busy, comm, wchan);
+            LOG(LL_WARN, LCF_WAIT, "Thread %d (%s, wchan %s) still busy after %lld ms", busy, comm, wchan, static_cast<long long>(timeout_ns / 1000000));
             break;
         }
         struct timespec pause = {0, 100000};

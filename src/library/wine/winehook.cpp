@@ -293,4 +293,16 @@ void hook_wine_syscall(const char* library, const char* name, void** orig_functi
         mprotect(page, page_size, PROT_READ);
 }
 
+
+bool wineCsmtEnabled()
+{
+    static int enabled = -1;
+    if (enabled < 0) {
+        const char *config = getenv("WINE_D3D_CONFIG");
+        const char *csmt = config ? strstr(config, "csmt=") : nullptr;
+        enabled = csmt ? (strtol(csmt + 5, nullptr, 0) != 0) : 1;
+    }
+    return enabled;
+}
+
 }

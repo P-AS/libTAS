@@ -161,6 +161,8 @@ void frameBoundary(std::function<void()> draw, RenderHUD& hud)
 
     ThreadManager::setCheckpointThread();
     ThreadManager::setMainThread();
+    if (draw)
+        ThreadManager::setMainThreadOnDraw();
 
     /* Reset the busy loop detector */
     BusyLoopDetection::reset();

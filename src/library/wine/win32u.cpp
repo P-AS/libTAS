@@ -23,6 +23,7 @@
  * calling convention, even on i386. */
 
 #include "win32u.h"
+#include "DeterministicTimer.h"
 #include "ntdll.h"
 #include "winehook.h"
 
@@ -244,9 +245,20 @@ static int NtUserGetMessage(void *msg, void *hwnd, uint32_t first, uint32_t last
 
     /* The game may wait for a message posted from a timer thread, which
      * waits until our deterministic time reaches its deadline. Advance time
-     * while no message is available, otherwise both threads wait forever. */
+     * while no message is available, otherwise both threads wait forever.
+     * Only advance it when the other threads are idle: the first thread of
+     * Rayman 2 only handles messages while its engine thread starts, and
+     * advancing time at the pace of the real time it takes to start made the
+     * number of non-draw frames at startup vary between runs. Stop doing it
+     * when another thread runs the frame boundaries: this thread then only
+     * waits for its messages. */
     struct timespec mssleep = {0, 1000000};
     while (orig::NtUserMsgWaitForMultipleObjectsEx(0, nullptr, 0, QS_ALLINPUT, MWMO_INPUTAVAILABLE) == WAIT_TIMEOUT) {
+        if (!ThreadManager::isMainThread() || !ThreadManager::isFrameThread())
+            break;
+        DeterministicTimer::get().waitForIdleThreads(2000000000LL);
+        if (orig::NtUserMsgWaitForMultipleObjectsEx(0, nullptr, 0, QS_ALLINPUT, MWMO_INPUTAVAILABLE) != WAIT_TIMEOUT)
+            break;
         transfer_sleep(mssleep, nullptr);
 
         /* Give other threads the chance to post their message */

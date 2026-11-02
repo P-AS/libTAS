@@ -109,9 +109,7 @@ void ThreadManager::setMainThread()
     }
 
 #ifdef __linux__
-    /* Wine games present their frames from the wined3d command stream thread
-     * while the game logic stays on the first thread, which must be kept as
-     * the main thread for time-tracking to work. */
+    /* Wine games: see setMainThreadOnDraw() */
     if (isWineGame())
         return;
 #endif
@@ -126,13 +124,63 @@ void ThreadManager::setMainThread()
     }
 }
 
+void ThreadManager::setMainThreadOnDraw()
+{
+#ifdef __linux__
+    /* For Wine games, the main thread becomes the thread that draws all the
+     * frames for a while (30 in a row while the main thread does not draw).
+     * Without CSMT (the default, see GameThread), the game presents its frames
+     * itself, and its engine is not always on the first thread: Rayman 2 runs
+     * it on a second thread while the first one only handles window messages
+     * (and presents a single frame at startup). Other threads that present a
+     * few frames during loadings (Sonic Generations) must not take it over.
+     * With CSMT, frames are presented by the wined3d command stream thread
+     * while the game logic stays on the first thread, which must stay the main
+     * thread for time-tracking to work. */
+    if (!isWineGame() || wineCsmtEnabled() ||
+        (Global::shared_config.debug_state & SharedConfig::DEBUG_MAIN_FIRST_THREAD))
+        return;
+
+    static pthread_t candidate = 0;
+    static int draws = 0;
+
+    pthread_t pthread_id = getThreadId();
+    if (!main_pthread_id || (pthread_id == main_pthread_id)) {
+        draws = 0;
+        return;
+    }
+
+    if (pthread_id != candidate) {
+        candidate = pthread_id;
+        draws = 0;
+    }
+
+    if (++draws >= 30) {
+        LOG(LL_INFO, LCF_THREAD, "Wine game draws from thread %d, making it the main thread", getThreadTid(pthread_id));
+        main_pthread_id = pthread_id;
+        draws = 0;
+    }
+#endif
+}
+
 void ThreadManager::setMainThread(pthread_t pthread_id)
 {
     main_pthread_id = pthread_id;
 }
 
+static bool frame_thread_set = false;
+
+bool ThreadManager::isFrameThread()
+{
+    if (!frame_thread_set)
+        return true;
+    return getCurrentThread()->state == ThreadInfo::ST_CKPNTHREAD;
+}
+
 void ThreadManager::setCheckpointThread()
 {
+    frame_thread_set = true;
+
     if (current_thread->state == ThreadInfo::ST_CKPNTHREAD)
         return;
 
@@ -495,5 +543,6 @@ void ThreadManager::updateStackInfo()
 
     unlockList();
 }
+
 
 }

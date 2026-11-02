@@ -574,44 +574,216 @@ static HRESULT WINAPI enum_devices_w(void *self, DWORD type, enum_callback_t cal
     return enum_devices(TRUE, self, type, callback, ref, flags);
 }
 
-/* Replace EnumDevices (slot 4) in the table of the object that dinput8 gives */
-static void patch_vtable(HMODULE dinput8, const GUID *iid, void *replacement, enum_devices_t *orig)
+/* ---- DirectInput keyboard ----
+ *
+ * Wine's DirectInput keyboard gets its state from a low-level keyboard hook,
+ * which Wine calls from another thread when it processes the key events, so
+ * the frame on which a game sees a key depends on timing (Rayman 2 missed or
+ * delayed some key presses of the same movie). GetDeviceState() of a keyboard
+ * now gives the state of the keys of the frame, from GetAsyncKeyState(),
+ * which libtas answers with the inputs of the frame. */
+
+typedef HRESULT (WINAPI *get_device_state_t)(void *self, DWORD size, void *data);
+typedef HRESULT (WINAPI *get_device_info_t)(void *self, void *instance);
+
+static get_device_state_t orig_get_state_a, orig_get_state_w;
+static get_device_info_t get_info_a, get_info_w;
+
+#define DI8DEVTYPE_KEYBOARD 0x13
+#define MAPVK_VK_TO_VSC_ 0
+
+static const GUID GUID_SysKeyboard_ = { 0x6f1d2b61, 0xd5a0, 0x11cf, { 0xbf, 0xc7, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00 } };
+
+/* Virtual key of each DirectInput key code (DIK), 0 if none */
+static BYTE dik_to_vk[256];
+static INIT_ONCE dik_once = INIT_ONCE_STATIC_INIT;
+
+static BOOL CALLBACK init_dik_table(PINIT_ONCE once, PVOID param, PVOID *context)
+{
+    /* Keys whose scan code has the E0 prefix: their DIK has the 0x80 bit */
+    static const BYTE extended[] = {
+        VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT, VK_INSERT, VK_DELETE, VK_HOME, VK_END,
+        VK_PRIOR, VK_NEXT, VK_RCONTROL, VK_RMENU, VK_DIVIDE, VK_LWIN, VK_RWIN, VK_APPS
+    };
+
+    for (int vk = 1; vk < 255; vk++) {
+        /* Generic modifiers would hide the left and right ones */
+        if ((vk == VK_SHIFT) || (vk == VK_CONTROL) || (vk == VK_MENU))
+            continue;
+        UINT sc = MapVirtualKeyW(vk, MAPVK_VK_TO_VSC_) & 0x7f;
+        if (!sc)
+            continue;
+        for (size_t i = 0; i < sizeof(extended); i++)
+            if (extended[i] == vk)
+                sc |= 0x80;
+        /* The extended keys share their scan code with keys of the keypad */
+        if (!dik_to_vk[sc] || (sc & 0x80))
+            dik_to_vk[sc] = (BYTE)vk;
+    }
+    /* Keys that the loop gives the same scan code as another one */
+    dik_to_vk[0x1c] = VK_RETURN;
+    dik_to_vk[0x1d] = VK_LCONTROL;
+    dik_to_vk[0x9d] = VK_RCONTROL;
+    dik_to_vk[0x38] = VK_LMENU;
+    dik_to_vk[0xb8] = VK_RMENU;
+    dik_to_vk[0x2a] = VK_LSHIFT;
+    dik_to_vk[0x36] = VK_RSHIFT;
+    return TRUE;
+}
+
+/* Devices known to be keyboards or not (a game has a few devices) */
+static struct { void *device; BOOL keyboard; } known_devices[16];
+static LONG known_count;
+
+static BOOL is_keyboard(void *self, BOOL wide)
+{
+    LONG n = known_count;
+    for (LONG i = 0; i < n && i < 16; i++)
+        if (known_devices[i].device == self)
+            return known_devices[i].keyboard;
+
+    union { DEVICEINSTANCEA a; DEVICEINSTANCEW w; } inst;
+    memset(&inst, 0, sizeof(inst));
+    BOOL keyboard = FALSE;
+    if (wide) {
+        inst.w.dwSize = sizeof(inst.w);
+        if (get_info_w && SUCCEEDED(get_info_w(self, &inst.w)))
+            keyboard = ((inst.w.dwDevType & 0xff) == DI8DEVTYPE_KEYBOARD);
+    } else {
+        inst.a.dwSize = sizeof(inst.a);
+        if (get_info_a && SUCCEEDED(get_info_a(self, &inst.a)))
+            keyboard = ((inst.a.dwDevType & 0xff) == DI8DEVTYPE_KEYBOARD);
+    }
+
+    LONG i = InterlockedIncrement(&known_count) - 1;
+    if (i < 16) {
+        known_devices[i].device = self;
+        known_devices[i].keyboard = keyboard;
+    }
+    return keyboard;
+}
+
+static HRESULT get_device_state(BOOL wide, void *self, DWORD size, void *data)
+{
+    get_device_state_t orig = wide ? orig_get_state_w : orig_get_state_a;
+    HRESULT hr = orig(self, size, data);
+
+    if ((size != 256) || !data || !is_keyboard(self, wide))
+        return hr;
+
+    InitOnceExecuteOnce(&dik_once, init_dik_table, NULL, NULL);
+    BYTE *keys = data;
+    for (int dik = 0; dik < 256; dik++)
+        keys[dik] = (dik_to_vk[dik] && (GetAsyncKeyState(dik_to_vk[dik]) & 0x8000)) ? 0x80 : 0;
+
+    static LONG logged;
+    if (!InterlockedExchange(&logged, 1))
+        xlog(LL_INFO, "Giving the keys of libTAS to the DirectInput keyboard");
+
+    /* The state is the one of the frame even if the device lost the focus */
+    return 0; /* DI_OK */
+}
+
+static HRESULT WINAPI get_device_state_a(void *self, DWORD size, void *data)
+{
+    return get_device_state(FALSE, self, size, data);
+}
+
+static HRESULT WINAPI get_device_state_w(void *self, DWORD size, void *data)
+{
+    return get_device_state(TRUE, self, size, data);
+}
+
+static void patch_slot(void **vtable, int slot, void *replacement, void **orig)
+{
+    DWORD old;
+    if (!VirtualProtect(&vtable[slot], sizeof(void *), PAGE_READWRITE, &old)) {
+        xlog(LL_ERROR, "Could not patch DirectInput (error %lu)", GetLastError());
+        return;
+    }
+    if (vtable[slot] != replacement) {
+        *orig = vtable[slot];
+        vtable[slot] = replacement;
+    }
+    VirtualProtect(&vtable[slot], sizeof(void *), old, &old);
+}
+
+/* Patch EnumDevices (slot 4) of the DirectInput object, and GetDeviceState
+ * (slot 9) of its devices, whose table is shared by all devices */
+static void patch_vtable(HMODULE dinput8, BOOL wide)
 {
     typedef HRESULT (WINAPI *create_t)(HINSTANCE, DWORD, const GUID *, void **, void *);
     create_t create = (create_t)(void *)GetProcAddress(dinput8, "DirectInput8Create");
     void *obj = NULL;
 
-    if (!create || FAILED(create(GetModuleHandleW(NULL), 0x0800, iid, &obj, NULL)) || !obj) {
+    if (!create || FAILED(create(GetModuleHandleW(NULL), 0x0800, wide ? &IID_IDirectInput8W_ : &IID_IDirectInput8A_, &obj, NULL)) || !obj) {
         xlog(LL_ERROR, "Could not create a DirectInput object, DirectInput will show the controllers of the host");
         return;
     }
 
     void **vtable = *(void ***)obj;
-    DWORD old;
-    if (VirtualProtect(&vtable[4], sizeof(void *), PAGE_READWRITE, &old)) {
-        if (vtable[4] != replacement) {
-            *orig = (enum_devices_t)vtable[4];
-            vtable[4] = replacement;
-        }
-        VirtualProtect(&vtable[4], sizeof(void *), old, &old);
+    patch_slot(vtable, 4, wide ? (void *)enum_devices_w : (void *)enum_devices_a,
+               wide ? (void **)&orig_enum_w : (void **)&orig_enum_a);
+
+    /* CreateDevice() */
+    typedef HRESULT (WINAPI *create_device_t)(void *, const GUID *, void **, void *);
+    void *device = NULL;
+    if (SUCCEEDED(((create_device_t)vtable[3])(obj, &GUID_SysKeyboard_, &device, NULL)) && device) {
+        void **dvtable = *(void ***)device;
+        if (wide)
+            get_info_w = (get_device_info_t)dvtable[15];
+        else
+            get_info_a = (get_device_info_t)dvtable[15];
+        patch_slot(dvtable, 9, wide ? (void *)get_device_state_w : (void *)get_device_state_a,
+                   wide ? (void **)&orig_get_state_w : (void **)&orig_get_state_a);
+        ((ULONG (WINAPI *)(void *))dvtable[2])(device);
     } else {
-        xlog(LL_ERROR, "Could not patch DirectInput (error %lu)", GetLastError());
+        xlog(LL_ERROR, "Could not create a DirectInput keyboard, keys will not be deterministic");
     }
 
     /* Release() */
     ((ULONG (WINAPI *)(void *))vtable[2])(obj);
 }
 
+/* Only the dinput8.dll of Wine is patched, not wrappers with the same name
+ * that games ship (Xidi for Rayman 2), which call the one of Wine */
+static BOOL is_wine_builtin(HMODULE module)
+{
+    return module && (memcmp((const char *)module + 0x40, "Wine builtin DLL", 16) == 0);
+}
+
 static LONG dinput_patched;
 
 static void patch_dinput(HMODULE dinput8)
 {
+    if (!is_wine_builtin(dinput8))
+        return;
     if (InterlockedExchange(&dinput_patched, 1))
         return;
 
-    patch_vtable(dinput8, &IID_IDirectInput8A_, (void *)enum_devices_a, &orig_enum_a);
-    patch_vtable(dinput8, &IID_IDirectInput8W_, (void *)enum_devices_w, &orig_enum_w);
-    xlog(LL_INFO, "Patched EnumDevices() of DirectInput 8");
+    patch_vtable(dinput8, FALSE);
+    patch_vtable(dinput8, TRUE);
+    xlog(LL_INFO, "Patched EnumDevices() and GetDeviceState() of DirectInput 8");
+}
+
+/* Look for the dinput8.dll of Wine among the loaded modules */
+static void patch_loaded_dinput(void)
+{
+    typedef BOOL (WINAPI *enum_modules_t)(HANDLE, HMODULE *, DWORD, DWORD *);
+    enum_modules_t enum_modules = (enum_modules_t)(void *)GetProcAddress(GetModuleHandleA("kernel32.dll"), "K32EnumProcessModules");
+    HMODULE modules[512];
+    DWORD needed = 0;
+
+    if (!enum_modules || !enum_modules(GetCurrentProcess(), modules, sizeof(modules), &needed))
+        return;
+
+    for (DWORD i = 0; i < needed / sizeof(HMODULE) && i < 512; i++) {
+        WCHAR path[MAX_PATH];
+        DWORD len = GetModuleFileNameW(modules[i], path, MAX_PATH);
+        if ((len >= 11) && (_wcsicmp(path + len - 11, L"dinput8.dll") == 0) &&
+            ((len == 11) || (path[len - 12] == L'\\') || (path[len - 12] == L'/')))
+            patch_dinput(modules[i]);
+    }
 }
 
 typedef struct {
@@ -655,10 +827,8 @@ static void hook_dinput(void)
     if (reg)
         reg(0, dll_loaded, NULL, &cookie);
 
-    /* Already loaded when the game imports it */
-    HMODULE dinput8 = GetModuleHandleW(L"dinput8.dll");
-    if (dinput8)
-        patch_dinput(dinput8);
+    /* Already loaded (imported by the game, or by a wrapper) */
+    patch_loaded_dinput();
 }
 
 /* Not in the dlls of Wine: games and test programs can look for it to know
