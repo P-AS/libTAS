@@ -5,11 +5,6 @@ on:
     branches: [next, master]
   pull_request:
   workflow_dispatch:
-    inputs:
-      appimage:
-        description: Also build the AppImage
-        type: boolean
-        default: false
 
 jobs:
   build:
@@ -51,7 +46,6 @@ jobs:
         run: DEB_BUILD_OPTIONS=nostrip dpkg-buildpackage --no-sign -b
 
       - name: Build AppImage
-        if: ${{ inputs.appimage }}
         env:
           ARCH: ${{ matrix.arch }}
           QMAKE: /usr/lib/qt6/bin/qmake
@@ -85,9 +79,7 @@ jobs:
           if ls ../libtas32_*_${{ matrix.deb_arch }}.deb >/dev/null 2>&1; then
             mv ../libtas32_*_${{ matrix.deb_arch }}.deb dist/libtas32-deb-${{ matrix.arch }}-${sha}.deb
           fi
-          if [ "${{ inputs.appimage }}" = "true" ]; then
-            mv libTAS-${{ matrix.arch }}.AppImage dist/libtas-appimage-${{ matrix.arch }}-${sha}.AppImage
-          fi
+          mv libTAS-${{ matrix.arch }}.AppImage dist/libtas-appimage-${{ matrix.arch }}-${sha}.AppImage
           ls -l dist
           echo "SHA=${sha}" >> "$GITHUB_ENV"
 
@@ -106,7 +98,6 @@ jobs:
           archive: false
 
       - name: Upload AppImage
-        if: ${{ inputs.appimage }}
         uses: actions/upload-artifact@v7
         with:
           path: dist/libtas-appimage-${{ matrix.arch }}-${{ env.SHA }}.AppImage

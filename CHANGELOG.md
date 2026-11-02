@@ -249,6 +249,7 @@
 * Wine: only patch the DirectInput of Wine, not wrappers with the same name
   that games ship (Xidi for Rayman 2)
 * Fix log files being partly overwritten after loading a state
+* CI: build the AppImage again on every push and pull request
 
 ## [1.4.8] - 2026-05-14
 ### Added
