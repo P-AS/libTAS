@@ -263,6 +263,10 @@
   API without Proton too
 * Steam: add the SteamController006 interface layout, which fixes a crash when
   a game uses the Steam Controller API (Sonic Mania)
+* Fix libTAS hanging before the game starts when the game path has a word
+  "-" in it, such as "Touhou 15 - Legacy of Lunatic Kingdom", by computing
+  the MD5 of the game without a shell. The hash was also empty for any path
+  with a space
 
 ## [1.4.8] - 2026-05-14
 ### Added

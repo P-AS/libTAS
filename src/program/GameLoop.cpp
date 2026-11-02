@@ -50,6 +50,8 @@
 #include "../shared/inputs/AllInputs.h"
 #include "../shared/inputs/ControllerInputs.h"
 
+#include <QCryptographicHash>
+#include <QFile>
 #include <string>
 #include <iostream>
 #include <sstream>
@@ -226,14 +228,16 @@ void GameLoop::init()
     /* Init savestate list */
     SaveStateList::init(context);
 
-    /* Compute the MD5 hash of the game binary */
+    /* Compute the MD5 hash of the game binary. This does not go through a
+     * shell: a path with spaces was split into several words, and a word
+     * such as "-" made md5sum wait for its standard input forever. */
     context->md5_game.clear();
-    std::ostringstream cmd;
-    cmd << "md5sum -b \"" << context->gamepath << "\" 2> /dev/null";
-
-    context->md5_game = queryCmd(cmd.str());
-    if (context->md5_game.size() > 32)
-        context->md5_game.resize(32);
+    QFile game_file(QString::fromStdString(context->gamepath.string()));
+    if (game_file.open(QIODevice::ReadOnly)) {
+        QCryptographicHash hash(QCryptographicHash::Md5);
+        if (hash.addData(&game_file))
+            context->md5_game = hash.result().toHex().toStdString();
+    }
 
     /* Only open the movie if we did not restart */
     if (context->status != Context::RESTARTING) {

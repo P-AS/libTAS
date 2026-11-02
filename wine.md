@@ -725,6 +725,35 @@ the environment or the env overrides. Proton then starts the game from its
   the game, and our `dlsym()` hook returns our `XRR*` functions there even in
   native mode, as winex11 loads libXrandr with `dlopen()` (`c61bd8c8`).
 
+### Touhou 15
+
+`th15.exe` (Legacy of Lunatic Kingdom, 32-bit, Direct3D 9 through wined3d,
+plain Wine), in a folder named `Touhou 15 - Legacy of Lunatic Kingdom`.
+
+- **libTAS froze before the game started, with no log**: the launcher
+  computes the MD5 of the game with `md5sum -b "<path>"`, and the path was
+  streamed from a `std::filesystem::path`, which adds quotes of its own, so
+  the shell saw `""/home/.../Touhou 15 - Legacy.../th15.exe""`: the path
+  was split into words, and the word `-` made `md5sum` read its standard
+  input forever (`sh -c md5sum` as a child of libTAS in `ps`, and libTAS
+  idle in the Qt event loop in `eu-stack`). Any path with a space had an
+  empty hash instead. The hash is now computed with `QCryptographicHash`.
+- The game then shows its own settings dialog at each start (resolution,
+  windowed mode), with no config in the prefix, and waits for it. Keys and
+  clicks go through libTAS inputs: a click that is only a few ms long falls
+  between two frames and is lost, so hold the button (`xdotool mousedown 1`,
+  wait 0.4 s, `mouseup 1`), after `windowactivate` with a window manager.
+  Return did not close it.
+- After the dialog it spins on `QueryPerformanceCounter` (the frame counter
+  stops, libTAS warns `many calls to function QueryPerformanceCounter()`):
+  QPC time-tracking on the main thread (threshold 100) is needed, like Boshy,
+  Cave Story+ and Sonic Mania. Not set in the user's `th15.exe.ini`. With
+  it, the demo play of the title runs at 60 fps (frame 3341, rendering
+  checked on a screenshot). The frames before are non-draw frames from the
+  time the dialog is open (372 here).
+- Idle Threads sync (`game_specific_sync=64` in the user's profile) was not
+  the cause of the freeze: it is the same with and without.
+
 ### Sonic Mania
 
 Steam version (32-bit, Steam DRM wrapper `.bind`, DirectX 9 through wined3d,
