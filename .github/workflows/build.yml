@@ -35,7 +35,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends devscripts equivs fakeroot file wget qt6-wayland
+          sudo apt-get install --yes --no-install-recommends devscripts equivs fakeroot file librsvg2-bin wget qt6-wayland
           sudo mk-build-deps --install --remove --tool "apt-get --yes --no-install-recommends" debian/control
 
       - name: Install 32-bit build dependencies
@@ -70,6 +70,8 @@ jobs:
           # The AppImage bundles both the 64-bit and the 32-bit libraries
           mkdir AppDir
           cp -a debian/libtas/usr AppDir/
+          # linuxdeploy needs a PNG icon at the top of the AppDir for the desktop file
+          rsvg-convert -w 256 -h 256 libTAS.svg -o AppDir/libTAS.png
           if [ -d debian/libtas32/usr ]; then
             cp -a debian/libtas32/usr AppDir/
           fi
