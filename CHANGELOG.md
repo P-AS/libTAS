@@ -267,6 +267,7 @@
   "-" in it, such as "Touhou 15 - Legacy of Lunatic Kingdom", by computing
   the MD5 of the game without a shell. The hash was also empty for any path
   with a space
+* Fix the -t command-line option, which was listed in the help but rejected
 
 ## [1.4.8] - 2026-05-14
 ### Added

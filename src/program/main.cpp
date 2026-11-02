@@ -158,7 +158,7 @@ int main(int argc, char **argv)
     bool openLuaConsole = false;
 
     // std::string libname;
-    while ((c = getopt_long (argc, argv, "+r:w:d:l:nhiLs:", long_options, &option_index)) != -1) {
+    while ((c = getopt_long (argc, argv, "+r:w:d:l:nthiLs:", long_options, &option_index)) != -1) {
         switch (c) {
             case 'r':
             case 'w':
@@ -187,6 +187,7 @@ int main(int argc, char **argv)
             case 'n':
                 context.interactive = false;
                 break;
+            case 't':
             case 'N':
                 /* Test mode: disable prevent_savefiles and enable non-interactive */
                 test_mode = true;
