@@ -43,6 +43,7 @@
 #include "utils.h"
 #include "GameEvents.h"
 #include "GameThread.h"
+#include "LogOutput.h"
 #include "../shared/version.h"
 
 #include <QtWidgets/QFileDialog>
@@ -57,6 +58,8 @@
 #include <QtWidgets/QInputDialog>
 #include <QtWidgets/QApplication>
 #include <QtCore/QTimer>
+#include <QtCore/QUrl>
+#include <QtGui/QDesktopServices>
 
 #include <iostream>
 #include <future>
@@ -116,10 +119,20 @@ MainWindow::MainWindow(Context* c) : QMainWindow(), context(c)
     qRegisterMetaType<std::string>("std::string");
 
 #ifdef LIBTAS_INTERIM_COMMIT
+#ifdef LIBTAS_INTERIM_BRANCH
+    QString title = QString("libTAS v%1.%2.%3 - interim %4 %5")
+        .arg(MAJORVERSION).arg(MINORVERSION).arg(PATCHVERSION)
+        .arg(LIBTAS_INTERIM_COMMIT).arg(LIBTAS_INTERIM_BRANCH);
 #ifdef LIBTAS_INTERIM_DATE
-    QString title = QString("libTAS v%1.%2.%3 - interim %4 (%5)").arg(MAJORVERSION).arg(MINORVERSION).arg(PATCHVERSION).arg(LIBTAS_INTERIM_COMMIT).arg(LIBTAS_INTERIM_DATE);
+    title = title + QString(" (%1)").arg(LIBTAS_INTERIM_DATE);
+#endif
 #else
-    QString title = QString("libTAS v%1.%2.%3 - interim %4").arg(MAJORVERSION).arg(MINORVERSION).arg(PATCHVERSION).arg(LIBTAS_INTERIM_COMMIT);
+    QString title = QString("libTAS v%1.%2.%3 - interim %4")
+        .arg(MAJORVERSION).arg(MINORVERSION).arg(PATCHVERSION)
+        .arg(LIBTAS_INTERIM_COMMIT);
+#ifdef LIBTAS_INTERIM_DATE
+    title = title + QString(" (%1)").arg(LIBTAS_INTERIM_DATE);
+#endif
 #endif
 #else
     QString title = QString("libTAS v%1.%2.%3").arg(MAJORVERSION).arg(MINORVERSION).arg(PATCHVERSION);
@@ -612,6 +625,26 @@ void MainWindow::createFileMenu()
     disabledActionsOnStart.append(action);
     action = fileMenu->addAction(tr("Executable Options..."), this, [this] { windowManager->showExecutableWindow(); });
     disabledActionsOnStart.append(action);
+
+    fileMenu->addSeparator();
+    fileMenu->addAction(tr("Open Logs Folder"), this, &MainWindow::slotOpenLogsFolder);
+}
+
+void MainWindow::slotOpenLogsFolder()
+{
+    const std::filesystem::path dir = LogOutput::directory(context);
+
+    std::error_code ec;
+    if (!std::filesystem::is_directory(dir, ec)) {
+        QMessageBox::critical(this, tr("Logs folder"),
+            tr("The logs folder %1 does not exist. It is created when a game is launched with \"Log to file\" enabled in the debug settings.")
+            .arg(QString::fromStdString(dir.string())));
+        return;
+    }
+
+    if (!QDesktopServices::openUrl(QUrl::fromLocalFile(QString::fromStdString(dir.string()))))
+        QMessageBox::critical(this, tr("Logs folder"),
+            tr("Could not open the logs folder %1.").arg(QString::fromStdString(dir.string())));
 }
 
 void MainWindow::createSettingsMenu()

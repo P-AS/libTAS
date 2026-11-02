@@ -66,6 +66,8 @@
   Generations controllers)
 * Steam: add a setting (`steam_cloud`) to tell games that Steam Cloud is
   enabled or disabled in the virtual Steam client
+* Add "Open Logs Folder" to the File menu, with an error message when the
+  folder does not exist
 
 ### Changed
 
@@ -108,6 +110,12 @@
   file instead of the executable name (#557)
 * Settings given with the --set command-line option are not saved in the
   config files anymore
+* Include the git branch name in the window titlebar alongside the
+  commit hash for interim builds
+* Logging to the console and to a file are now two separate options, that
+  can both be enabled, and give the same text. Log files are written to the
+  logs folder of the data directory, named after the game executable and
+  the date and time, instead of next to the game executable
 
 ### Fixed
 
@@ -204,8 +212,7 @@
 * Wine: fix random crashes when saving or loading a state while a thread of a
   32-bit game runs its own code (WoW64)
 * Steam: report Steam Cloud as enabled in the virtual Steam client, so that
-  games save through the Steam API as they do with the real client (Sonic
-  Generations stayed on its saving screen)
+  games save through the Steam API as they do with the real client
 * Steam: confirm ISteamUserStats::StoreStats() with the stats and achievement
   stored callbacks and report the game's own id in the stats callbacks (Sonic
   Generations never showed the button prompt of the results screen)
@@ -217,6 +224,7 @@
 * Wine: fix clicks on the game window or on a window below it doing nothing
   after focusing another window, as the window that Wine maps to clip the
   cursor stayed over the game (Sonic Generations)
+* Apply OSD font size changes while the game is running
 
 ## [1.4.8] - 2026-05-14
 ### Added

@@ -249,6 +249,7 @@ private slots:
     void slotLaunch(bool attach_gdb);
     void slotStop();
     void slotBrowseGamePath();
+    void slotOpenLogsFolder();
     void slotGamePathChanged();
     void slotBrowseMoviePath();
     void slotMoviePathChanged();

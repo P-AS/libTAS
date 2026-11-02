@@ -78,11 +78,9 @@ void DebugPane::initLayout()
     QVBoxLayout* logLayout = new QVBoxLayout;
     logBox->setLayout(logLayout);
 
-    logToChoice = new QComboBox();
-
-    logToChoice->addItem(tr("Disabled logging"), SharedConfig::NO_LOGGING);
-    logToChoice->addItem(tr("Log to console"), SharedConfig::LOGGING_TO_CONSOLE);
-    logToChoice->addItem(tr("Log to file"), SharedConfig::LOGGING_TO_FILE);
+    logToConsoleBox = new QCheckBox(tr("Log to console"));
+    logToFileBox = new QCheckBox(tr("Log to file"));
+    logToFileBox->setToolTip(tr("Write the same logs to a file in the logs folder of the data directory (File > Open Logs Folder)"));
 
     QGroupBox* logLevelBox = new QGroupBox(tr("Level"));
     logLevelSlider = new QSlider(Qt::Horizontal);
@@ -184,7 +182,8 @@ void DebugPane::initLayout()
         }        
     }
     
-    logLayout->addWidget(logToChoice);
+    logLayout->addWidget(logToConsoleBox);
+    logLayout->addWidget(logToFileBox);
     logLayout->addWidget(logLevelBox);
     logLayout->addWidget(logPrintBox);
 
@@ -207,7 +206,8 @@ void DebugPane::initSignals()
     connect(debugSigIntBox, &QAbstractButton::clicked, this, &DebugPane::saveConfig);
     connect(debugStraceEvents, &QLineEdit::textEdited, this, &DebugPane::saveConfig);
     
-    connect(logToChoice, static_cast<void (QComboBox::*)(int)>(&QComboBox::activated), this, &DebugPane::saveConfig);
+    connect(logToConsoleBox, &QAbstractButton::clicked, this, &DebugPane::saveConfig);
+    connect(logToFileBox, &QAbstractButton::clicked, this, &DebugPane::saveConfig);
     connect(logLevelSlider, &QAbstractSlider::valueChanged, this, &DebugPane::saveConfig);
 
     connect(logPrintAllBox, &QAbstractButton::clicked, this, &DebugPane::saveConfig);
@@ -254,9 +254,8 @@ void DebugPane::loadConfig()
     debugSigIntBox->setChecked(context->config.sc.sigint_upon_launch);
     debugStraceEvents->setText(context->config.strace_events.c_str());
 
-    int index = logToChoice->findData(context->config.sc.logging_status);
-    if (index >= 0)
-        logToChoice->setCurrentIndex(index);
+    logToConsoleBox->setChecked(context->config.sc.logging_console);
+    logToFileBox->setChecked(context->config.sc.logging_file);
 
     /* Disconnect to not trigger valueChanged() signal */
     disconnect(logLevelSlider, &QAbstractSlider::valueChanged, this, &DebugPane::saveConfig);
@@ -292,7 +291,8 @@ void DebugPane::saveConfig()
     context->config.sc.sigint_upon_launch = debugSigIntBox->isChecked();
     context->config.strace_events = debugStraceEvents->text().toStdString();
 
-    context->config.sc.logging_status = logToChoice->currentData().toInt();
+    context->config.sc.logging_console = logToConsoleBox->isChecked();
+    context->config.sc.logging_file = logToFileBox->isChecked();
     
     context->config.sc.logging_level = logLevelSlider->value();
     
