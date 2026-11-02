@@ -52,6 +52,15 @@ for vk in range(0x41, 0x5B):
 # VK_F1..VK_F12 are 0x70-0x7B; keysyms XK_F1..XK_F12 are 0xffbe..0xffc9
 for n in range(12):
     VK_TO_KEYSYM[0x70 + n] = "%x" % (0xffbe + n)
+# VK_NUMPAD0..VK_NUMPAD9 are 0x60-0x69; keysyms XK_KP_0..XK_KP_9 are 0xffb0..0xffb9
+for n in range(10):
+    VK_TO_KEYSYM[0x60 + n] = "%x" % (0xffb0 + n)
+# US layout punctuation (the .wtf layout string is 00000409 for these files)
+VK_TO_KEYSYM[0xBC] = "2c"  # VK_OEM_COMMA  -> comma
+VK_TO_KEYSYM[0xBE] = "2e"  # VK_OEM_PERIOD -> period
+VK_TO_KEYSYM[0xC0] = "60"  # VK_OEM_3      -> grave
+VK_TO_KEYSYM[0xDB] = "5b"  # VK_OEM_4      -> bracketleft
+VK_TO_KEYSYM[0xDD] = "5d"  # VK_OEM_6      -> bracketright
 
 VK_END = 0xF0
 VK_LBUTTON = 0x01
