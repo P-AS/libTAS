@@ -245,6 +245,10 @@ static int open_audio_device(const sdl2::SDL_AudioSpec * desired, sdl2::SDL_Audi
          */
 
         auto buffer = audiocontext.createBuffer();
+        if (!buffer) {
+            LOG(LL_WARN, LCF_SDL | LCF_SOUND, "No more audio buffers available");
+            return -1;
+        }
 
         buffer->frequency = sdl_source->frequency;
         buffer->channels = sdl_source->channels;
@@ -654,6 +658,11 @@ void SDL_MixAudio(Uint8 * dst, const Uint8 * src, Uint32 len, int volume)
 
     /* We try to reuse a buffer that has been processed from the source */
     std::shared_ptr<AudioBuffer> ab = audiocontext.reuseBufferFromSourceOrCreate(sdl_source);
+    if (!ab) {
+        /* No more audio buffers, they are only processed at frame boundaries */
+        LOG(LL_WARN, LCF_SDL | LCF_SOUND, "    No more audio buffers available");
+        return -1;
+    }
 
     /* Filling buffer */
     ab->samples.clear();
@@ -940,6 +949,11 @@ static int getDeviceFromStream(SDL_AudioStream *stream)
 
     /* We try to reuse a buffer that has been processed from the source */
     std::shared_ptr<AudioBuffer> ab = audiocontext.reuseBufferFromSourceOrCreate(source);
+    if (!ab) {
+        /* No more audio buffers, they are only processed at frame boundaries */
+        LOG(LL_WARN, LCF_SDL | LCF_SOUND, "    No more audio buffers available");
+        return false;
+    }
 
     /* Filling buffer */
     ab->samples.clear();
@@ -1242,6 +1256,10 @@ static int getDeviceFromStream(SDL_AudioStream *stream)
        
         /* Push an empty buffer just to indicate that the source can play samples */
         auto buffer = audiocontext.createBuffer();
+        if (!buffer) {
+            LOG(LL_WARN, LCF_SDL | LCF_SOUND, "No more audio buffers available");
+            return nullptr;
+        }
 
         buffer->frequency = sdl_source->frequency;
         buffer->channels = sdl_source->channels;

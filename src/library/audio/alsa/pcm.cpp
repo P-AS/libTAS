@@ -30,12 +30,124 @@
 #include "global.h"
 
 #include <cerrno>
+#include <vector>
+#include <algorithm>
+#include <cstring>
+#include <cmath>
+#include <mutex>
+#include <map>
 #include <time.h> //nanosleep
 #include <stdint.h>
 
 #define BUFFER_SIZE_MIN 2048
 
 namespace libtas {
+
+/* The number of channels that the game configured on a stream when it is
+ * more than the two that we mix (Wine opens the device with the format that
+ * a game asks, such as 12 channels, and relies on the plug plugin of ALSA to
+ * convert it). Such a stream is downmixed to stereo in snd_pcm_writei(). */
+static const int MAX_APP_CHANNELS = 16;
+static std::map<int, int> app_channels;
+static std::mutex app_channels_mutex;
+
+static int getAppChannels(int source_id)
+{
+    std::lock_guard<std::mutex> lock(app_channels_mutex);
+    auto it = app_channels.find(source_id);
+    return (it == app_channels.end()) ? 0 : it->second;
+}
+
+static void setAppChannels(int source_id, int channels)
+{
+    std::lock_guard<std::mutex> lock(app_channels_mutex);
+    if (channels > 2)
+        app_channels[source_id] = channels;
+    else
+        app_channels.erase(source_id);
+}
+
+static int bytesPerSample(int format)
+{
+    switch (format) {
+        case AudioBuffer::SAMPLE_FMT_U8: return 1;
+        case AudioBuffer::SAMPLE_FMT_S16: return 2;
+        case AudioBuffer::SAMPLE_FMT_S32: return 4;
+        case AudioBuffer::SAMPLE_FMT_FLT: return 4;
+        default: return 0;
+    }
+}
+
+static float readSample(const uint8_t* p, int format)
+{
+    switch (format) {
+        case AudioBuffer::SAMPLE_FMT_U8: return (static_cast<int>(p[0]) - 128) / 128.0f;
+        case AudioBuffer::SAMPLE_FMT_S16: { int16_t v; memcpy(&v, p, 2); return v / 32768.0f; }
+        case AudioBuffer::SAMPLE_FMT_S32: { int32_t v; memcpy(&v, p, 4); return static_cast<float>(v / 2147483648.0); }
+        default: { float v; memcpy(&v, p, 4); return v; }
+    }
+}
+
+static void writeSample(uint8_t* p, int format, float v)
+{
+    switch (format) {
+        case AudioBuffer::SAMPLE_FMT_U8: {
+            float c = std::max(-1.0f, std::min(1.0f, v));
+            p[0] = static_cast<uint8_t>(std::lround(c * 127.0f) + 128);
+            break;
+        }
+        case AudioBuffer::SAMPLE_FMT_S16: {
+            float c = std::max(-1.0f, std::min(1.0f, v));
+            int16_t o = static_cast<int16_t>(std::lround(c * 32767.0f));
+            memcpy(p, &o, 2);
+            break;
+        }
+        case AudioBuffer::SAMPLE_FMT_S32: {
+            double c = std::max(-1.0, std::min(1.0, static_cast<double>(v)));
+            int32_t o = static_cast<int32_t>(std::llround(c * 2147483647.0));
+            memcpy(p, &o, 4);
+            break;
+        }
+        default:
+            memcpy(p, &v, 4);
+            break;
+    }
+}
+
+/* Downmix interleaved frames of `channels` channels to stereo. The first six
+ * channels are front left/right, center, LFE (dropped), back left/right, like
+ * the order of WAVE_FORMAT_EXTENSIBLE; the following ones alternate between
+ * left and right. */
+static void downmixToStereo(const uint8_t* in, uint8_t* out, size_t frames, int channels, int format)
+{
+    const int bps = bytesPerSample(format);
+    const float k = 0.7071f;
+    int extra = (channels > 6) ? (channels - 6) : 0;
+    int extra_left = (extra + 1) / 2;
+    int extra_right = extra / 2;
+    /* Normalize so that the sum of the weights is 1: no clipping */
+    const float norm_left = 1.0f / (1.0f + k * ((channels > 2) + (channels > 4) + extra_left));
+    const float norm_right = 1.0f / (1.0f + k * ((channels > 2) + (channels > 5) + extra_right));
+
+    for (size_t f = 0; f < frames; f++) {
+        const uint8_t* frame = in + f * channels * bps;
+        float l = 0.0f, r = 0.0f;
+        for (int c = 0; c < channels; c++) {
+            float v = readSample(frame + c * bps, format);
+            switch (c) {
+                case 0: l += v; break;
+                case 1: r += v; break;
+                case 2: l += k * v; r += k * v; break;
+                case 3: break;
+                case 4: l += k * v; break;
+                case 5: r += k * v; break;
+                default: if (c % 2 == 0) l += k * v; else r += k * v; break;
+            }
+        }
+        writeSample(out + (f * 2) * bps, format, l * norm_left);
+        writeSample(out + (f * 2 + 1) * bps, format, r * norm_right);
+    }
+}
 
 static int buffer_size = 4096; // in samples
 static int avail_min = 0;
@@ -84,6 +196,7 @@ int snd_pcm_open(snd_pcm_t **pcm, const char *name, snd_pcm_stream_t stream, int
     /* Fill the source id in pcm, so that you can locate the source on future calls */
     *pcm = reinterpret_cast<snd_pcm_t*>(source->id);
     last_source = source->id;
+    setAppChannels(source->id, 0);
 
     return 0;
 }
@@ -123,6 +236,7 @@ int snd_pcm_close(snd_pcm_t *pcm)
     if (source) {
         audiocontext.deleteSource(sourceId);
     }
+    setAppChannels(sourceId, 0);
 
     return 0;
 }
@@ -592,12 +706,28 @@ snd_pcm_sframes_t snd_pcm_writei(snd_pcm_t *pcm, const void *buffer, snd_pcm_ufr
     /* We try to reuse a buffer that has been processed from the source */
     /* The buffer is already filled with the source specs. */
     std::shared_ptr<AudioBuffer> ab = audiocontext.reuseBufferFromSourceOrCreate(source.get());
+    if (!ab) {
+        /* No more audio buffers, they are only processed at frame boundaries.
+         * Tell the game to try again later, like a full device. */
+        LOG(LL_WARN, LCF_SOUND, "    No more audio buffers available");
+        return -EAGAIN;
+    }
 
     /* Filling buffer */
     ab->sampleSize = size;
     ab->size = size * ab->alignSize;
     ab->samples.clear();
-    ab->samples.insert(ab->samples.end(), static_cast<const uint8_t*>(buffer), &(static_cast<const uint8_t*>(buffer))[ab->size]);
+
+    const int app_ch = getAppChannels(sourceId);
+    LOGTRACE(LCF_SOUND, "  game channels %d, source channels %d format %d, buffer align %d, %d frames", app_ch, source->channels, source->format, ab->alignSize, static_cast<int>(size));
+    if ((app_ch > 2) && (ab->alignSize == 2 * bytesPerSample(source->format)) && (bytesPerSample(source->format) > 0)) {
+        /* The game writes more channels than we mix */
+        ab->samples.resize(ab->size);
+        downmixToStereo(static_cast<const uint8_t*>(buffer), ab->samples.data(), size, app_ch, source->format);
+    }
+    else {
+        ab->samples.insert(ab->samples.end(), static_cast<const uint8_t*>(buffer), &(static_cast<const uint8_t*>(buffer))[ab->size]);
+    }
 
     source->queueBuffer(ab);
 
@@ -645,6 +775,11 @@ int snd_pcm_mmap_begin(snd_pcm_t *pcm, const snd_pcm_channel_area_t **areas, snd
 
     /* We try to reuse a buffer that has been processed from the source */
     mmap_ab = audiocontext.reuseBufferFromSourceOrCreate(source.get());
+    if (!mmap_ab) {
+        LOG(LL_WARN, LCF_SOUND, "    No more audio buffers available");
+        *frames = 0;
+        return -EAGAIN;
+    }
 
     /* Configuring the buffer */
     mmap_ab->sampleSize = *frames;
@@ -786,7 +921,8 @@ int snd_pcm_hw_params_get_channels(const snd_pcm_hw_params_t *params, unsigned i
     /* We don't have the pcm parameter here, so using the last opened source */
     int sourceId = last_source;
     auto source = AudioContext::get().getSource(sourceId);
-    *val = source->channels;
+    int app = getAppChannels(sourceId);
+    *val = app ? app : source->channels;
 
     return 0;
 }
@@ -817,10 +953,20 @@ int snd_pcm_hw_params_set_channels(snd_pcm_t *pcm, snd_pcm_hw_params_t *params, 
 
     LOGTRACE(LCF_SOUND, "%s call with channels %d", __func__, val);
 
+    if ((val < 1) || (val > static_cast<unsigned int>(MAX_APP_CHANNELS))) {
+        LOG(LL_WARN, LCF_SOUND, "    Unsupported number of channels %d", val);
+        return -EINVAL;
+    }
+
     int sourceId = reinterpret_cast<intptr_t>(pcm);
     AudioContext& audiocontext = AudioContext::get();
     auto source = audiocontext.getSource(sourceId);
-    source->channels = val;
+
+    /* We only mix 1 or 2 channels, more are downmixed when written */
+    setAppChannels(sourceId, val);
+    source->channels = (val > 2) ? 2 : val;
+    if (val > 2)
+        LOG(LL_INFO, LCF_SOUND, "    %d channels will be downmixed to stereo", val);
 
     /* If channel audio parameter is set to auto, fill it with this value */
     audiocontext.initValues(AudioBuffer::SAMPLE_FMT_UNKNOWN, source->channels, 0);
@@ -1165,6 +1311,10 @@ int snd_pcm_hw_params_test_channels(snd_pcm_t *pcm, snd_pcm_hw_params_t *params,
     RETURN_IF_NATIVE(snd_pcm_hw_params_test_channels, (pcm, params, val), nullptr);
 
     LOGTRACE(LCF_SOUND, "%s call with val %d", __func__, val);
+
+    /* More than 2 channels are downmixed */
+    if ((val < 1) || (val > static_cast<unsigned int>(MAX_APP_CHANNELS)))
+        return -EINVAL;
     return 0;
 }
 
@@ -1201,6 +1351,11 @@ int snd_pcm_set_params(snd_pcm_t *pcm, snd_pcm_format_t format, snd_pcm_access_t
 
     LOGTRACE_SIMPLE(LCF_SOUND);
 
+    if ((channels < 1) || (channels > static_cast<unsigned int>(MAX_APP_CHANNELS))) {
+        LOG(LL_WARN, LCF_SOUND, "    Unsupported number of channels %d", channels);
+        return -EINVAL;
+    }
+
     int sourceId = reinterpret_cast<intptr_t>(pcm);
     AudioContext& audiocontext = AudioContext::get();
     auto source = audiocontext.getSource(sourceId);
@@ -1228,7 +1383,8 @@ int snd_pcm_set_params(snd_pcm_t *pcm, snd_pcm_format_t format, snd_pcm_access_t
     }
     current_access = access;
 
-    source->channels = channels;
+    setAppChannels(sourceId, channels);
+    source->channels = (channels > 2) ? 2 : channels;
     source->frequency = rate;
 
 
@@ -1330,14 +1486,14 @@ int snd_pcm_set_chmap(snd_pcm_t *pcm, const snd_pcm_chmap_t *map)
 
     LOGTRACE(LCF_SOUND, "%s call with channels %d", __func__, map->channels);
 
-    /* We only support 1 or 2 channels */
-    if (map->channels > 2)
+    if (map->channels > static_cast<unsigned int>(MAX_APP_CHANNELS))
         return EINVAL;
 
-    /* Set the number of channels */
+    /* Set the number of channels, more than 2 are downmixed when written */
     int sourceId = reinterpret_cast<intptr_t>(pcm);
     auto source = AudioContext::get().getSource(sourceId);
-    source->channels = map->channels;
+    setAppChannels(sourceId, map->channels);
+    source->channels = (map->channels > 2) ? 2 : map->channels;
 
     return 0;
 }

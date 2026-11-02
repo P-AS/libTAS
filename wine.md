@@ -826,6 +826,44 @@ fake Steam library.
   `button1`...) are neutral: our `ISteamController` maps names such as
   `a`, `b` or `dpup` to the pads, not these.
 
+### Sonic X Shadow Generations
+
+64-bit, Direct3D 11, Steam (app 2513280), through Proton 11.0. Tested in a
+fake Steam library (real copy of the exe, symlinks to the 38 GB of data),
+on an RTX 2070 SUPER with `opengl_soft=false`, throttled (`nice`, 4 cores,
+`LP_NUM_THREADS=2`, a watchdog on the load average): the software renderer at
+full speed made the PC of the user unusable.
+
+- **"Unable to create interface ISteamUser"** (a modal message box of a
+  wrapper in the exe, which holds the game at frame 4; `+msgbox`): the
+  wrapper loads `steamclient64.dll` of Proton and creates `SteamClient015`,
+  then `GetISteamUser("SteamUser017")` fails. It takes the user and pipe
+  handles from the game's `steam_api64.dll`, which is ours with the virtual
+  Steam client: the real client rejects them. With `virtual_steam=false` the
+  box does not appear. Not fixed for the virtual client.
+- **12-channel audio crashed libTAS**: the game calls
+  `IAudioClient::Initialize` with 12 channels (mask `0x2d63f`) and
+  `AUTOCONVERTPCM`; Wine's ALSA driver calls `snd_pcm_hw_params_set_channels`
+  with 12, which the hooks accepted and passed to the audio context (only 1
+  or 2 channels are mixed). The hooks now keep the channel count of the game
+  for the stream, mix a stereo stream and downmix in `snd_pcm_writei()`
+  (`downmixToStereo()`: first six channels as 5.1 without the LFE, the others
+  alternate left and right), like the plug plugin of ALSA. Not listened to.
+  The crash of `snd_pcm_writei` itself was a null pointer: `createBuffer()`
+  returns null after 2048 buffers (`MAXBUFFERS`) and the callers did not
+  check; buffers are only processed at frame boundaries, and the audio
+  thread of the game wrote thousands of them while the game loaded at 1
+  frame per second. Found with `warn+seh` (Wine prints the faulting libtas
+  offset of a crash inside a unix call) and `addr2line -i -e libtas.so`.
+- **wined3d cannot run the game**: with the software renderer, GLSL errors
+  (`textureLod(samplerCubeArrayShadow...)`); on the NVIDIA GPU, many compute
+  shaders and `GL_INVALID_OPERATION ... program is not successfully linked`,
+  the game stops at about frame 15. DXVK (`PROTON_USE_WINED3D=0`, which the
+  launcher respects) stays at frame 0, with a Vulkan loader error
+  `vkEnumerateDeviceExtensionProperties: Invalid physicalDevice` from the
+  wrapper of `vkCreateDevice()` in `rendering/vulkanwrappers.cpp`, and the
+  game never creates its Direct3D device. Not investigated further.
+
 ### Sonic Generations
 
 Tested with Proton 11.0 (`proton-11.0-2e`): the game reaches the title

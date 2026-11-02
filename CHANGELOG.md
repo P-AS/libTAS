@@ -271,6 +271,12 @@
 * Wine: keep the keys that a game presses with SendInput() in the keyboard
   state that it reads, so that controller buttons that Xidi turns into key
   presses work (Rayman 2)
+* ALSA: accept streams with more than two channels (Wine games that open a
+  surround output, such as Sonic X Shadow Generations) and downmix them to
+  stereo, instead of mixing them with the wrong number of channels
+* Fix a crash of the ALSA and SDL audio hooks when the game writes audio faster
+  than the frames are processed and the audio buffers run out. The ALSA hooks
+  now return -EAGAIN, and SDL_QueueAudio() and SDL_PutAudioStreamData() fail
 
 ## [1.4.8] - 2026-05-14
 ### Added
