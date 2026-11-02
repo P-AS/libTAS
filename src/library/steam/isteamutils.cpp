@@ -18,6 +18,7 @@
  */
 
 #include "isteamutils.h"
+#include "isteamuserstats/isteamuserstats_priv.h"
 
 #include "CCallbackManager.h"
 #include "logging.h"
@@ -82,7 +83,7 @@ uint8_t ISteamUtils::GetCurrentBatteryPower()
 unsigned int ISteamUtils::GetAppID()
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
-	return 1234;
+	return static_cast<unsigned int>(getSteamGameId());
 }
 
 void ISteamUtils::SetOverlayNotificationPosition( ENotificationPosition eNotificationPosition )

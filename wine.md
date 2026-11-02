@@ -499,6 +499,15 @@ right Ctrl/Alt, keypad divide, Windows keys). Not done: buffered reads
   (we have no audio input). This printed `WARN: Unsupported stream
   direction 1` three times per run; it is now an info message.
 
+- **Encoded audio ahead of the video** (Kero Blaster, virtual Steam client):
+  when the game makes non-draw frames before its first draw (180 here, see
+  the Steam section), the encoder wrote the silence of those frames with
+  the size of the current audio buffer, which is 0 while no sound plays, so
+  the audio track was that many frames short. It is now sized from the frame
+  times (`startup_silence_ns` in `AVEncoder`). Found by comparing stream
+  durations with `ffprobe` and the `Write nut audio frame` lines of a Debug
+  log.
+
 ## Files and "Prevent writing to disk"
 
 Wine opens and creates files from **wineserver**, which sends back the file
@@ -604,6 +613,25 @@ and 32-bit PE code cannot call our 64-bit unix code anyway.
   Boshy. Native VVVVVV and Shovel Knight still work.
 - The dll has no access to libtas inputs, so Steam controllers stay
   neutral.
+- **3 second wait at startup** (Kero Blaster, 180 black non-draw frames):
+  the game registers the user stats callbacks, calls `GetAppID()` and
+  `BLoggedOn()`, then polls `SteamAPI_RunCallbacks()` with `Sleep(10)` up to
+  300 times (about 3 s) for `UserStatsReceived_t`, without calling
+  `RequestCurrentStats()`. Two things were wrong: the real client sends that
+  callback by itself at startup (now sent at the first `RunCallbacks`), and
+  its `m_nGameID` (from `SteamAppId`) never matched `GetAppID()`, which
+  returned 1234 (both now use `getSteamGameId()`). The main thread's `Sleep`
+  calls were the source of the non-draw frames (`addDelay`), not another
+  thread. Found by tracing the Steam calls with `logging_level=5` and
+  `logging_include_flags=536870912` (only the Steam category), and with a
+  temporary backtrace in `DeterministicTimer::addDelay()`. The app id (`SteamAppId`, `SteamGameId`) used to be set only when
+  running through Proton, so with plain Wine the fallback 105600 was used;
+  it is now set for any Windows game in a Steam library (checked with a
+  copy of the game in a fake `steamapps/common` and the real manifest:
+  `SteamAppId=292500` in the game environment). Without the virtual
+  Steam client the game takes another path (real `steam_api.dll` finds no
+  client) and has no wait.
+
 
 ## Proton
 

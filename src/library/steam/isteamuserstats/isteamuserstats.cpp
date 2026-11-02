@@ -53,7 +53,7 @@ static std::vector<std::string> pending_achievements;
 
 /* Game id that the game expects in the callbacks, from the environment that
  * Steam (and Proton) set. */
-static uint64_t getGameId()
+uint64_t getSteamGameId()
 {
     const char *id = getenv("SteamAppId");
     if (!id)
@@ -158,7 +158,7 @@ bool STEAM_CALL ISteamUserStats_RequestCurrentStats( void* iface )
     LOGTRACE_SIMPLE(LCF_STEAM);
 
     struct UserStatsReceived_t user_stats_received;
-    user_stats_received.m_nGameID = getGameId();
+    user_stats_received.m_nGameID = getSteamGameId();
     user_stats_received.m_eResult = 1; // k_EResultOK
     user_stats_received.m_steamIDUser = 1; // TODO
     
@@ -246,7 +246,7 @@ bool STEAM_CALL ISteamUserStats_StoreStats( void* iface )
      * for it (Sonic Generations after a stage clear). */
     for (const std::string& name : pending_achievements) {
         struct UserAchievementStored_t achievement_stored = {};
-        achievement_stored.m_nGameID = getGameId();
+        achievement_stored.m_nGameID = getSteamGameId();
         achievement_stored.m_bGroupAchievement = false;
         strncpy(achievement_stored.m_rgchAchievementName, name.c_str(), sizeof(achievement_stored.m_rgchAchievementName) - 1);
         achievement_stored.m_nCurProgress = 0;
@@ -256,7 +256,7 @@ bool STEAM_CALL ISteamUserStats_StoreStats( void* iface )
     pending_achievements.clear();
 
     struct UserStatsStored_t user_stats_stored;
-    user_stats_stored.m_nGameID = getGameId();
+    user_stats_stored.m_nGameID = getSteamGameId();
     user_stats_stored.m_eResult = 1; // k_EResultOK
     CCallbackManager::DispatchCallbackOutput(STEAM_CALLBACK_TYPE_USER_STATS_USER_STATS_STORED, &user_stats_stored, sizeof(user_stats_stored));
 
@@ -305,7 +305,7 @@ SteamAPICall_t STEAM_CALL ISteamUserStats_RequestUserStats( void* iface, CSteamI
     struct UserStatsReceived_t user_stats_received;
     bool io_failure = false;
 
-    user_stats_received.m_nGameID = getGameId();
+    user_stats_received.m_nGameID = getSteamGameId();
     user_stats_received.m_eResult = 1; // k_EResultOK
     user_stats_received.m_steamIDUser = steamIDUser; // TODO
     

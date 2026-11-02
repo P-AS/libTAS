@@ -93,7 +93,8 @@ class AVEncoder {
         int segment_frames = 0;
 
         int startup_video_frames = 0;
-        int startup_audio_frames = 0;
+        /* Duration of the skipped frames that had no audio, in ns */
+        uint64_t startup_silence_ns = 0;
         std::vector<uint8_t> startup_audio_bytes;
 
         /* remainder of the number of video frames to send */

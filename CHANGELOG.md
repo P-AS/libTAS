@@ -250,6 +250,13 @@
   that games ship (Xidi for Rayman 2)
 * Fix log files being partly overwritten after loading a state
 * CI: build the AppImage again on every push and pull request
+* Fix encoded audio running ahead of the video when the game draws no frame
+  at startup (Kero Blaster)
+* Steam: send the initial UserStatsReceived callback like the real client and
+  make GetAppID match its game id, removing a 3 second wait at startup (Kero
+  Blaster)
+* Wine: give the app id of games installed in a Steam library to their Steam
+  API without Proton too
 
 ## [1.4.8] - 2026-05-14
 ### Added

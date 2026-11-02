@@ -172,28 +172,31 @@ void GameThread::set_env_variables(Context *context, int gameArch)
         if (context->config.use_proton && !context->config.proton_path.empty())
             distpath = protonDistPath(context->config.proton_path);
 
+        auto isEnvSet = [context](const char* name) {
+            if (getenv(name))
+                return true;
+            for (const auto& env_var : context->config.env_overrides)
+                if (env_var.first == name)
+                    return true;
+            return false;
+        };
+
+        /* Give the app id of the game to its Steam API (the virtual Steam
+         * client, or the real one), from its Steam library, whether the game
+         * runs through Proton or plain Wine. */
+        std::filesystem::path steamapps;
+        std::string appid = steamAppId(context->gamepath, &steamapps);
+        if (!appid.empty()) {
+            for (const char* name : {"SteamAppId", "SteamGameId", "STEAM_COMPAT_APP_ID"})
+                if (!isEnvSet(name))
+                    setenv(name, appid.c_str(), 1);
+        }
+
         if (!protonScriptPath(context).empty()) {
             /* The proton script sets up the prefix and the environment of
              * wine, and starts the game from its steam.exe, which connects
              * to the running Steam client (needed by games wrapped with the
              * Steam DRM). Give it what Steam would, unless the user did. */
-            auto isEnvSet = [context](const char* name) {
-                if (getenv(name))
-                    return true;
-                for (const auto& env_var : context->config.env_overrides)
-                    if (env_var.first == name)
-                        return true;
-                return false;
-            };
-
-            std::filesystem::path steamapps;
-            std::string appid = steamAppId(context->gamepath, &steamapps);
-            if (!appid.empty()) {
-                for (const char* name : {"SteamAppId", "SteamGameId", "STEAM_COMPAT_APP_ID"})
-                    if (!isEnvSet(name))
-                        setenv(name, appid.c_str(), 1);
-            }
-
             /* Use the prefix of the game in its Steam library, like Steam */
             if (!isEnvSet("STEAM_COMPAT_DATA_PATH")) {
                 std::filesystem::path compatdata;

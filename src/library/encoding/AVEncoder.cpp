@@ -200,13 +200,15 @@ void AVEncoder::encodeOneFrame(bool is_draw_frame, TimeHolder frametime) {
         if (ScreenCapture::isInited()) {
             initMuxer();
 
-            /* Encode audio samples that we skipped */
-            if (startup_audio_frames > 0) {
-                std::vector<uint8_t> empty_samples(audiocontext.samples_byte_size, AudioBuffer::formatToSilenceByte(audiocontext.format));
-                for (int i=0; i<startup_audio_frames; i++) {
-                    nutMuxer->writeAudioFrame(empty_samples.data(), audiocontext.samples_byte_size);
-                }
+            /* Encode the silence of the skipped frames. Its length comes from
+             * the frame times, as the audio context may not have produced any
+             * samples (samples_byte_size is 0) before the game plays a sound. */
+            if (startup_silence_ns > 0 && audiocontext.frequency > 0 && audiocontext.bytes_per_sample > 0) {
+                uint64_t samples = startup_silence_ns * static_cast<uint64_t>(audiocontext.frequency) / 1000000000ULL;
+                std::vector<uint8_t> empty_samples(samples * audiocontext.bytes_per_sample, AudioBuffer::formatToSilenceByte(audiocontext.format));
+                nutMuxer->writeAudioFrame(empty_samples.data(), empty_samples.size());
             }
+            startup_silence_ns = 0;
 
             nutMuxer->writeAudioFrame(startup_audio_bytes.data(), startup_audio_bytes.size());
 
@@ -227,7 +229,7 @@ void AVEncoder::encodeOneFrame(bool is_draw_frame, TimeHolder frametime) {
                 startup_audio_bytes.insert(startup_audio_bytes.end(), audiocontext.samples_data.data(), audiocontext.samples_data.data() + audiocontext.samples_byte_size);
             }
             else {
-                startup_audio_frames++;
+                startup_silence_ns += static_cast<uint64_t>(frametime.tv_sec) * 1000000000ULL + frametime.tv_nsec;
             }
             return;
         }

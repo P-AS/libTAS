@@ -37,6 +37,7 @@
 #include "isteamuser/isteamuser021.h"
 #include "isteamuser/isteamuser023.h"
 #include "isteamuserstats/isteamuserstats005.h"
+#include "isteamuserstats/isteamuserstats_priv.h"
 #include "isteamuserstats/isteamuserstats006.h"
 #include "isteamuserstats/isteamuserstats007.h"
 #include "isteamuserstats/isteamuserstats008.h"
@@ -365,8 +366,17 @@ bool SteamAPI_RestartAppIfNecessary( unsigned int unOwnAppID )
 void SteamAPI_RunCallbacks()
 {
     LOGTRACE_SIMPLE(LCF_STEAM);
-    if (Global::shared_config.virtual_steam)
+    if (Global::shared_config.virtual_steam) {
+        /* The Steam client sends UserStatsReceived_t to a game by itself when
+         * it starts. Some games (Kero Blaster) never request the stats and
+         * wait for it, with a timeout of about 3 seconds. */
+        static bool initial_stats_sent = false;
+        if (!initial_stats_sent) {
+            initial_stats_sent = true;
+            ISteamUserStats_RequestCurrentStats(nullptr);
+        }
         return CCallbackManager::Run();
+    }
 
     RETURN_NATIVE(SteamAPI_RunCallbacks, (), "steam_api");
 }

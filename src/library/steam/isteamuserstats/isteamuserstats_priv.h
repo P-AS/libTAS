@@ -14,6 +14,9 @@
 
 namespace libtas {
 
+/* App id of the game, from the environment, same value for every Steam call */
+uint64_t getSteamGameId();
+
 bool STEAM_CALL ISteamUserStats_RequestCurrentStats( void* iface );
 
 // Data accessors
