@@ -3,9 +3,12 @@
 # Just run ./hourglass2libTAS path/to/tasfile.tas
 #
 # A .wtf file has a 1024-byte header, followed by one 8-byte slot per frame.
-# Each slot holds up to 8 Windows virtual-key codes (VK_*). A slot with fewer
-# than 8 keys is terminated by 0xF0 and padded with zeros, so 0xF0 and 0x00 are
-# not keys. 0x01 (VK_LBUTTON) is the left mouse button, and 0xFF is skipped.
+# Each slot holds up to 8 Windows virtual-key codes (VK_*). The list of keys
+# ends at the first zero byte. 0x01 (VK_LBUTTON) is the left mouse button.
+# 0xFF is skipped. 0xF0 is also skipped: it appears in front of zero padding
+# and is not a game key. 0xF2, 0xF3 and 0xF4 are not mapped and are reported
+# as warnings; in the Japanese-layout files seen so far they are probably IME
+# keys, which the game does not use.
 
 import sys
 import os
@@ -63,7 +66,8 @@ with open(sys.argv[1], 'rb') as input_file:
 
 body = data[HEADER_SIZE:]
 
-with open(os.path.dirname(sys.argv[1]) + '/inputs', 'w') as output_file:
+output_path = os.path.join(os.path.dirname(os.path.abspath(sys.argv[1])), 'inputs')
+with open(output_path, 'w') as output_file:
     for offset in range(0, len(body), SLOT_SIZE):
         slot = body[offset:offset + SLOT_SIZE]
         keysyms = []
