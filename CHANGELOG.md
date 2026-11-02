@@ -277,6 +277,7 @@
 * Fix a crash of the ALSA and SDL audio hooks when the game writes audio faster
   than the frames are processed and the audio buffers run out. The ALSA hooks
   now return -EAGAIN, and SDL_QueueAudio() and SDL_PutAudioStreamData() fail
+* Fix a crash of cubeb_stream_init() when the audio buffers run out
 
 ## [1.4.8] - 2026-05-14
 ### Added

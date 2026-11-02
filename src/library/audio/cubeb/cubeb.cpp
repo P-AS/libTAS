@@ -96,6 +96,10 @@ int cubeb_stream_init(cubeb * context,
 
     /* Create the buffer and fill params */
     auto buffer = audiocontext.createBuffer();
+    if (!buffer) {
+        LOG(LL_WARN, LCF_SOUND, "   No more audio buffers available");
+        return CUBEB_ERROR;
+    }
 
     buffer->frequency = output_stream_params->rate;
     LOG(LL_DEBUG, LCF_SOUND, "   Frequency %d Hz", buffer->frequency);
