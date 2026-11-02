@@ -42,7 +42,7 @@ You can download the latest stable version of the software in the [Releases](htt
 
 Installing with the debian package will install all the required packages as well.
 
-There are also [automated builds](https://github.com/P-AS/libTAS/actions/workflows/build.yml) (deb packages and AppImages, x86_64 and aarch64) available for the last interim version.
+There are also [automated builds](https://github.com/P-AS/libTAS/actions/workflows/build.yml) (deb packages, x86_64 and aarch64, and AppImages when requested) available for the last interim version.
 
 ## Building
 
@@ -64,7 +64,7 @@ You will need to download and install the following to build libTAS:
 
     ./build.sh
 
-This configures the project with CMake into the `build` directory, builds it and prepares an AppImage. Use `./build.sh --skip-appimage` to only build. Any extra argument is passed to CMake, and you can also use CMake directly:
+This configures the project with CMake into the `build` directory, and builds it. Use `./build.sh --appimage` to also build an AppImage. Any extra argument is passed to CMake, and you can also use CMake directly:
 
     cmake -S . -B build
     cmake --build build

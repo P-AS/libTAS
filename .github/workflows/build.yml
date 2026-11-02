@@ -5,6 +5,11 @@ on:
     branches: [next, master]
   pull_request:
   workflow_dispatch:
+    inputs:
+      appimage:
+        description: Also build the AppImage
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -30,7 +35,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends devscripts equivs fakeroot file wget qt6-wayland
+          sudo apt-get install --yes --no-install-recommends devscripts equivs fakeroot file librsvg2-bin wget qt6-wayland
           sudo mk-build-deps --install --remove --tool "apt-get --yes --no-install-recommends" debian/control
 
       - name: Install 32-bit build dependencies
@@ -46,6 +51,7 @@ jobs:
         run: DEB_BUILD_OPTIONS=nostrip dpkg-buildpackage --no-sign -b
 
       - name: Build AppImage
+        if: ${{ inputs.appimage }}
         env:
           ARCH: ${{ matrix.arch }}
           QMAKE: /usr/lib/qt6/bin/qmake
@@ -64,6 +70,8 @@ jobs:
           # The AppImage bundles both the 64-bit and the 32-bit libraries
           mkdir AppDir
           cp -a debian/libtas/usr AppDir/
+          # linuxdeploy needs a PNG icon at the top of the AppDir for the desktop file
+          rsvg-convert -w 256 -h 256 libTAS.svg -o AppDir/libTAS.png
           if [ -d debian/libtas32/usr ]; then
             cp -a debian/libtas32/usr AppDir/
           fi
@@ -77,7 +85,9 @@ jobs:
           if ls ../libtas32_*_${{ matrix.deb_arch }}.deb >/dev/null 2>&1; then
             mv ../libtas32_*_${{ matrix.deb_arch }}.deb dist/libtas32-deb-${{ matrix.arch }}-${sha}.deb
           fi
-          mv libTAS-${{ matrix.arch }}.AppImage dist/libtas-appimage-${{ matrix.arch }}-${sha}.AppImage
+          if [ "${{ inputs.appimage }}" = "true" ]; then
+            mv libTAS-${{ matrix.arch }}.AppImage dist/libtas-appimage-${{ matrix.arch }}-${sha}.AppImage
+          fi
           ls -l dist
           echo "SHA=${sha}" >> "$GITHUB_ENV"
 
@@ -96,6 +106,7 @@ jobs:
           archive: false
 
       - name: Upload AppImage
+        if: ${{ inputs.appimage }}
         uses: actions/upload-artifact@v7
         with:
           path: dist/libtas-appimage-${{ matrix.arch }}-${{ env.SHA }}.AppImage

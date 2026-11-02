@@ -16,7 +16,7 @@ watch/search.
 # Download
 
 * **[Latest stable release, deb package](https://github.com/clementgallet/libTAS/releases/latest)**
-* [Latest interim builds, deb package and AppImage (x86_64 and aarch64)](https://github.com/P-AS/libTAS/actions/workflows/build.yml)
+* [Latest interim builds, deb package (x86_64 and aarch64), and AppImage when requested](https://github.com/P-AS/libTAS/actions/workflows/build.yml)
 
 
 
