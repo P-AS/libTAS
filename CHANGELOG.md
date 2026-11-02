@@ -72,6 +72,10 @@
   read it with GetDeviceState(), so that key presses reach the same frame
   (Rayman 2)
 * Docs: add a guide to run Rayman 2 (GOG, with Ray2Fix) through Wine
+* Wine: add the game-specific timing option "No startup sleep", which makes
+  the sleeps of the main thread before the game window exists not advance the
+  game time, so that the Steam DRM wait does not change the number of frames
+  before the game starts (Sonic Mania)
 
 ### Changed
 

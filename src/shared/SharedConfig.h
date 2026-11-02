@@ -240,6 +240,7 @@ struct __attribute__((packed, aligned(8))) SharedConfig {
         GC_TIMING_CELESTE = 0x01,
         GC_TIMING_ARMA_CWA = 0x02,
         GC_TIMING_NO_NONDRAW = 0x04,
+        GC_TIMING_NO_STARTUP_SLEEP = 0x08,
     };
 
     /* Game-specific timing settings */

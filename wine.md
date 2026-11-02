@@ -742,8 +742,28 @@ fake Steam library.
   warns `many calls to function QueryPerformanceCounter()`): QPC
   time-tracking on the main thread (threshold 100) is needed, like Boshy
   and Cave Story+. Not set in the user's `SonicMania.exe.ini`.
-- With these, the intro, the title screen and the first cutscene render,
-  audio and video have the same length, about 86 non-draw frames at startup.
+- **Delay before the game runs, and a different number of non-draw frames at
+  each start** (0 to 90 in a row, then the window): the Steam DRM stub, before
+  the game creates its window, sleeps with a backoff (4, 8, 16... 256 ms, then
+  1 s) while it waits for the Steam client, and the number of steps depends on
+  how long that takes in real time. Each step advanced the game time, so it
+  made frames. Idle Threads sync did not change it, and "No non-draw frames"
+  (applies the delay over later frames) removed the frames but left the game
+  time different. The game-specific timing option "No startup sleep"
+  (`GC_TIMING_NO_STARTUP_SLEEP`, `game_specific_timing=8`) makes the sleeps
+  of the main thread before the game window exists real sleeps that do not
+  advance the game time (bounded to 20 s in total). It is not the default,
+  as it would change the frames of Rayman 2, whose `Sleep(1000)` at frame 15
+  is a fixed wait. Found by logging `addDelay()` with the thread and the
+  main-thread flag, and by sampling the unix stacks of the game process
+  (`eu-stack`): the main thread was in `NtDelayExecution` called from
+  Windows code, with no `Sleep` call of the game (`+relay` with
+  `RelayInclude` showed none). 5 runs, 3 more compared in full: no non-draw
+  frames at startup, the window and the first audio at frame 0, and the
+  same list of non-draw frames afterwards (one every 48 frames, from the
+  polling of `Sleep(1)`).
+- With these, the intro, the title screen and the first cutscene render, and
+  audio and video have the same length.
 - Steam Input actions (`Controls`: `up`, `down`, `left`, `right`,
   `button1`...) are neutral: our `ISteamController` maps names such as
   `a`, `b` or `dpup` to the pads, not these.

@@ -29,6 +29,7 @@
 #include "DeterministicTimer.h"
 #include "general/sleepwrappers.h"
 #include "checkpoint/ThreadManager.h"
+#include "xlib/XlibGameWindow.h"
 #include "global.h"
 #include "../shared/SharedConfig.h"
 
@@ -225,6 +226,23 @@ static uint32_t NtDelayExecution(unsigned char alertable, const int64_t *timeout
 
         /* The main thread polls with Sleep() for other threads to be done */
         DeterministicTimer::get().waitForIdleThreads();
+    }
+
+    /* Wrappers such as the Steam DRM wait for another process before the game
+     * starts, and sleep with a backoff whose number of steps depends on the
+     * real time that the other process takes. Advancing the game time would
+     * change the number of frames before the game starts in each run, so
+     * sleep in real time only. The total is bounded, in case a game really
+     * waits for the time to pass. */
+    static const int64_t max_startup_sleep_ns = 20000000000LL;
+    static int64_t startup_sleep_ns = 0;
+    if ((Global::shared_config.game_specific_timing & SharedConfig::GC_TIMING_NO_STARTUP_SLEEP) &&
+        ThreadManager::isMainThread() && !XlibGameWindow::get() &&
+        (startup_sleep_ns < max_startup_sleep_ns)) {
+        startup_sleep_ns += static_cast<int64_t>(ts.tv_sec) * 1000000000LL + ts.tv_nsec;
+        LOG(LL_DEBUG, LCF_WINE | LCF_SLEEP, "%s: real sleep of %d.%09d sec before the game window", __func__, ts.tv_sec, ts.tv_nsec);
+        NATIVECALL(nanosleep(&ts, nullptr));
+        return STATUS_SUCCESS;
     }
 
     transfer_sleep(ts, nullptr);
