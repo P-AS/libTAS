@@ -72,6 +72,8 @@
   read it with GetDeviceState(), so that key presses reach the same frame
   (Rayman 2)
 * Docs: add a guide to run Rayman 2 (GOG, with Ray2Fix) through Wine
+* Add the debug_state setting to the command-line option -s (uncontrolled time,
+  native events, ...)
 
 ### Changed
 
@@ -278,6 +280,7 @@
   than the frames are processed and the audio buffers run out. The ALSA hooks
   now return -EAGAIN, and SDL_QueueAudio() and SDL_PutAudioStreamData() fail
 * Fix a crash of cubeb_stream_init() when the audio buffers run out
+* Fix the log being lost when the game reopens or closes its stderr (La-Mulana)
 
 ## [1.4.8] - 2026-05-14
 ### Added

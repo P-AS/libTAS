@@ -29,6 +29,8 @@
 
 #include <stdlib.h>
 #include <unistd.h> // For isatty
+#include <fcntl.h> // For fcntl
+#include <cstdio>
 #include <cstdarg>
 #include <cstring>
 #include <inttypes.h> // PRI stuff
@@ -57,6 +59,27 @@
 #define ANSI_COLOR_RESET         "\x1b[0m"
 
 namespace libtas {
+
+/* The log is written to our own copy of the original stderr: a game may
+ * reopen or close its stderr (La-Mulana does freopen("log-err.txt")), which
+ * would send our log to a file of the game, in memory when savefiles are
+ * prevented, and the log would be lost. */
+static FILE* log_stream = nullptr;
+
+__attribute__((constructor)) static void initLogStream()
+{
+    int fd = fcntl(STDERR_FILENO, F_DUPFD_CLOEXEC, 3);
+    if (fd >= 0) {
+        log_stream = fdopen(fd, "w");
+        if (log_stream)
+            setvbuf(log_stream, nullptr, _IONBF, 0);
+    }
+}
+
+static inline FILE* logStream()
+{
+    return log_stream ? log_stream : stderr;
+}
 
 void debuglogfull(LogLevel ll, LogCategoryFlag lcf, const char* file, int line, ...)
 {
@@ -97,7 +120,7 @@ void debuglogfull(LogLevel ll, LogCategoryFlag lcf, const char* file, int line, 
     int size = 0;
 
     /* We only print colors if displayed on a terminal */
-    bool isTerm = isatty(STDERR_FILENO);
+    bool isTerm = isatty(log_stream ? fileno(log_stream) : STDERR_FILENO);
     if (isTerm) {
         /* Write the header text in white */
         strncat(s, ANSI_COLOR_LIGHT_GRAY, maxsize-size-1);
@@ -172,18 +195,18 @@ void debuglogfull(LogLevel ll, LogCategoryFlag lcf, const char* file, int line, 
      * - Thread 1 wants to acquire the lock
      */
 #ifdef __linux__
-    fputs_unlocked(s, stderr);
+    fputs_unlocked(s, logStream());
 #else
-    fputs(s, stderr);
+    fputs(s, logStream());
 #endif
 
     if (Global::shared_config.logging_level == LL_STACK && ll == LL_TRACE) {
         if (isTerm) {
-            fputs_unlocked(LL_COLORS[LL_STACK], stderr);
+            fputs_unlocked(LL_COLORS[LL_STACK], logStream());
         }
         printBacktrace();
         if (isTerm) {
-            fputs_unlocked(ANSI_COLOR_RESET, stderr);
+            fputs_unlocked(ANSI_COLOR_RESET, logStream());
         }
     }
 }

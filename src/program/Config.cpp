@@ -120,6 +120,7 @@ bool Config::applyCliSetting(const std::string& key, const std::string& value)
     else if (key == "async_events")             sc.async_events = intValue();
     else if (key == "wait_timeout")             sc.wait_timeout = intValue();
     else if (key == "sleep_handling")           sc.sleep_handling = intValue();
+    else if (key == "debug_state")              sc.debug_state = intValue();
     else if (key == "game_specific_timing")     sc.game_specific_timing = intValue();
     else if (key == "game_specific_sync")       sc.game_specific_sync = intValue();
     else if (key == "video_codec")              sc.video_codec = intValue();

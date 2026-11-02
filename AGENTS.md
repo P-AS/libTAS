@@ -43,3 +43,18 @@ problems found, how they were fixed, design choices, and what is still open.
   `wine.md` in the matching section, with the commit hash when there is one.
 - Keep the "Open problems" section current: add what you could not solve and
   remove what you fixed.
+
+## Native Linux games
+
+`games.md` documents everything about running native Linux games: how the
+games are built, what makes them fail under libTAS, how they were fixed, design
+choices, debugging techniques, and what is still open.
+
+- Read it before working on anything native-game related (a Linux binary, not
+  a Windows game through Wine: those are in `wine.md`).
+- When you fix a problem of a native game, make a design choice, find a
+  limitation, or learn something worth knowing (including debugging
+  techniques), add it to `games.md` in the matching section, with the commit
+  hash when there is one.
+- Keep the "Open problems" section current: add what you could not solve and
+  remove what you fixed.
