@@ -41,6 +41,7 @@
 #include "../shared/inputs/SingleInput.h"
 
 #include <X11/keysym.h>
+#include <atomic>
 #include <cstdint>
 #include <ctime>
 
@@ -61,6 +62,7 @@ static int (*NtUserGetCursorPos)(POINT *pt);
 static uint32_t (*NtUserMsgWaitForMultipleObjectsEx)(uint32_t count, void* const *handles, uint32_t timeout, uint32_t mask, uint32_t flags);
 static int (*NtUserGetMessage)(void *msg, void *hwnd, uint32_t first, uint32_t last);
 static int (*NtUserPeekMessage)(void *msg, void *hwnd, uint32_t first, uint32_t last, uint32_t flags);
+static uint32_t (*NtUserSendInput)(uint32_t count, void *inputs, int size);
 static void (*client_surface_present)(void *surface);
 static void (*client_surface_add_ref)(void *surface);
 static void (*client_surface_release)(void *surface);
@@ -72,6 +74,49 @@ static const uint32_t INFINITE = 0xFFFFFFFF;
 static const uint32_t MWMO_ALERTABLE = 0x2;
 static const uint32_t MWMO_INPUTAVAILABLE = 0x4;
 static const uint32_t QS_ALLINPUT = 0x4FF;
+
+/* Keys that the game itself pressed with SendInput(), such as the keyboard
+ * output of Xidi, which turns the buttons of a controller into key presses.
+ * They are not libTAS inputs, but a game that reads the keyboard state must
+ * see them. */
+static std::atomic<bool> injected_vkeys[256];
+
+/* Virtual key of a scan code (set 1, US layout) */
+static int scanToVKey(unsigned int scan, bool extended)
+{
+    static const unsigned char normal[0x59] = {
+        0, 0x1B, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 0xBD, 0xBB, 0x08, 0x09, // 0x00
+        'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 0xDB, 0xDD, 0x0D, 0xA2, 'A', 'S', // 0x10
+        'D', 'F', 'G', 'H', 'J', 'K', 'L', 0xBA, 0xDE, 0xC0, 0xA0, 0xDC, 'Z', 'X', 'C', 'V', // 0x20
+        'B', 'N', 'M', 0xBC, 0xBE, 0xBF, 0xA1, 0x6A, 0xA4, 0x20, 0x14, 0x70, 0x71, 0x72, 0x73, 0x74, // 0x30
+        0x75, 0x76, 0x77, 0x78, 0x79, 0x90, 0x91, 0x67, 0x68, 0x69, 0x6D, 0x64, 0x65, 0x66, 0x6B, 0x61, // 0x40
+        0x62, 0x63, 0x60, 0x6E, 0, 0, 0, 0x7A, 0x7B // 0x50
+    };
+    if (extended) {
+        switch (scan) {
+            case 0x1C: return 0x0D; // numpad enter
+            case 0x1D: return 0xA3; // right control
+            case 0x35: return 0x6F; // divide
+            case 0x38: return 0xA5; // right alt
+            case 0x47: return 0x24; // home
+            case 0x48: return 0x26; // up
+            case 0x49: return 0x21; // prior
+            case 0x4B: return 0x25; // left
+            case 0x4D: return 0x27; // right
+            case 0x4F: return 0x23; // end
+            case 0x50: return 0x28; // down
+            case 0x51: return 0x22; // next
+            case 0x52: return 0x2D; // insert
+            case 0x53: return 0x2E; // delete
+            case 0x5B: return 0x5B; // left windows
+            case 0x5C: return 0x5C; // right windows
+            default: return 0;
+        }
+    }
+    if (scan < sizeof(normal))
+        return normal[scan];
+    return 0;
+}
 
 static bool isKeysymPressed(KeySym ks)
 {
@@ -91,6 +136,19 @@ static bool isKeysymPressed(KeySym ks)
 
 static bool isVKeyPressed(int vkey)
 {
+    /* Keys pressed by the game with SendInput(), the generic modifiers match
+     * the left and right keys */
+    if ((vkey >= 0) && (vkey <= 0xff)) {
+        if (injected_vkeys[vkey])
+            return true;
+        if ((vkey == 0x10) && (injected_vkeys[0xA0] || injected_vkeys[0xA1]))
+            return true;
+        if ((vkey == 0x11) && (injected_vkeys[0xA2] || injected_vkeys[0xA3]))
+            return true;
+        if ((vkey == 0x12) && (injected_vkeys[0xA4] || injected_vkeys[0xA5]))
+            return true;
+    }
+
     switch (vkey) {
         /* Mouse buttons. libTAS uses Xlib numbering, where button 2 is the
          * middle button and button 3 is the right button. */
@@ -142,6 +200,47 @@ int NtUserGetKeyboardState(unsigned char *state)
         state[vkey] = isVKeyPressed(vkey) ? 0x80 : 0;
     }
     return 1;
+}
+
+
+/* INPUT of the 64-bit syscall (WoW64 converts the one of 32-bit programs) */
+struct WineKeybdInput {
+    uint32_t type; // INPUT_KEYBOARD is 1
+    uint32_t pad;
+    uint16_t vk;
+    uint16_t scan;
+    uint32_t flags; // 1: extended, 2: key up, 4: unicode, 8: scan code
+    uint32_t time;
+    uint32_t pad2;
+    uint64_t extra;
+    uint64_t pad3;
+};
+
+uint32_t NtUserSendInput(uint32_t count, void *inputs, int size)
+{
+    LOGTRACE(LCF_WINE | LCF_KEYBOARD, "%s called with %u inputs of size %d", __func__, count, size);
+    if (inputs && (size == static_cast<int>(sizeof(WineKeybdInput)))) {
+        const WineKeybdInput* in = static_cast<const WineKeybdInput*>(inputs);
+        for (uint32_t i = 0; i < count; i++) {
+            if (in[i].type != 1)
+                continue;
+
+            const uint32_t flags = in[i].flags;
+            if (flags & 0x4) // KEYEVENTF_UNICODE
+                continue;
+
+            int vkey = in[i].vk;
+            if (flags & 0x8) { // KEYEVENTF_SCANCODE
+                const bool extended = (flags & 0x1) || ((in[i].scan >> 8) == 0xE0);
+                vkey = scanToVKey(in[i].scan & 0xFF, extended);
+            }
+            const bool down = !(flags & 0x2); // KEYEVENTF_KEYUP
+            LOG(LL_DEBUG, LCF_WINE | LCF_KEYBOARD, "   SendInput key vk 0x%x scan 0x%x flags 0x%x -> vkey 0x%x %s", in[i].vk, in[i].scan, flags, vkey, down ? "down" : "up");
+            if ((vkey > 0) && (vkey <= 0xff))
+                injected_vkeys[vkey] = down;
+        }
+    }
+    return orig::NtUserSendInput(count, inputs, size);
 }
 
 int NtUserGetCursorPos(POINT *pt)
@@ -325,6 +424,9 @@ void hook_win32u()
     hook_wine_syscall("win32u.so", "NtUserPeekMessage",
         reinterpret_cast<void**>(&orig::NtUserPeekMessage),
         reinterpret_cast<void*>(NtUserPeekMessage));
+    hook_wine_syscall("win32u.so", "NtUserSendInput",
+        reinterpret_cast<void**>(&orig::NtUserSendInput),
+        reinterpret_cast<void*>(NtUserSendInput));
 }
 
 #else

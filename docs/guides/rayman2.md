@@ -90,8 +90,11 @@ with `WINEDLLOVERRIDES="dinput8,dinput=n,b"` already in its environment.
 * **Controllers**: Xidi turns XInput controllers into the DirectInput
   controllers that the game reads, and libTAS gives its own controllers to
   XInput. Set the number of controllers in the input settings. The controllers
-  of your system are hidden from the game. Controllers were not tested with
-  Rayman 2 yet.
+  of your system are hidden from the game. The Ray2Fix layout of Xidi gives the
+  left stick as axes, but turns most buttons into key presses (A is Enter,
+  B is Space, X is End, the D-pad is the arrow keys, Start is Escape), which
+  it sends to Windows with `SendInput()`. libTAS adds these keys to the keys
+  that the game reads, on the frame where the button is pressed.
 
 ## What works
 
@@ -106,7 +109,7 @@ under 30 seconds, at normal speed):
   frame 600 and loads it at frame 900 gives the same image at frame 1100 as a
   run without loading.
 
-Not tested yet: gameplay in a level, long movies, controllers.
+Not tested yet: gameplay in a level, long movies.
 
 ## Troubleshooting
 

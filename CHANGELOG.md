@@ -268,6 +268,9 @@
   the MD5 of the game without a shell. The hash was also empty for any path
   with a space
 * Fix the -t command-line option, which was listed in the help but rejected
+* Wine: keep the keys that a game presses with SendInput() in the keyboard
+  state that it reads, so that controller buttons that Xidi turns into key
+  presses work (Rayman 2)
 
 ## [1.4.8] - 2026-05-14
 ### Added

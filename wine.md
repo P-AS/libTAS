@@ -460,6 +460,32 @@ games import by ordinal, in 32 and 64-bit):
   system32, so two modules have that name. The dll looks for Wine's among the
   loaded modules (`K32EnumProcessModules`) and when one is loaded later.
 
+### Keys sent with SendInput
+
+- **Controller buttons did nothing in Rayman 2** (the left stick worked): the
+  `Xidi.ini` of Ray2Fix has a custom mapper where only the sticks and a few
+  buttons are DirectInput axes and buttons, and the other buttons are
+  keyboard output (`ButtonA=Compound(Keyboard(A),Keyboard(Enter))`,
+  `ButtonB=...Keyboard(Space),Keyboard(Backspace)`, `ButtonX=Keyboard(End)`,
+  `ButtonStart=Keyboard(Esc)`, D-pad = arrow keys). Xidi presses them with
+  `SendInput()` (scan codes, `KEYEVENTF_SCANCODE`, `0xE0` prefix for End
+  and the arrows), while libTAS answers `GetAsyncKeyState()`,
+  `GetKeyState()`, `GetKeyboardState()` and the DirectInput keyboard (which
+  the xinput dll reads from `GetAsyncKeyState()`) only with its own inputs.
+  The XInput dll did receive every button (its log shows the packets with
+  `buttons 1000` for A, `2000`, `4000`, `8000`, `0010`), so the loss was
+  after it. `NtUserSendInput` is now hooked in the syscall table of
+  `win32u.so`: the keyboard events of the game (virtual key or scan code,
+  `scanToVKey()` for set 1 scan codes on a US layout) are kept in a table
+  that `isVKeyPressed()` checks first, and the call goes on to Wine. The
+  key presses come on the frame of the button press (a Lua script pressing
+  A at frame 600 gave Enter and A at frame 600, released at frame 630).
+  Checked in the game: with A, B and Start at frames 600, 700 and 1000 the
+  language menu is left, a new game name entry opens and Start goes back to
+  the main menu; without the buttons it stays on the language menu.
+- The unicode flag of `SendInput()` and the mouse events are ignored. The
+  scan code table is for a US layout.
+
 ### DirectInput keyboard
 
 Wine's DirectInput keyboard gets its state from a low-level keyboard hook,
@@ -1038,7 +1064,8 @@ which reads XInput.
   at frame 900 gives the same picture at frame 1100 as a run that does not
   load; 11 loads in a row without a crash. The "Idle Threads" sync made runs
   slower and less deterministic here.
-- Not tested: gameplay in a level, controllers, long movies.
+- Not tested: gameplay in a level, long movies. Controller buttons work
+  (see Keys sent with SendInput in [Input](#input)).
 - Compare screenshots inside the game picture: the window title shows the real
   frame rate (`fps: 60.0`/`60.1`), and the windows are not always at the same
   place.
