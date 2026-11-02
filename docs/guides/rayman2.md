@@ -13,7 +13,7 @@ under libTAS through Wine on Linux, with the
 
 ## Requirements
 
-* libTAS built from source on the `wine` branch, so that `libTAS`, `libtas.so`
+* libTAS built from source, so that `libTAS`, `libtas.so`
   and the `libtas-xinput*.dll` files are in `build/src/program`. The xinput
   dlls need the mingw-w64 cross compilers (`i686-w64-mingw32-gcc`).
 * Wine 11 (tested with 11.21, as packaged by Arch Linux). Proton is not needed.
@@ -37,13 +37,18 @@ GAME="$HOME/Games/Rayman 2"
    name from dgVoodoo2 2.79.3: `Glide2x.dll` (from the `3Dfx/x86` folder of the
    archive), `DDraw.dll` (from `MS/x86`) and `dgVoodooCpl.exe`. The tested
    setup kept the `D3DImm.dll` of Ray2Fix.
-3. Remove the `glide2x.dll` of the GOG version. Linux file names are case
-   sensitive, so it stays next to dgVoodoo's `Glide2x.dll`, and Wine may load
-   either of them. Renaming it (for example to `glide2x.dll.bak`) is enough.
+3. Linux file names are case sensitive, so some files now exist twice with
+   names that only differ in case, and Wine may load either of them. Move these
+   out of the game directory (for example to a backup directory):
+   * `glide2x.dll`: the nGlide Glide dll of the GOG version (dgVoodoo's
+     `Glide2x.dll` replaces it),
+   * `ddraw.dll`: the "GOG.com DirectX 1-7 wrapper" (dgVoodoo's `DDraw.dll`
+     replaces it),
+   * `3dfxspl2.dll`: a second copy of the 3dfx splash screen (the game loads
+     `3DfxSpl2.dll`).
 
-Other files exist in two cases after this (`3dfxspl2.dll` and `3DfxSpl2.dll`,
-`ddraw.dll` and `DDraw.dll`). The setup of this page was tested with both
-present.
+   Check that `ls | grep -i -E 'ddraw|3dfx|glide'` gives only `3DfxSpl2.dll`,
+   `DDraw.dll` and `Glide2x.dll`.
 
 Run `R2FixCfg.exe` with Wine to choose the display settings if you want to
 change them. In its Input tab, keep the XInput controller backend: the SDL3

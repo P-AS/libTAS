@@ -17,7 +17,7 @@ Ideas and planned work for this fork of libTAS.
 
 ## Platform support
 
-- [ ] Wine support (WIP in the `wine` branch)
+- [ ] Wine support (WIP)
 - [ ] Native Wayland support
 - [ ] Revive macOS support
 
