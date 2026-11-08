@@ -32,6 +32,7 @@
 #endif
 
 #include <QtWidgets/QApplication>
+#include <QtCore/QLoggingCategory>
 
 #include <limits.h> // PATH_MAX
 #include <libgen.h> // dirname
@@ -418,6 +419,12 @@ int main(int argc, char **argv)
         if (!luafile.empty())
             Lua::Callbacks::getList().addFile(luafile);
     }
+
+    /* Qt's Wayland text-input-v3 code forgets to disable the surface when the
+     * window loses focus, then warns about its own stale state each time the
+     * window regains focus with a text field active. It is harmless, and it is
+     * fixed in later Qt code. QT_LOGGING_RULES can still enable the warning. */
+    QLoggingCategory::setFilterRules("qt.qpa.wayland.textinput.warning=false");
 
     /* Starts the user interface */
     QApplication app(argc, argv);

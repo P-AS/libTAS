@@ -285,6 +285,8 @@
   wrapper scripts such as the `wine` of Debian and Ubuntu
 * Wine: fix games running below their framerate depending on the timeout of
   their message waits
+* Silence the repeated Qt text input warning when the UI regains focus on
+  Wayland compositors using text-input-v3, such as niri
 
 ## [1.4.8] - 2026-05-14
 ### Added
