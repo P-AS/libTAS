@@ -281,6 +281,10 @@
   now return -EAGAIN, and SDL_QueueAudio() and SDL_PutAudioStreamData() fail
 * Fix a crash of cubeb_stream_init() when the audio buffers run out
 * Fix the log being lost when the game reopens or closes its stderr (La-Mulana)
+* Wine: fix 32-bit games not being hooked with Wine older than 10.2 and with
+  wrapper scripts such as the `wine` of Debian and Ubuntu
+* Wine: fix games running below their framerate depending on the timeout of
+  their message waits
 
 ## [1.4.8] - 2026-05-14
 ### Added

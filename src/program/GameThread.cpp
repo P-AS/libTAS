@@ -301,12 +301,21 @@ void GameThread::set_env_variables(Context *context, int gameArch)
             setenv("WINE_D3D_CONFIG", d3dconfig.c_str(), 1);
         }
 
-        /* WoW64 wine starts 32-bit games in a 64-bit process, which then
-         * restarts itself into a new 32-bit process. Tell libtas to only hook
-         * the restarted process. */
-        int processArch = wineProcessArch(findWinePath(context, gameArch), gameArch);
-        if (!proton_script && ((gameArch & BT_TYPEMASK) != BT_PE32P) && (processArch == BT_ELF64))
-            setenv("LIBTAS_WINE_RESTART", "1", 1);
+        /* Since Wine 10.2, WoW64 wine starts 32-bit games from a 64-bit process
+         * running start.exe, which creates a new process for the game, unless
+         * WINEARCH is wow64. Tell libtas to only hook this new process. Older
+         * versions keep the game in the first process. */
+        std::filesystem::path winepath = findWinePath(context, gameArch);
+        if (!proton_script && ((gameArch & BT_TYPEMASK) != BT_PE32P) &&
+            (wineProcessArch(winepath, gameArch) == BT_ELF64) &&
+            wineSupportsWow64Arch(winepath)) {
+            const char* winearch = getenv("WINEARCH");
+            for (const auto& env_var : context->config.env_overrides)
+                if (env_var.first == "WINEARCH")
+                    winearch = env_var.second.c_str();
+            if (!winearch || (strcmp(winearch, "wow64") != 0))
+                setenv("LIBTAS_WINE_RESTART", "1", 1);
+        }
 
         /* Windows games get the controllers of libtas through our xinput dlls */
         setXInputSharedFile(context);

@@ -216,6 +216,20 @@ std::filesystem::path findWinePath(const Context* context, int gameArch)
     return "";
 }
 
+/* Get the unix ntdll that a wine loader uses, by asking the dynamic linker.
+ * This goes through wrapper scripts, which choose the loader to run depending
+ * on the packages that are installed (e.g. on Debian and Ubuntu). */
+static std::filesystem::path wineNtdllPath(const std::filesystem::path& winepath)
+{
+    std::ostringstream oss;
+    oss << "LD_DEBUG=files " << winepath << " --version 2>&1 >/dev/null | grep -m1 -o 'file=.*/ntdll\\.so'";
+    std::string output = queryCmd(oss.str());
+    const std::string prefix = "file=";
+    if (output.compare(0, prefix.size(), prefix) != 0)
+        return "";
+    return output.substr(prefix.size());
+}
+
 int wineProcessArch(const std::filesystem::path& winepath, int gameArch)
 {
     /* The wine loader has the same arch as the process it creates. */
@@ -223,9 +237,30 @@ int wineProcessArch(const std::filesystem::path& winepath, int gameArch)
     if ((wineArch == BT_ELF32) || (wineArch == BT_ELF64))
         return wineArch;
 
-    /* The loader may be a wrapper script (e.g. on Debian), so guess from the
-     * game arch. */
+    /* The loader may be a wrapper script, so look at what it runs. */
+    std::filesystem::path ntdll = wineNtdllPath(winepath);
+    if (!ntdll.empty()) {
+        wineArch = extractBinaryType(ntdll) & BT_TYPEMASK;
+        if ((wineArch == BT_ELF32) || (wineArch == BT_ELF64))
+            return wineArch;
+    }
+
+    /* Otherwise, guess from the game arch. */
     return ((gameArch & BT_TYPEMASK) == BT_PE32P) ? BT_ELF64 : BT_ELF32;
+}
+
+bool wineSupportsWow64Arch(const std::filesystem::path& winepath)
+{
+    std::filesystem::path ntdll = wineNtdllPath(winepath);
+    if (ntdll.empty())
+        return false;
+
+    /* Look for the error message that lists the accepted values rather than
+     * at the version, which also works for builds patched by distributions. */
+    std::ostringstream oss;
+    oss << "grep -a -c 'win64, or wow64' " << ntdll;
+    std::string count = queryCmd(oss.str());
+    return !count.empty() && (count != "0");
 }
 
 std::filesystem::path extractMacOSExecutable(std::filesystem::path path)

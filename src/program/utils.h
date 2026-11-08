@@ -74,6 +74,11 @@ std::filesystem::path findWinePath(const Context* context, int gameArch);
  * a Windows game. WoW64 builds of wine run 32-bit games inside a 64-bit process. */
 int wineProcessArch(const std::filesystem::path& winepath, int gameArch);
 
+/* Does this wine accept WINEARCH=wow64 (since Wine 10.2)? These versions start
+ * 32-bit games from a 64-bit process through start.exe and a new process, unless
+ * WINEARCH has this value. Older ones keep the game in the first process. */
+bool wineSupportsWow64Arch(const std::filesystem::path& winepath);
+
 /* Get the executable from MacOS .app directory. */
 std::filesystem::path extractMacOSExecutable(std::filesystem::path path);
 

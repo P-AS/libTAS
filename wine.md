@@ -42,6 +42,28 @@ Launching (`a148b183`): fall back to `wine` when `wine64` is missing (WoW64
 builds), choose `libtas.so` from the architecture of the Wine process rather
 than the game's, and look for Proton in its `files` directory.
 
+Which process runs a 32-bit game depends on the Wine version, which decides in
+`get_alternate_wineloader()` (`dlls/ntdll/unix/loader.c`):
+
+| Wine | Process chain | Hook |
+|---|---|---|
+| 11.21 on Arch (no `i386-unix`) | `wine`, `wine-preloader`, `start.exe /exec`, new process for the game | `LIBTAS_DELAY_INIT` + `LIBTAS_WINE_RESTART` |
+| Any >= 10.2 with `WINEARCH=wow64` | `wine`, `wine-preloader`, which runs the game | `LIBTAS_DELAY_INIT` |
+| 10.0 on Ubuntu (`wine64` + `wine32`) | `sh`, `sh`, `wine`, `wine`, which runs the game in 64 bits | `LIBTAS_DELAY_INIT` |
+| Only `wine32` on Ubuntu | `sh`, `sh`, `wine`, `wine`, which runs the game in 32 bits | `libtas32.so`, `LIBTAS_DELAY_INIT` |
+
+- `wine` of Debian and Ubuntu is a script that runs `wine64` when it is
+  installed, so the arch of the process depends on the installed packages.
+  `wineProcessArch()` asks the dynamic linker which `ntdll.so` the script ends
+  up loading (`LD_DEBUG=files wine --version`) instead of guessing from the game.
+- `wineSupportsWow64Arch()` looks for `win64, or wow64` in that `ntdll.so`: this
+  error message and the loader change both appeared in Wine 10.2. Wine 10.0 and
+  10.1 abort with `WINEARCH=wow64`, so it can't simply be set everywhere.
+- Setting `WINEARCH=wow64` on recent Wine would avoid the new process, but the
+  timing phase of Boshy changes (below), so existing movies could be affected:
+  the launcher only follows what Wine does. A `WINEARCH=wow64` set by the user
+  is respected.
+
 ### Hooking the unix side of Wine
 
 Since Wine 5, Windows dlls are PE files that we cannot hook from `LD_PRELOAD`
@@ -116,6 +138,17 @@ game computes its timeouts from our deterministic clock. Two consequences:
   `NtUserMsgWaitForMultipleObjectsEx` checks without waiting and transfers the
   timeout as a deterministic sleep when nothing is signaled (`0a68fde2`).
   Infinite and alertable waits are left to Wine.
+- That timeout depends on the phase between the game's own frame timer and our
+  frames, which is set at startup and then stays constant, as each frame
+  advances the time by exactly the frame duration. Boshy waits 2 ms per frame
+  when going through `start.exe`, and 20 ms when started in the first process.
+  Sleeping it in real time added to the time spent working, which takes no
+  game time, so the game ran at 30 fps instead of 50 (found by comparing
+  `strace -T` of the main thread, then a trace with only `LCF_WAIT`, `LCF_SLEEP`
+  and `LCF_WINE`). The main thread now only advances the game time and leaves
+  the real sleep to the frame boundary (except Unity games and "never" sleep
+  handling, which don't advance the time for sleeps). The imported movie gives the same image
+  at frame 800, and went from 37 to 50 fps in the same scene.
 - `GetMessage()` with no message available blocks forever, while the message
   comes from a timer thread (`timeSetEvent`) that waits until our time reaches
   its deadline, which nothing advances. On the main thread, the
@@ -1235,6 +1268,11 @@ the game config, not in the movie.
 
 ## Open problems
 
+- The imported Boshy movie is not pixel-identical between Wine 11.21 on Arch and
+  Wine 10.0 on Ubuntu: at frame 800 the room is the same, but one animated "?"
+  sprite is in another state (88 of 190000 pixels). Each is repeatable, also
+  after loading a state. Not known yet if this comes from the timing phase
+  or the Wine version, nor if movies can desync between the two later on.
 - The Windows steam_api.dll replacement has no access to libtas inputs, so
   Steam controllers stay neutral in Windows games.
 - SRB2 video dumps are black after the first frame, while the game renders

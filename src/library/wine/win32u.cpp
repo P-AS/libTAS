@@ -37,6 +37,8 @@
 #include "xlib/xevents.h"
 #include "general/sleepwrappers.h"
 #include "GlobalState.h"
+#include "global.h"
+#include "UnityHacks.h"
 #include "checkpoint/ThreadManager.h"
 #include "../shared/inputs/SingleInput.h"
 
@@ -320,7 +322,16 @@ static uint32_t NtUserMsgWaitForMultipleObjectsEx(uint32_t count, void* const *h
     struct timespec ts;
     ts.tv_sec = timeout / 1000;
     ts.tv_nsec = (timeout % 1000) * 1000000;
-    transfer_sleep(ts, nullptr);
+
+    /* The frame boundary already sleeps until the end of the frame. As the
+     * game time doesn't advance while the game works, a timeout up to the
+     * next frame slept in real time would add to the time of that work, and
+     * the game would run below its framerate. */
+    if (ThreadManager::isMainThread() && !UnityHacks::isUnity() &&
+        (Global::shared_config.sleep_handling != SharedConfig::SLEEP_NEVER))
+        DeterministicTimer::get().addDelay(ts);
+    else
+        transfer_sleep(ts, nullptr);
     return WAIT_TIMEOUT;
 }
 
