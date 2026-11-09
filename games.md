@@ -379,6 +379,22 @@ of `lsdl2srb2legacy` (save at 520, load at 570) gives the same picture at frame
 
 ## Testing and debugging
 
+- A crash at exit of `lsdl2srb2legacy` was on SIGTERM only (10 runs out of 15): its
+  handler runs `I_Quit()`. The signal interrupted the real sleep of
+  `exitFrameBoundary()`, which is a native section, so the whole shutdown ran in
+  native state, and the Mesa llvmpipe threads were joined with the real
+  `pthread_join()`, but all our threads are detached by `pthread_create()`. This
+  read a freed stack, or corrupted the heap (`unlink_chunk` at the exit of a thread).
+  The join functions now only call the real function for threads that we don't
+  manage. Stopping a game from libTAS uses SIGKILL and `timeout` sends SIGTERM to its
+  process group, so it showed up only with test scripts. To test a shutdown, send
+  SIGTERM to the game alone: with `timeout`, libTAS also kills the game, which hides
+  a hang. The handler can still interrupt Mesa in a GL call: one run before this fix
+  hung in `delete_textures()`. This is a limit of shutting down from a signal handler.
+- `kill -9` while a core is written truncates it. There are no stacks, but the first
+  thread of the notes is the faulting one: its registers and signal address are in
+  the file, and the `NT_FILE` note maps them to a library. Let the game die by itself
+  to get a full core.
 - SDL2 dynapi indices (`index_sdl2`) must match the jump table of the real
   library. `SDL2_dynapi_procs.h` has `__LINUX__` entries, and 76e37025 dropped
   the SDL header that defined it: from index 622 on, hooks and `ORIG_SDL2_*`

@@ -309,6 +309,7 @@
 * Fix SDL2 games crashing at startup when SDL2 is provided by sdl2-compat, and
   keep movies recorded with the regular SDL2 library in sync
 * Fix SDL1 games crashing at startup when SDL1 is provided by sdl12-compat
+* Fix a crash when a game shuts down from a signal handler, such as on SIGTERM
 
 ## [1.4.8] - 2026-05-14
 ### Added

@@ -187,9 +187,21 @@ static void *pthread_native_start(void *arg)
     RETURN_NATIVE(pthread_exit, (retval), nullptr);
 }
 
+/* All threads created while not native are detached by pthread_create(), and we
+ * implement ourself their joinable state. So the real functions must not be
+ * called on them even in native state: a shutdown running from a signal handler
+ * that interrupted one of our native sections joins these threads. Joining a
+ * detached thread reads its freed stack, and corrupts the heap. */
+#define RETURN_IF_NATIVE_THREAD(FUNC, ARGS, LIB, PTHREAD_ID) \
+do { \
+    static decltype(&FUNC) orig_##FUNC; \
+    link_function((void**)&orig_##FUNC, #FUNC, LIB); \
+    if (GlobalState::isNative() && !ThreadManager::getThread(PTHREAD_ID)) return orig_##FUNC ARGS; \
+} while (0)
+
 /* Override */ int pthread_join (pthread_t pthread_id, void **thread_return)
 {
-    RETURN_IF_NATIVE(pthread_join, (pthread_id, thread_return), "libpthread.so");
+    RETURN_IF_NATIVE_THREAD(pthread_join, (pthread_id, thread_return), "libpthread.so", pthread_id);
 
     ThreadSync::waitForThreadsToFinishInitialization();
 
@@ -247,7 +259,7 @@ static void *pthread_native_start(void *arg)
 
 /* Override */ int pthread_tryjoin_np(pthread_t pthread_id, void **retval) __THROW
 {
-    RETURN_IF_NATIVE(pthread_tryjoin_np, (pthread_id, retval), "libpthread.so");
+    RETURN_IF_NATIVE_THREAD(pthread_tryjoin_np, (pthread_id, retval), "libpthread.so", pthread_id);
 
     WrapperLock wrapperLock;
     ThreadSync::waitForThreadsToFinishInitialization();
@@ -283,7 +295,7 @@ static void *pthread_native_start(void *arg)
 
 /* Override */ int pthread_timedjoin_np(pthread_t pthread_id, void **retval, const struct timespec *abstime)
 {
-    RETURN_IF_NATIVE(pthread_timedjoin_np, (pthread_id, retval, abstime), "libpthread.so");
+    RETURN_IF_NATIVE_THREAD(pthread_timedjoin_np, (pthread_id, retval, abstime), "libpthread.so", pthread_id);
 
     WrapperLock wrapperLock;
     ThreadSync::waitForThreadsToFinishInitialization();
