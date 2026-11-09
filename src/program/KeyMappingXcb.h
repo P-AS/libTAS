@@ -68,6 +68,17 @@ class KeyMappingXcb : public KeyMapping {
          */
         void buildAllInputs(AllInputs& ai, uint32_t window, SharedConfig& sc, bool mouse_warp);
 
+        /*
+         * Xwayland only honors a pointer warp while the cursor is hidden, by
+         * locking the Wayland pointer and feeding relative motion to the X
+         * pointer. Otherwise, the warp only lasts until the next real motion.
+         * So on Xwayland, we hold the pointer with a grab that hides the cursor
+         * and confines it to the window: without the confinement, a motion
+         * going past the window edge would break the lock for good.
+         * Does nothing on a real X server, where warping just works.
+         */
+        void capturePointer(uint32_t window, bool capture);
+
     private:
         /* Connection to the X11 server */
         xcb_connection_t *conn;
@@ -81,6 +92,21 @@ class KeyMappingXcb : public KeyMapping {
         /* Returns the list of modifiers from the keyboard state */
         keysym_t build_modifiers(unsigned char keyboard_state[]);
 
+        /* Are we running on Xwayland */
+        bool is_xwayland = false;
+
+        /* Window that the pointer is held in, if any */
+        xcb_window_t captured_window = XCB_NONE;
+
+        /* Invisible cursor shown during our pointer grabs */
+        xcb_cursor_t blank_cursor = XCB_NONE;
+
+        /* Grab the pointer, hiding the cursor and confining it to the window */
+        bool grabPointer(xcb_window_t window);
+
+        /* Warp the pointer at the center of a window of the given size, in a
+         * way that really moves the pointer. */
+        void warpPointer(xcb_window_t window, int width, int height);
 };
 
 #endif // LIBTAS_KEYMAPPING_XCB_H_INCLUDED

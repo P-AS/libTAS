@@ -36,6 +36,12 @@ KeyMappingXcb::KeyMappingXcb(void* c) : KeyMapping(c)
 {
     conn = static_cast<xcb_connection_t*>(c);
 
+    static const char xwayland_name[] = "XWAYLAND";
+    xcb_query_extension_cookie_t ext_cookie = xcb_query_extension(conn, strlen(xwayland_name), xwayland_name);
+    xcb_query_extension_reply_t* ext_reply = xcb_query_extension_reply(conn, ext_cookie, nullptr);
+    is_xwayland = ext_reply && ext_reply->present;
+    free(ext_reply);
+
     /* Build the list of keysym values to be mapped based on valid keycodes.
      * This list is dependent on the keyboard layout.
      */
@@ -264,6 +270,85 @@ void KeyMappingXcb::default_input(int tab, int input_index)
     }
 }
 
+bool KeyMappingXcb::grabPointer(xcb_window_t window)
+{
+    if (blank_cursor == XCB_NONE) {
+        /* Pixmaps start with undefined contents, so clear the mask explicitly */
+        xcb_window_t root = xcb_setup_roots_iterator(xcb_get_setup(conn)).data->root;
+        xcb_pixmap_t pixmap = xcb_generate_id(conn);
+        xcb_create_pixmap(conn, 1, pixmap, root, 1, 1);
+
+        xcb_gcontext_t gc = xcb_generate_id(conn);
+        const uint32_t foreground = 0;
+        xcb_create_gc(conn, gc, pixmap, XCB_GC_FOREGROUND, &foreground);
+        const xcb_rectangle_t rectangle = {0, 0, 1, 1};
+        xcb_poly_fill_rectangle(conn, pixmap, gc, 1, &rectangle);
+        xcb_free_gc(conn, gc);
+
+        blank_cursor = xcb_generate_id(conn);
+        xcb_create_cursor(conn, blank_cursor, pixmap, pixmap, 0, 0, 0, 0, 0, 0, 0, 0);
+        xcb_free_pixmap(conn, pixmap);
+    }
+
+    /* The cursor is part of the grab, so the server restores the one of the
+     * window when the grab ends, including when we exit or crash. */
+    xcb_grab_pointer_cookie_t cookie = xcb_grab_pointer(conn, 1, window, 0,
+        XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC, window, blank_cursor, XCB_CURRENT_TIME);
+    xcb_grab_pointer_reply_t* reply = xcb_grab_pointer_reply(conn, cookie, nullptr);
+    bool success = reply && (reply->status == XCB_GRAB_STATUS_SUCCESS);
+    free(reply);
+    return success;
+}
+
+void KeyMappingXcb::capturePointer(uint32_t window, bool capture)
+{
+    if (!is_xwayland)
+        return;
+
+    if (!capture) {
+        if (captured_window != XCB_NONE) {
+            xcb_ungrab_pointer(conn, XCB_CURRENT_TIME);
+            xcb_flush(conn);
+            captured_window = XCB_NONE;
+        }
+        return;
+    }
+
+    if ((window == XCB_NONE) || (captured_window == window))
+        return;
+
+    xcb_get_geometry_cookie_t geometry_cookie = xcb_get_geometry(conn, window);
+    xcb_get_geometry_reply_t* geometry_reply = xcb_get_geometry_reply(conn, geometry_cookie, nullptr);
+    if (geometry_reply && grabPointer(window)) {
+        captured_window = window;
+
+        /* Start from the center, otherwise the distance between the pointer
+         * and the center would become the first motion of the game. */
+        xcb_warp_pointer(conn, XCB_NONE, window, 0, 0, 0, 0, geometry_reply->width/2, geometry_reply->height/2);
+    }
+    free(geometry_reply);
+}
+
+void KeyMappingXcb::warpPointer(xcb_window_t window, int width, int height)
+{
+    /* While the pointer is not held (frame advance while paused, where it must
+     * stay free), the position given by a warp is still used when the lock
+     * ends, so that a short capture moves the real pointer. */
+    bool short_capture = is_xwayland && (captured_window != window);
+    if (short_capture && !grabPointer(window))
+        return;
+
+    xcb_warp_pointer(conn, XCB_NONE, window, 0, 0, 0, 0, width/2, height/2);
+
+    if (short_capture)
+        xcb_ungrab_pointer(conn, XCB_CURRENT_TIME);
+
+    /* The warp must reach the server now. Otherwise, it is sent with the next
+     * request, just before the pointer is read for the next frame, which would
+     * erase all the motion made during this frame. */
+    xcb_flush(conn);
+}
+
 void KeyMappingXcb::buildAllInputs(AllInputs& ai, uint32_t window, SharedConfig& sc, bool mouse_warp)
 {
     int i,j;
@@ -418,7 +503,7 @@ void KeyMappingXcb::buildAllInputs(AllInputs& ai, uint32_t window, SharedConfig&
 
             /* Warp pointer if needed */
             if (mouse_warp)
-                xcb_warp_pointer (conn, XCB_NONE, window, 0, 0, 0, 0, geometry_reply->width/2, geometry_reply->height/2);
+                warpPointer(window, geometry_reply->width, geometry_reply->height);
 
             free(geometry_reply);
         }

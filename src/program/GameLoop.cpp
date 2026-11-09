@@ -132,6 +132,8 @@ void GameLoop::start()
             if (eventFlag & GameEvents::RETURN_FLAG_UPDATE)
                 emit uiChanged();
 
+            updatePointerCapture();
+
             endInnerLoop = context->config.sc.running ||
                 (eventFlag & GameEvents::RETURN_FLAG_ADVANCE) ||
                 (context->status == Context::QUITTING);
@@ -647,6 +649,22 @@ bool GameLoop::startFrameMessages()
     return false;
 }
 
+void GameLoop::updatePointerCapture()
+{
+    /* Let go of the pointer whenever the user may want it for something else:
+     * while paused, so that the libTAS windows can be used, and when another
+     * window has the focus. */
+    bool capture = context->config.mouse_warp &&
+        context->config.sc.mouse_support &&
+        context->config.sc.mouse_mode_relative &&
+        context->config.sc.running &&
+        (context->config.sc.recording != SharedConfig::RECORDING_READ) &&
+        (context->status != Context::QUITTING) &&
+        gameEvents->haveFocus();
+
+    context->config.km->capturePointer(context->game_window, capture);
+}
+
 void GameLoop::sleepSendPreview()
 {
     /* Sleep a bit to not surcharge the processor */
@@ -934,6 +952,8 @@ void GameLoop::loopExit()
 {
     /* Unvalidate the game pid */
     context->game_pid = 0;
+
+    context->config.km->capturePointer(context->game_window, false);
 
     /* The file that gave the controllers to the xinput dlls of Windows games */
     unlink(GameThread::xinputSharedFile(getpid()).c_str());

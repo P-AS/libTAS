@@ -200,6 +200,11 @@ class KeyMapping {
          * - Warp mouse pointer if needed
          */
         virtual void buildAllInputs(AllInputs& ai, uint32_t window, SharedConfig& sc, bool mouse_warp) = 0;
+
+        /* Hold the pointer in the window while warping it after each frame, if
+         * the display server needs it for warping to work, or stop holding it
+         * if `capture` is false. */
+        virtual void capturePointer(uint32_t window, bool capture) {}
 };
 
 #endif // LIBTAS_KEYMAPPING_H_INCLUDED

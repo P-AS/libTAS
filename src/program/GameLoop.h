@@ -67,6 +67,9 @@ private:
 
     bool startFrameMessages();
 
+    /* Hold or let go of the pointer for warping it, based on the current state */
+    void updatePointerCapture();
+
     void sleepSendPreview();
 
     void processInputs(AllInputs &ai);

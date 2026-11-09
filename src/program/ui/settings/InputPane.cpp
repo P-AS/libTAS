@@ -90,7 +90,8 @@ void InputPane::initToolTips()
     mouseSupportBox->setDescription("Enable mouse inputs. If unchecked, it will "
     "report a fixed mouse cursor at (0,0) coordinates.");
     mouseWarpBox->setDescription("Warp mouse to the center of the game window on each frame. "
-    "This is useful in combination with relative mode, to ease mouse inputs.");
+    "This is useful in combination with relative mode, to ease mouse inputs. "
+    "On Wayland, the cursor is hidden and held in the game window while the game is running.");
     mouseGameWarpBox->setDescription("Prevents games from warping the mouse cursor.");
     mouseIgnoreWindowCoordsBox->setDescription("Always report the game window position as (0,0). "
     "This fixes mouse input in some engines such as Godot.");

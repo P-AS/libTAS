@@ -310,6 +310,9 @@
   keep movies recorded with the regular SDL2 library in sync
 * Fix SDL1 games crashing at startup when SDL1 is provided by sdl12-compat
 * Fix a crash when a game shuts down from a signal handler, such as on SIGTERM
+* Fix "Warp mouse to center" discarding all mouse motion of each frame
+* Xwayland: Fix "Warp mouse to center", by hiding the cursor and holding it in
+  the game window while the game is running and has the focus
 
 ## [1.4.8] - 2026-05-14
 ### Added

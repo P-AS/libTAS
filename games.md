@@ -377,8 +377,60 @@ deadlock on savefiles above: at the level 3, it froze `lsdl2srb2legacy` at frame
 of `lsdl2srb2legacy` (save at 520, load at 570) gives the same picture at frame
 640. Sonic Generations, the main user of Idle Threads sync, was not run.
 
+## Pointer warp on Xwayland
+
+"Warp mouse to center" (`mouse_warp`, with relative mouse mode) reads the pointer
+and warps it to the center of the game window on each frame, from the libTAS
+program. This is independent of the game, so it also concerns Windows games.
+
+- `xcb_warp_pointer()` was only buffered, then sent with the next request: the
+  `haveFocus()` of the next frame, just before the pointer is read. So the game
+  always got a motion of 0, on any X server. `warpPointer()` now flushes.
+- Xwayland only honors a warp while the cursor is hidden: it locks the Wayland
+  pointer with `zwp_locked_pointer_v1` and feeds relative motion to the X pointer
+  (`xwl_seat_emulate_pointer_warp()` returns if `x_cursor` is set). With a visible
+  cursor, the warp only changes the position of the X pointer until the next real
+  motion, so that the position read after it is fake and the deltas are wrong. A
+  game can't hide the cursor, as we noop `XDefineCursor()`.
+- So on Xwayland (`XWAYLAND` extension present, nothing changes on a real X server),
+  `KeyMappingXcb::capturePointer()` grabs the pointer with a blank cursor and
+  `confine_to` the game window. Warps then work for any client, not only the owner
+  of the window. Design choices:
+  - The cursor is an argument of the grab, instead of `XDefineCursor()` on the game
+    window, so the server restores everything when the grab ends, including if
+    libTAS is killed (checked with SIGKILL). An empty cursor counts as hidden:
+    `mi` turns it into `NullCursor`. `XFixesHideCursor()` also works but hides
+    the cursor on all the windows of the screen, including the libTAS UI.
+  - The confinement is needed: without it, a motion that goes past the window edge
+    in a single frame destroys the warp emulator and the pointer escapes for good.
+  - `GameLoop::updatePointerCapture()` holds the pointer only when the game is
+    running, has the focus and inputs are not read from a movie. Otherwise the
+    libTAS UI could not be reached.
+  - A frame advance while paused does a short grab, warp and ungrab: Xwayland gives
+    the warped position as `set_cursor_position_hint`, used when the lock ends, so
+    the real pointer moves to the center. The hint is optional for the compositor.
+- Checked with `simplestgame` on niri + xwayland-satellite, rootful Xwayland on
+  niri, and Xvfb: the sum of the deltas seen by Lua matches the motion sent
+  (Xvfb only checks the flush, as it does not grab). Not checked on GNOME, KDE,
+  a physical mouse, or a Windows game.
+- A single motion larger than the window is not limited to the window: it was only
+  limited by the screen size (959 for a center at 320 on a 1280 wide screen), and
+  the pointer stays held. Why the confinement does not limit it here, while it does
+  in a small Xlib test, was not investigated.
+
 ## Testing and debugging
 
+- Pointer behavior can be tested on the real stack without touching the pointer of
+  the session or showing a window: `weston --backend=headless --renderer=gl
+  --socket=X`, a private `niri -c cfg -- cmd` with `WAYLAND_DISPLAY=X` and without
+  `NIRI_SOCKET`, and a client moving the pointer with `zwlr_virtual_pointer_v1`.
+  Nesting niri in the session on a hidden workspace is too slow, as it gets no frame
+  callbacks. An `XGrabPointer()` from another client tells if the pointer is held
+  (`AlreadyGrabbed`). Traps: a server where no client has defined a cursor has it
+  hidden (`CursorVisible`), so warps seem to work; absolute virtual pointer motion
+  escapes a lock on niri, unlike a mouse; the first `xdotool key` was lost under
+  xwayland-satellite (not on rootful Xwayland), so send a throwaway key first;
+  `xdotool search` finds nothing under xwayland-satellite, use `xwininfo -root -tree`.
 - A crash at exit of `lsdl2srb2legacy` was on SIGTERM only (10 runs out of 15): its
   handler runs `I_Quit()`. The signal interrupted the real sleep of
   `exitFrameBoundary()`, which is a native section, so the whole shutdown ran in
@@ -473,6 +525,11 @@ of `lsdl2srb2legacy` (save at 520, load at 570) gives the same picture at frame
 
 ## Open problems
 
+- Rootless Xwayland: the position of the pointer is unknown outside of the X11
+  windows. `XQueryPointer()` keeps returning the last position and success, and no
+  Wayland protocol gives a global position. It only works with a button held
+  (implicit grab; the top and left clamp to 0 with xwayland-satellite) or on the root
+  of a rootful Xwayland, where `(-50,-50)` relative to the game is read correctly.
 - La-Mulana: one non-draw frame around the handover of the main thread moves
   between frames 280 and 283 (about 1 run out of 4; 6 out of 20 in the last
   count). It happens when the system thread hands over to the logic thread,
