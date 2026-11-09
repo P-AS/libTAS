@@ -308,6 +308,14 @@ of `lsdl2srb2legacy` (save at 520, load at 570) gives the same picture at frame
 
 ## Testing and debugging
 
+- SDL2 dynapi indices (`index_sdl2`) must match the jump table of the real
+  library. `SDL2_dynapi_procs.h` has `__LINUX__` entries, and 76e37025 dropped
+  the SDL header that defined it: from index 622 on, hooks and `ORIG_SDL2_*`
+  calls were one or two slots off (`SDL_RenderGeometryRaw` called
+  `SDL_RenderGeometry`, so no OSD, and `SDL_wcsdup` reached the rumble hook).
+  To check, read each exported wrapper with `objdump -d`: its `jmp
+  *slot(%rip)` gives the real slot, and `slot - index*8` must be the same value
+  for all functions.
 - With a fresh `XDG_CONFIG_HOME`, add `-s allow_downloads=0` (or `1`): `-n` still
   shows the libraries download dialog when the setting was never answered, and
   nothing happens, without any window from the game or a line in the output.

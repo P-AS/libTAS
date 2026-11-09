@@ -36,6 +36,13 @@
 
 #include "SDL_common.h"
 
+/* SDL2_dynapi_procs.h has Linux-only entries under __LINUX__, which is normally
+ * defined by SDL_platform.h. Without it, the indices of all following functions
+ * don't match the jump table of the real library. */
+#if defined(__linux__) && !defined(__LINUX__)
+#define __LINUX__ 1
+#endif
+
 namespace libtas {
 
 namespace sdl2 {
