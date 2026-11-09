@@ -287,6 +287,52 @@ advancing (the stack is the giveaway, `SaveFile::open` then `debuglogfull` then
 - Whether the native events setting matters for input in the uncontrolled run
   (the page says it is needed; the game runs without it).
 
+## sdl2-compat
+
+`sdl2-compat` provides `libSDL2-2.0.so.0` and implements it on top of `libSDL3`.
+Its constructor loads SDL3 with `dlopen(RTLD_LOCAL)` and all its functions with
+`dlsym(handle, "SDL_...")`. libTAS expected one version of SDL per game, so a game
+crashed at startup (`X_CreateWindow BadValue`, a window of size 0):
+
+- Our `dlsym()` returned our hooks for these names, so that the SDL3 functions of
+  sdl2-compat came back into libTAS.
+- SDL3 reads `SDL3_DYNAMIC_API` and calls our `SDL_DYNAPI_entry()` with API version
+  2, which overwrote the table of original functions, and the game was
+  treated as an SDL3 game: SDL2 arguments of `SDL_CreateWindow()` were read as SDL3
+  ones.
+
+Design choice: such a game is an SDL2 game, sdl2-compat is its SDL2 library, and
+SDL3 stays unhooked, like the internals of the regular SDL2 library. What is below
+SDL3 (X11, OpenGL, time) is still hooked. `dlsym()` returns the real function when
+`libSDL2-2.0` looks up an `SDL_` symbol that resolves to `libSDL3`, which also
+detects sdl2-compat (`isSDL2Compat()`). `SDL_DYNAPI_entry()` then fills the table of
+SDL3 with its own functions. A real SDL3 game is not affected.
+
+`WAYLAND_DISPLAY` does not matter, even if SDL3 prefers Wayland, as libTAS already
+clears it for the game.
+
+SDL3 calls `nanosleep(10ms)` inside `SDL_CreateWindow()` (2 calls) and
+`SDL_CreateRenderer()` (3 calls), where the regular SDL2 library doesn't sleep.
+These added non-draw frames, which shifted the inputs and desynced a movie recorded
+with the regular SDL2 library. A sleep called from `libSDL3` now only sleeps, without
+adding to the game time. In case SDL3 is waiting for a timeout, sleeps of the main
+thread count again after 100 calls in the same frame, to prevent a softlock.
+
+Checked with sdl2-compat 2.32.74 and SDL 3.4.20: `simplestgame` and
+`lsdl2srb2legacy` with the OSD and inputs, the same picture at frame 450 over two
+runs, and with a savestate (save at 300, load at 400). A 2777-frame movie of
+`lsdl2srb2legacy` recorded with the regular SDL2 has no differing pixel at frame 900
+between both libraries; the rest of the movie was not compared.
+
+32-bit, with lib32-sdl2-compat 2.32.74 and lib32-sdl3 3.4.18: `simplestgame` built
+with `-m32` has inputs, the OSD, the same picture over two runs and with a savestate,
+and only the OSD differs from the regular 32-bit SDL2 at frame 200. La-Mulana and
+Shovel Knight are not concerned: they bundle their own SDL2 through their `RPATH`.
+
+To compare with the regular SDL2 library without uninstalling sdl2-compat, extract an
+`sdl2` package from `/var/cache/pacman/pkg` and export `LD_LIBRARY_PATH` to its
+`usr/lib` when starting libTAS. Check `/proc/<pid>/maps` of the game to be sure.
+
 ## Regression check of the changes for La-Mulana
 
 Old build (the commit before) against new build, two runs each at normal speed

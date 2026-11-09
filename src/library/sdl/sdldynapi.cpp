@@ -22,6 +22,7 @@
 #include "logging.h"
 #include "hook.h"
 #include "hookpatch.h"
+#include "general/dlhook.h"
 #include "GlobalState.h"
 #include "../external/elfhacks.h"
 
@@ -80,8 +81,36 @@ void setSDLFullscreenAddr(uint64_t addr)
     hook_patch_addr(reinterpret_cast<void*>(addr), reinterpret_cast<void**>(&orig_X11_SetWindowFullscreen), reinterpret_cast<void*>(dummy_X11_SetWindowFullscreen)); \
 }
 
+/* Fill the table of the private SDL3 library of sdl2-compat with its own functions
+ * and don't hook them, because the game uses the SDL2 API. */
+static Sint32 initSDL2CompatSDL3Table(Uint32 apiver, void *table, Uint32 tablesize, void* caller)
+{
+    static decltype(&SDL_DYNAPI_entry) orig_entry = nullptr;
+
+    if (!orig_entry) {
+        Dl_info info;
+        if (dladdr(caller, &info)) {
+            eh_obj_t obj;
+            if (eh_find_obj(&obj, info.dli_fname) == 0) {
+                eh_find_sym(&obj, "SDL_DYNAPI_entry", (void **) &orig_entry);
+                eh_destroy_obj(&obj);
+            }
+        }
+    }
+
+    if (!orig_entry) {
+        LOG(LL_ERROR, LCF_SDL | LCF_HOOK, "   Could not find the SDL_DYNAPI_entry function of sdl2-compat's SDL3");
+        return 1;
+    }
+
+    return orig_entry(apiver, table, tablesize);
+}
+
 /* Override */ Sint32 SDL_DYNAPI_entry(Uint32 apiver, void *table, Uint32 tablesize) {
     LOGTRACE_SIMPLE(LCF_SDL | LCF_HOOK);
+
+    if ((apiver == 2) && isSDL2Compat())
+        return initSDL2CompatSDL3Table(apiver, table, tablesize, __builtin_return_address(0));
 
     sdl_apiver = apiver;
     if ((apiver != 1) && (apiver != 2)) {

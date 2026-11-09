@@ -80,6 +80,9 @@ void add_lib(const char* library);
  */
 void *find_sym(const char* name);
 
+/* Return if the game uses sdl2-compat, which implements SDL2 on top of SDL3 */
+bool isSDL2Compat();
+
 OVERRIDE void *dlopen(const char *file, int mode) __THROW;
 OVERRIDE void *dlsym(void *handle, const char *name) __THROW;
 

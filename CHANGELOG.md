@@ -306,6 +306,8 @@
   in SDL3 games
 * Fix SDL3 not being detected in SDL_Init(), which disabled inputs of the game
 * Fix SDL3 event filters not dropping events when returning false
+* Fix SDL2 games crashing at startup when SDL2 is provided by sdl2-compat, and
+  keep movies recorded with the regular SDL2 library in sync
 
 ## [1.4.8] - 2026-05-14
 ### Added

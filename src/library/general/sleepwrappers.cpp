@@ -27,7 +27,11 @@
 #include "hook.h"
 #include "UnityHacks.h"
 #include "global.h"
+#include "frame.h"
+#include "dlhook.h"
 
+#include <cstring>
+#include <dlfcn.h>
 #include <sched.h> // sched_yield()
 #include <execinfo.h>
 
@@ -150,6 +154,32 @@ void transfer_sleep(const struct timespec &ts, struct timespec *rem)
     return 0;
 }
 
+/* The SDL3 library used by sdl2-compat sleeps internally where the regular SDL2
+ * library doesn't, for example when creating a window. Adding these to the game
+ * time would add non-draw frames and desync movies, so they must not count.
+ * If the main thread keeps sleeping there, SDL3 may be waiting for a timeout, so
+ * we let them count to prevent a softlock. */
+static bool isSDL2CompatInternalSleep(void* caller)
+{
+    if (!isSDL2Compat())
+        return false;
+
+    Dl_info info;
+    if (!dladdr(caller, &info) || !info.dli_fname || !strstr(info.dli_fname, "libSDL3"))
+        return false;
+
+    if (!ThreadManager::isMainThread())
+        return true;
+
+    static uint64_t last_framecount = 0;
+    static int count = 0;
+    if (last_framecount != framecount) {
+        last_framecount = framecount;
+        count = 0;
+    }
+    return ++count <= 100;
+}
+
 /* Override */ int nanosleep (const struct timespec *requested_time, struct timespec *remaining)
 {
     LINK_NAMESPACE_GLOBAL(nanosleep);
@@ -159,6 +189,9 @@ void transfer_sleep(const struct timespec &ts, struct timespec *rem)
     }
 
     LOGTRACE(LCF_SLEEP, "%s call - sleep for %d.%09d sec", __func__, requested_time->tv_sec, requested_time->tv_nsec);
+
+    if (isSDL2CompatInternalSleep(__builtin_return_address(0)))
+        return orig::nanosleep(requested_time, remaining);
 
     transfer_sleep(*requested_time, remaining);
     return 0;
