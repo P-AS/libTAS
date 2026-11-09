@@ -340,7 +340,7 @@ sdl3::SDL_WindowFlags sdl3::SDL_GetWindowFlags(SDL_Window *window);
  *
  *  \sa SDL_GetWindowTitle()
  */
-OVERRIDE void SDL_SetWindowTitle(SDL_Window * window, const char *title);
+OVERRIDE bool SDL_SetWindowTitle(SDL_Window * window, const char *title);
 
 /** SDL 1.2
  * Sets the title and icon text of the display window (UTF-8 encoded)

@@ -629,19 +629,26 @@ static int countEmptyPoll(int popped)
     return SDL_FALSE;
 }
 
-/* Override */ void SDL_AddEventWatch(sdl2::SDL_EventFilter filter, void *userdata)
+/* Override */ bool SDL_AddEventWatch(sdl2::SDL_EventFilter filter, void *userdata)
 {
     LOGTRACE_SIMPLE(LCF_SDL | LCF_EVENTS);
 
+    int SDLver = get_sdlversion();
+
     if (Global::shared_config.debug_state & SharedConfig::DEBUG_NATIVE_EVENTS) {
-        return ORIG_SDL23_CALL(SDL_AddEventWatch, (filter, userdata));
+        if (SDLver == 3)
+            return ORIG_SDL3_CALL(SDL_AddEventWatch, (reinterpret_cast<sdl3::SDL_EventFilter>(filter), userdata));
+        ORIG_SDL2_CALL(SDL_AddEventWatch, (filter, userdata));
+        return true;
     }
 
-    int SDLver = get_sdlversion();
     if (SDLver == 2)
         sdlEventQueue.addWatch(filter, userdata);
     if (SDLver == 3)
         sdlEventQueue.addWatch(reinterpret_cast<sdl3::SDL_EventFilter>(filter), userdata);
+
+    /* The return value is only read by SDL3 games */
+    return true;
 }
 
 /* Override */ void SDL_DelEventWatch(sdl2::SDL_EventFilter filter, void *userdata)

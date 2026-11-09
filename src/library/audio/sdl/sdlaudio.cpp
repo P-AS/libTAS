@@ -594,11 +594,17 @@ bool SDL_AudioDevicePaused(sdl3::SDL_AudioDeviceID devid)
     return sdl_device_sources[devid][0]->state == AudioSource::SOURCE_PAUSED;
 }
 
-void SDL_MixAudio(Uint8 * dst, const Uint8 * src, Uint32 len, int volume)
+bool SDL_MixAudio(Uint8 * dst, const Uint8 * src, Uint32 p3, int p4, float sdl3_volume)
 {
     LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND);
 
     int SDLver = get_sdlversion();
+
+    if (SDLver == 3)
+        return ORIG_SDL3_CALL(SDL_MixAudio, (dst, src, static_cast<SDL_AudioFormat>(p3), static_cast<Uint32>(p4), sdl3_volume));
+
+    Uint32 len = p3;
+    int volume = p4;
 
     if (SDLver == 2) {
         /* SDL_MixAudio uses the opened audio device, but we don't open any,
@@ -606,10 +612,12 @@ void SDL_MixAudio(Uint8 * dst, const Uint8 * src, Uint32 len, int volume)
          * and instead let us specify the audio format.
          */
 
-        return ORIG_SDL2_CALL(SDL_MixAudioFormat, (dst, src, audioFormat, len, volume));
+        ORIG_SDL2_CALL(SDL_MixAudioFormat, (dst, src, audioFormat, len, volume));
+        return true;
     }
 
-    return ORIG_SDL2_CALL(SDL_MixAudio, (dst, src, len, volume));
+    ORIG_SDL2_CALL(SDL_MixAudio, (dst, src, len, volume));
+    return true;
 }
 
 /* Override */ float SDL_GetAudioDeviceGain(sdl3::SDL_AudioDeviceID devid)

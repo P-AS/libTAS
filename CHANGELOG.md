@@ -300,6 +300,11 @@
 * Fix the joystick of an open SDL game controller being treated as closed
 * Fix SDL_SetWindowResizable() and SDL_SetWindowBordered() returning a garbage
   value to SDL3 games
+* Fix SDL_RenderPresent(), SDL_SetWindowTitle() and SDL_AddEventWatch()
+  returning a garbage value to SDL3 games
+* Fix SDL_MixAudio() reading the wrong arguments and calling the wrong function
+  in SDL3 games
+* Fix SDL3 not being detected in SDL_Init(), which disabled inputs of the game
 
 ## [1.4.8] - 2026-05-14
 ### Added

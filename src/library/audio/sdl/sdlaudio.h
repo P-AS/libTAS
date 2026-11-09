@@ -551,8 +551,12 @@ OVERRIDE bool SDL_AudioDevicePaused(sdl3::SDL_AudioDeviceID devid);
  *  for full audio volume.  Note this does not change hardware volume.
  *  This is provided for convenience -- you can mix your own audio data.
  */
-OVERRIDE void SDL_MixAudio(Uint8 * dst, const Uint8 * src,
-                                          Uint32 len, int volume);
+/* The signature differs between versions, and this covers both:
+ * SDL1/SDL2: (dst, src, Uint32 len, int volume)
+ * SDL3:      (dst, src, SDL_AudioFormat format, Uint32 len, float volume)
+ * Integer and floating-point arguments are passed separately, so that p3 and p4
+ * hold the integer arguments of both, and sdl3_volume is not read for SDL1/SDL2. */
+OVERRIDE bool SDL_MixAudio(Uint8 * dst, const Uint8 * src, Uint32 p3, int p4, float sdl3_volume);
 
 /**
  *  This works like SDL_MixAudio(), but you specify the audio format instead of

@@ -80,10 +80,17 @@ SDL_Renderer *sdl3::SDL_CreateRenderer(SDL_Window *window, const char *name)
     ORIG_SDL23_CALL(SDL_DestroyRenderer, (renderer));
 }
 
-/* Override */ void SDL_RenderPresent(SDL_Renderer * renderer)
+/* Override */ bool SDL_RenderPresent(SDL_Renderer * renderer)
 {
-    if (GlobalState::isNative())
-        return ORIG_SDL23_CALL(SDL_RenderPresent, (renderer));
+    if (GlobalState::isNative()) {
+        if (get_sdlversion() == 3)
+            return ORIG_SDL3_CALL(SDL_RenderPresent, (renderer));
+        ORIG_SDL2_CALL(SDL_RenderPresent, (renderer));
+        return true;
+    }
+
+    /* The return value is only read by SDL3 games */
+    bool ret = true;
 
     LOGTRACE_SIMPLE(LCF_SDL | LCF_WINDOW);
 
@@ -91,13 +98,15 @@ SDL_Renderer *sdl3::SDL_CreateRenderer(SDL_Window *window, const char *name)
     if (Global::game_info.video & GameInfo::SDL3_RENDERER) {
         static RenderHUD_SDL3_renderer renderHUD;
         renderHUD.setRenderer(renderer);
-        frameBoundary([&] () {NATIVECALL(ORIG_SDL3_CALL(SDL_RenderPresent, (renderer)));}, renderHUD);
+        frameBoundary([&] () {NATIVECALL(ret = ORIG_SDL3_CALL(SDL_RenderPresent, (renderer)));}, renderHUD);
     }
     else {
         static RenderHUD_SDL2_renderer renderHUD;
         renderHUD.setRenderer(renderer);
         frameBoundary([&] () {NATIVECALL(ORIG_SDL2_CALL(SDL_RenderPresent, (renderer)));}, renderHUD);
     }
+
+    return ret;
 }
 
 static int logical_w = 0;

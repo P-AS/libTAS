@@ -518,12 +518,15 @@ sdl3::SDL_WindowFlags sdl3::SDL_GetWindowFlags(SDL_Window *window)
     return flags;
 }
 
-/* Override */ void SDL_SetWindowTitle(SDL_Window * window, const char *title)
+/* Override */ bool SDL_SetWindowTitle(SDL_Window * window, const char *title)
 {
     LOGTRACE(LCF_SDL | LCF_WINDOW, "%s call with title %s", __func__, title?title:"[null]");
 
     WindowTitle::setOriginalTitle(title);
     WindowTitle::setUpdateFunc([window] (const char* t) {ORIG_SDL23_CALL(SDL_SetWindowTitle, (window, t));});
+
+    /* The return value is only read by SDL3 games */
+    return true;
 }
 
 /* Override */ void SDL_WM_SetCaption(const char *title, const char *icon)

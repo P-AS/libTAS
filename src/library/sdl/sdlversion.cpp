@@ -99,13 +99,13 @@ int get_sdlversion(void)
     /* If not, determine which library was already dynamically loaded. */
     void *sdl1_handle, *sdl2_handle, *sdl3_handle;
 #ifdef __unix__
-    NATIVECALL(sdl1_handle = dlopen("libSDL-1.2.so.0", RTLD_NOLOAD));
-    NATIVECALL(sdl2_handle = dlopen("libSDL2-2.0.so.0", RTLD_NOLOAD));
-    NATIVECALL(sdl3_handle = dlopen("libSDL3.so.0", RTLD_NOLOAD));
+    NATIVECALL(sdl1_handle = dlopen("libSDL-1.2.so.0", RTLD_LAZY | RTLD_NOLOAD));
+    NATIVECALL(sdl2_handle = dlopen("libSDL2-2.0.so.0", RTLD_LAZY | RTLD_NOLOAD));
+    NATIVECALL(sdl3_handle = dlopen("libSDL3.so.0", RTLD_LAZY | RTLD_NOLOAD));
 #elif defined(__APPLE__) && defined(__MACH__)
-    NATIVECALL(sdl1_handle = dlopen("libSDL-1.2.0.dylib", RTLD_NOLOAD));
-    NATIVECALL(sdl2_handle = dlopen("libSDL2-2.0.0.dylib", RTLD_NOLOAD));
-    NATIVECALL(sdl3_handle = dlopen("libSDL3.so.0", RTLD_NOLOAD));
+    NATIVECALL(sdl1_handle = dlopen("libSDL-1.2.0.dylib", RTLD_LAZY | RTLD_NOLOAD));
+    NATIVECALL(sdl2_handle = dlopen("libSDL2-2.0.0.dylib", RTLD_LAZY | RTLD_NOLOAD));
+    NATIVECALL(sdl3_handle = dlopen("libSDL3.so.0", RTLD_LAZY | RTLD_NOLOAD));
 #endif
 
     if (sdl1_handle && !sdl2_handle && !sdl3_handle) {

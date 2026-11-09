@@ -62,7 +62,7 @@ OVERRIDE void SDL_DestroyRenderer(SDL_Renderer * renderer);
 /**
  *  \brief Update the screen with rendering performed.
  */
-OVERRIDE void SDL_RenderPresent(SDL_Renderer * renderer);
+OVERRIDE bool SDL_RenderPresent(SDL_Renderer * renderer);
 
 /**
  *  \brief Set device independent resolution for rendering

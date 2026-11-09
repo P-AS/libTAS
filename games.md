@@ -327,6 +327,11 @@ of `lsdl2srb2legacy` (save at 520, load at 570) gives the same picture at frame
   `mySDL_GameControllerIsOpen()`. Setting `joyids` would be closer to real SDL,
   but would add `SDL_JOY*` events and could desync existing movies, so these
   events are still not generated.
+- `utils/simplestgame.c` (SDL2) and `utils/simplestsdl3game.c` (SDL3) are minimal
+  games with the SDL renderer: `gcc utils/simplestsdl3game.c -o
+  utils/simplestsdl3game $(pkg-config --cflags --libs sdl3)`. The arrow keys move
+  the square, so a Lua script calling `input.setKey()` from `callback.onInput()`
+  checks that inputs reach the game. Lua `print()` doesn't go to stdout.
 - With a fresh `XDG_CONFIG_HOME`, add `-s allow_downloads=0` (or `1`): `-n` still
   shows the libraries download dialog when the setting was never answered, and
   nothing happens, without any window from the game or a line in the output.
@@ -380,6 +385,9 @@ of `lsdl2srb2legacy` (save at 520, load at 570) gives the same picture at frame
 
 ## Open problems
 
+- SDL3: `sdl3::SDL_EventFilter` is declared as returning `int`, but it returns a
+  `bool` in SDL3, so a filter that returns false can be read as true, and the
+  event is kept (seen with a filter using `sete %al`).
 - La-Mulana: one non-draw frame around the handover of the main thread moves
   between frames 280 and 283 (about 1 run out of 4; 6 out of 20 in the last
   count). It happens when the system thread hands over to the logic thread,

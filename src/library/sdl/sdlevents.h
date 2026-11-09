@@ -155,7 +155,7 @@ OVERRIDE SDL_bool SDL_GetEventFilter(sdl2::SDL_EventFilter * filter, void **user
 /**
  *  Add a function which is called when an event is added to the queue.
  */
-OVERRIDE void SDL_AddEventWatch(sdl2::SDL_EventFilter filter, void *userdata);
+OVERRIDE bool SDL_AddEventWatch(sdl2::SDL_EventFilter filter, void *userdata);
 
 /**
  *  Remove an event watch function added with SDL_AddEventWatch()
