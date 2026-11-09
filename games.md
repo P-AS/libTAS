@@ -148,7 +148,7 @@ Reasons, from the traces:
 
 ### The `sleep_handling=3` mode
 
-Design, in `DeterministicTimer`, `transfer_sleep()` and `SDL_PollEvent()`:
+Added in `55b694ae`. Design, in `DeterministicTimer`, `transfer_sleep()` and `SDL_PollEvent()`:
 
 - A sleep of a secondary thread calls `waitDeterministicDelay()`: it ends when
   the game time has advanced by its duration, and does not add to the delay.
@@ -267,7 +267,7 @@ savefile list, and `SaveFileList::openSaveFile()` already holds it while
 froze; La-Mulana stayed on a black screen in `createNandArea()` while frames kept
 advancing (the stack is the giveaway, `SaveFile::open` then `debuglogfull` then
 `fileno`). `GlobalNoLog` only disables logging, not the hooks, so it needs
-`NATIVECALL`.
+`NATIVECALL` (fixed in `55b694ae`).
 
 ### Steam
 
