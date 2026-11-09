@@ -321,6 +321,12 @@ of `lsdl2srb2legacy` (save at 520, load at 570) gives the same picture at frame
   `bool` only sets the lowest 8, so false could be read as true (`SDL_bool` was
   `bool` from 3905f3b8 on, for SDL3 aliases). An SDL3 function cannot be an alias
   of a `SDL_bool` function without a compiler warning, so it wraps it instead.
+  Fixed in 62e2f6cd.
+- Opening an SDL game controller doesn't set `joyids`, unlike real SDL which
+  opens its joystick. The joystick hooks accept it through
+  `mySDL_GameControllerIsOpen()`. Setting `joyids` would be closer to real SDL,
+  but would add `SDL_JOY*` events and could desync existing movies, so these
+  events are still not generated.
 - With a fresh `XDG_CONFIG_HOME`, add `-s allow_downloads=0` (or `1`): `-n` still
   shows the libraries download dialog when the setting was never answered, and
   nothing happens, without any window from the game or a line in the output.

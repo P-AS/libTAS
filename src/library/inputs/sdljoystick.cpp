@@ -18,6 +18,7 @@
  */
 
 #include "sdljoystick.h"
+#include "sdlgamecontroller.h"
 #include "inputs.h"
 
 #include "logging.h"
@@ -52,7 +53,10 @@ static bool isIdValidOpen(SDL_Joystick* joy)
     if (!isIdValid(joy))
         return false;
     int *joyid = reinterpret_cast<int*>(joy);
-    if (joyids[*joyid] == -1)
+    /* The joystick of an open game controller is usable without opening it,
+     * see SDL_GameControllerGetJoystick(). This doesn't set joyids, because
+     * it would generate joystick events that were not generated before. */
+    if (joyids[*joyid] == -1 && !mySDL_GameControllerIsOpen(*joyid))
         return false;
     return true;
 }
@@ -222,8 +226,8 @@ const char* joyname = "Microsoft X-Box 360 pad";
     if (joyid >= Global::shared_config.nb_controllers)
         return NULL;
     if (joyids[joyid] == -1)
-        /* Device not opened */
-        return NULL;
+        /* Device not opened, except if it belongs to an open game controller */
+        return reinterpret_cast<SDL_Joystick*>(libtas::SDL_GameControllerFromInstanceID(joyid));
 
     return reinterpret_cast<SDL_Joystick*>(&joyids[joyid]);
 }
@@ -721,6 +725,10 @@ static const int joyevents3[] = {
         return;
 
     int *joyid = reinterpret_cast<int*>(joystick);
+
+    /* The joystick of a game controller is closed with the controller */
+    if (joyids[*joyid] == -1)
+        return;
 
     /* Decrease the ref count */
     refids[*joyid]--;

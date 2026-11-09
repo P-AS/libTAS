@@ -297,6 +297,9 @@
   SDL2 renderer OSD, and remove the RTLD_NEXT warnings from the OSD
 * Fix SDL2 hooks returning SDL_bool values that games could read as true when
   they were false
+* Fix the joystick of an open SDL game controller being treated as closed
+* Fix SDL_SetWindowResizable() and SDL_SetWindowBordered() returning a garbage
+  value to SDL3 games
 
 ## [1.4.8] - 2026-05-14
 ### Added

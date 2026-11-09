@@ -361,7 +361,7 @@ OVERRIDE void SDL_WM_SetCaption(const char *title, const char *icon);
  *
  *  \sa SDL_GetWindowFlags()
  */
-OVERRIDE void SDL_SetWindowBordered(SDL_Window * window, SDL_bool bordered);
+OVERRIDE bool SDL_SetWindowBordered(SDL_Window * window, SDL_bool bordered);
 
 /**
  * Set the user-resizable state of a window.
@@ -379,7 +379,7 @@ OVERRIDE void SDL_SetWindowBordered(SDL_Window * window, SDL_bool bordered);
  *
  * \sa SDL_GetWindowFlags
  */
-OVERRIDE void SDL_SetWindowResizable(SDL_Window * window, SDL_bool resizable);
+OVERRIDE bool SDL_SetWindowResizable(SDL_Window * window, SDL_bool resizable);
 
 OVERRIDE int SDL_SetWindowFullscreen(std::uintptr_t p1, std::uintptr_t p2);
 

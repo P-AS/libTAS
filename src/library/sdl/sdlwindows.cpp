@@ -598,16 +598,18 @@ int SDL_SetWindowFullscreen(std::uintptr_t p1, std::uintptr_t p2)
     return 0; // success
 }
 
-/* Override */ void SDL_SetWindowResizable(SDL_Window * window, SDL_bool resizable)
+/* Override */ bool SDL_SetWindowResizable(SDL_Window * window, SDL_bool resizable)
 {
     LOGTRACE(LCF_SDL | LCF_WINDOW, "%s call with resizable %d", __func__, resizable);
-    /* Don't do anything */
+    /* Don't do anything. The return value is only read by SDL3 games. */
+    return true;
 }
 
-/* Override */ void SDL_SetWindowBordered(SDL_Window * window, SDL_bool bordered)
+/* Override */ bool SDL_SetWindowBordered(SDL_Window * window, SDL_bool bordered)
 {
     LOGTRACE(LCF_SDL | LCF_WINDOW, "%s call with border %d", __func__, bordered);
-    /* Don't do anything */
+    /* Don't do anything. The return value is only read by SDL3 games. */
+    return true;
 }
 
 int SDL_CreateWindowAndRenderer(std::uintptr_t p1, std::uintptr_t p2, std::uintptr_t p3, std::uintptr_t p4, std::uintptr_t p5, std::uintptr_t p6, std::uintptr_t p7)

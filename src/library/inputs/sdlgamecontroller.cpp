@@ -45,6 +45,11 @@ bool mySDL_GameControllerIsAttached(int index)
     return attached[index];
 }
 
+bool mySDL_GameControllerIsOpen(int index)
+{
+    return gcids[index] != -1;
+}
+
 void mySDL_GameControllerChangeAttached(int index)
 {
     attached[index] = !attached[index];

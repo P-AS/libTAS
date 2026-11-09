@@ -31,6 +31,7 @@ namespace libtas {
 
 /* Own methods to gather or change the attached state */
 bool mySDL_GameControllerIsAttached(int index);
+bool mySDL_GameControllerIsOpen(int index);
 
 void mySDL_GameControllerChangeAttached(int index);
 
