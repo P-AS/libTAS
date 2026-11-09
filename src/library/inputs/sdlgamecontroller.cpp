@@ -131,7 +131,10 @@ bool mySDL_GameControllerReportEvents(int index)
     return SDL_FALSE;
 }
 
-/* Override */ bool SDL_IsGamepad(sdl3::SDL_JoystickID instance_id) __attribute__((alias("SDL_IsGameController")));
+/* Override */ bool SDL_IsGamepad(sdl3::SDL_JoystickID instance_id)
+{
+    return SDL_IsGameController(instance_id);
+}
 
 /* Override */ SDL_GameController *SDL_GameControllerOpen(int joystick_index)
 {
@@ -298,7 +301,10 @@ static char* duplicateMapping()
     return SDL_TRUE;
 }
 
-/* Override */ bool SDL_GamepadConnected(SDL_Gamepad *gamepad) __attribute__((alias("SDL_GameControllerGetAttached")));
+/* Override */ bool SDL_GamepadConnected(SDL_Gamepad *gamepad)
+{
+    return SDL_GameControllerGetAttached(reinterpret_cast<SDL_GameController*>(gamepad));
+}
 
 /* Override */ int SDL_GameControllerEventState(int state)
 {
@@ -428,7 +434,10 @@ static const int gcevents3[] = {
     return SDL_TRUE;
 }
 
-/* Override */ bool SDL_GamepadHasAxis(SDL_Gamepad *gamepad, sdl3::SDL_GamepadAxis axis) __attribute__((alias("SDL_GameControllerHasAxis")));
+/* Override */ bool SDL_GamepadHasAxis(SDL_Gamepad *gamepad, sdl3::SDL_GamepadAxis axis)
+{
+    return libtas::SDL_GameControllerHasAxis(reinterpret_cast<SDL_GameController*>(gamepad), static_cast<sdl2::SDL_GameControllerAxis>(axis));
+}
 
 /* Override */ Sint16 SDL_GameControllerGetAxis(SDL_GameController *gamecontroller,
                                           sdl2::SDL_GameControllerAxis axis)
@@ -523,7 +532,10 @@ SDL_GameControllerGetBindForButton(SDL_GameController *gamecontroller,
     return SDL_TRUE;
 }
 
-/* Override */ bool SDL_GamepadHasButton(SDL_Gamepad *gamepad, sdl3::SDL_GamepadButton button) __attribute__((alias("SDL_GameControllerHasButton")));
+/* Override */ bool SDL_GamepadHasButton(SDL_Gamepad *gamepad, sdl3::SDL_GamepadButton button)
+{
+    return libtas::SDL_GameControllerHasButton(reinterpret_cast<SDL_GameController*>(gamepad), static_cast<sdl2::SDL_GameControllerButton>(button));
+}
 
 /* Override */ Uint8 SDL_GameControllerGetButton(SDL_GameController *gamecontroller,
                                                  sdl2::SDL_GameControllerButton button)
@@ -564,7 +576,10 @@ SDL_GameControllerGetBindForButton(SDL_GameController *gamecontroller,
     return SDL_FALSE;
 }
 
-/* Override */ bool SDL_GamepadHasSensor(SDL_Gamepad *gamepad, sdl3::SDL_SensorType type) __attribute__((alias("SDL_GameControllerHasSensor")));
+/* Override */ bool SDL_GamepadHasSensor(SDL_Gamepad *gamepad, sdl3::SDL_SensorType type)
+{
+    return libtas::SDL_GameControllerHasSensor(reinterpret_cast<SDL_GameController*>(gamepad), static_cast<sdl2::SDL_SensorType>(type));
+}
 
 /* Override */ int SDL_GameControllerSetSensorEnabled(SDL_GameController *gamecontroller, sdl2::SDL_SensorType type, SDL_bool enabled)
 {
@@ -584,7 +599,10 @@ SDL_GameControllerGetBindForButton(SDL_GameController *gamecontroller,
     return SDL_FALSE;
 }
 
-/* Override */ bool SDL_GamepadSensorEnabled(SDL_Gamepad *gamepad, sdl3::SDL_SensorType type) __attribute__((alias("SDL_GameControllerIsSensorEnabled")));
+/* Override */ bool SDL_GamepadSensorEnabled(SDL_Gamepad *gamepad, sdl3::SDL_SensorType type)
+{
+    return libtas::SDL_GameControllerIsSensorEnabled(reinterpret_cast<SDL_GameController*>(gamepad), static_cast<sdl2::SDL_SensorType>(type));
+}
 
 /* Override */ float SDL_GameControllerGetSensorDataRate(SDL_GameController *gamecontroller, sdl2::SDL_SensorType type)
 {

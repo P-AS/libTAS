@@ -376,7 +376,10 @@ sdl2::SDL_JoystickGUID nullGUID   = {{0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x
     return SDL_TRUE;
 }
 
-/* Override */ bool SDL_JoystickConnected(SDL_Joystick *joystick) __attribute__((alias("SDL_JoystickGetAttached")));
+/* Override */ bool SDL_JoystickConnected(SDL_Joystick *joystick)
+{
+    return SDL_JoystickGetAttached(joystick);
+}
 
 /* Override */ int SDL_JoystickOpened(int device_index)
 {

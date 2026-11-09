@@ -52,11 +52,11 @@ typedef int16_t Sint16;
 typedef int32_t Sint32;
 typedef int64_t Sint64;
 
-/* In SDL3, they changed the type SDL_bool to bool. However, SDL_bool was defined as int.
- * To be able to define SDL3 functions as aliases of SDL2 functions, we need the same signature.
- * So I changed SDL_bool type from int to bool. */
-//typedef int SDL_bool;
-typedef bool SDL_bool;
+/* SDL_bool must stay an int to match the SDL2 ABI: games read all 32 bits of a
+ * returned value, and returning a bool only sets the lowest 8 bits.
+ * SDL3 changed this type to bool. A hook shared by both versions can still use
+ * SDL_bool: it returns 0 or 1, and SDL3 callers only read the lowest 8 bits. */
+typedef int SDL_bool;
 
 enum {
     SDL_FALSE = 0,

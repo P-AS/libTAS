@@ -295,6 +295,8 @@
 * Fix a crash at game exit when libraries log during their teardown
 * Fix SDL2 hooks replacing the wrong functions on Linux, which also broke the
   SDL2 renderer OSD, and remove the RTLD_NEXT warnings from the OSD
+* Fix SDL2 hooks returning SDL_bool values that games could read as true when
+  they were false
 
 ## [1.4.8] - 2026-05-14
 ### Added

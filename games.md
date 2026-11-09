@@ -313,9 +313,14 @@ of `lsdl2srb2legacy` (save at 520, load at 570) gives the same picture at frame
   the SDL header that defined it: from index 622 on, hooks and `ORIG_SDL2_*`
   calls were one or two slots off (`SDL_RenderGeometryRaw` called
   `SDL_RenderGeometry`, so no OSD, and `SDL_wcsdup` reached the rumble hook).
+  Fixed in 7a83edac.
   To check, read each exported wrapper with `objdump -d`: its `jmp
   *slot(%rip)` gives the real slot, and `slot - index*8` must be the same value
   for all functions.
+- `SDL_bool` must stay an `int`: SDL2 games read 32 bits, and a hook returning a
+  `bool` only sets the lowest 8, so false could be read as true (`SDL_bool` was
+  `bool` from 3905f3b8 on, for SDL3 aliases). An SDL3 function cannot be an alias
+  of a `SDL_bool` function without a compiler warning, so it wraps it instead.
 - With a fresh `XDG_CONFIG_HOME`, add `-s allow_downloads=0` (or `1`): `-n` still
   shows the libraries download dialog when the setting was never answered, and
   nothing happens, without any window from the game or a line in the output.
