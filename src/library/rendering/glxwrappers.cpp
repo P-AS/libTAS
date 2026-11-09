@@ -32,6 +32,7 @@
 #include "GlobalState.h"
 #include "wine/winehook.h"
 #include "wine/win32u.h"
+#include "general/dlhook.h"
 
 #define GLX_GLXEXT_PROTOTYPES
 #define GL_GLEXT_PROTOTYPES
@@ -375,6 +376,13 @@ void glXSwapBuffers( Display *dpy, XID drawable )
         if (width && height)
             ScreenCapture::setDrawnSize(width, height);
     }
+    /* A private SDL library of sdl12-compat or sdl2-compat presents outside of
+     * the frames of the game, for example when setting the video mode */
+    if (isSDLCompatInternal(__builtin_return_address(0))) {
+        NATIVECALL(glProcs.XSwapBuffers(dpy, drawable));
+        return;
+    }
+
     /* Start the frame boundary and pass the function to draw */
     static RenderHUD_GL renderHUD;
     frameBoundary([&] () {

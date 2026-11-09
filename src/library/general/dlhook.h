@@ -83,6 +83,14 @@ void *find_sym(const char* name);
 /* Return if the game uses sdl2-compat, which implements SDL2 on top of SDL3 */
 bool isSDL2Compat();
 
+/* Return if the game uses sdl12-compat, which implements SDL1 on top of SDL2 */
+bool isSDL12Compat();
+
+/* Return if this address is inside a private SDL library of sdl12-compat or
+ * sdl2-compat, or inside one of these compat libraries when it isn't the one used
+ * by the game. */
+bool isSDLCompatInternal(void* addr);
+
 OVERRIDE void *dlopen(const char *file, int mode) __THROW;
 OVERRIDE void *dlsym(void *handle, const char *name) __THROW;
 

@@ -154,18 +154,14 @@ void transfer_sleep(const struct timespec &ts, struct timespec *rem)
     return 0;
 }
 
-/* The SDL3 library used by sdl2-compat sleeps internally where the regular SDL2
- * library doesn't, for example when creating a window. Adding these to the game
- * time would add non-draw frames and desync movies, so they must not count.
- * If the main thread keeps sleeping there, SDL3 may be waiting for a timeout, so
- * we let them count to prevent a softlock. */
-static bool isSDL2CompatInternalSleep(void* caller)
+/* The private SDL libraries of sdl2-compat and sdl12-compat sleep internally where
+ * the regular SDL library doesn't, for example when creating a window. Adding these
+ * to the game time would add non-draw frames and desync movies, so they must not
+ * count. If the main thread keeps sleeping there, it may be waiting for a timeout,
+ * so we let them count to prevent a softlock. */
+static bool isSDLCompatInternalSleep(void* caller)
 {
-    if (!isSDL2Compat())
-        return false;
-
-    Dl_info info;
-    if (!dladdr(caller, &info) || !info.dli_fname || !strstr(info.dli_fname, "libSDL3"))
+    if (!isSDLCompatInternal(caller))
         return false;
 
     if (!ThreadManager::isMainThread())
@@ -190,7 +186,7 @@ static bool isSDL2CompatInternalSleep(void* caller)
 
     LOGTRACE(LCF_SLEEP, "%s call - sleep for %d.%09d sec", __func__, requested_time->tv_sec, requested_time->tv_nsec);
 
-    if (isSDL2CompatInternalSleep(__builtin_return_address(0)))
+    if (isSDLCompatInternalSleep(__builtin_return_address(0)))
         return orig::nanosleep(requested_time, remaining);
 
     transfer_sleep(*requested_time, remaining);

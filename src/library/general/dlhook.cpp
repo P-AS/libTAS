@@ -349,33 +349,68 @@ void *find_sym(const char *name) {
 }
 
 static bool sdl2_compat = false;
+static bool sdl12_compat = false;
 
 bool isSDL2Compat()
 {
     return sdl2_compat;
 }
 
+bool isSDL12Compat()
+{
+    return sdl12_compat;
+}
+
+bool isSDLCompatInternal(void* addr)
+{
+    if (!sdl2_compat && !sdl12_compat)
+        return false;
+
+    Dl_info info;
+    if (!dladdr(addr, &info) || !info.dli_fname)
+        return false;
+
+    if (sdl12_compat && (strstr(info.dli_fname, "libSDL-1.2") || strstr(info.dli_fname, "libSDL2-2.0")))
+        return true;
+    return strstr(info.dli_fname, "libSDL3") != nullptr;
+}
+
 /* sdl2-compat is the SDL2 library for the game, and it implements it by loading
- * all functions of its own private SDL3 library. Those have the same names as our
- * hooks, but they must not be hooked: the hooked SDL2 function would call the
- * SDL3 hook, which expects SDL2 arguments or calls back the same function.
- * SDL3 remains unhooked, like the internals of the regular SDL2 library, and
- * we still hook what is below it. Return the real function in this case. */
-static void* findSDL2CompatSym(void *handle, const char *name, void* caller)
+ * all functions of its own private SDL3 library. sdl12-compat does the same for
+ * SDL1 with a private SDL2 library, which can itself be sdl2-compat.
+ * Those have the same names as our hooks, but they must not be hooked: the hooked
+ * function would call another hook, which expects other arguments, calls back the
+ * same function, or runs a frame boundary inside a frame boundary.
+ * The private library remains unhooked, like the internals of a regular SDL
+ * library, and we still hook what is below it. Return the real function in this
+ * case. */
+static void* findSDLCompatSym(void *handle, const char *name, void* caller)
 {
     if (strncmp(name, "SDL_", 4) != 0 || handle == RTLD_DEFAULT || handle == RTLD_NEXT)
         return nullptr;
 
     Dl_info info;
-    if (!dladdr(caller, &info) || !info.dli_fname || !strstr(info.dli_fname, "libSDL2-2.0"))
+    if (!dladdr(caller, &info) || !info.dli_fname)
+        return nullptr;
+
+    bool from_sdl1 = strstr(info.dli_fname, "libSDL-1.2") != nullptr;
+    bool from_sdl2 = strstr(info.dli_fname, "libSDL2-2.0") != nullptr;
+    if (!from_sdl1 && !from_sdl2)
         return nullptr;
 
     void* addr = orig::dlsym(handle, name);
-    if (!addr || !dladdr(addr, &info) || !info.dli_fname || !strstr(info.dli_fname, "libSDL3"))
+    if (!addr || !dladdr(addr, &info) || !info.dli_fname)
         return nullptr;
 
-    sdl2_compat = true;
-    return addr;
+    if (from_sdl1 && strstr(info.dli_fname, "libSDL2-2.0")) {
+        sdl12_compat = true;
+        return addr;
+    }
+    if (from_sdl2 && strstr(info.dli_fname, "libSDL3")) {
+        sdl2_compat = true;
+        return addr;
+    }
+    return nullptr;
 }
 
 void *dlsym(void *handle, const char *name) __THROW {
@@ -383,9 +418,9 @@ void *dlsym(void *handle, const char *name) __THROW {
         get_dlfct_symbols();
     }
 
-    void* sdl2_compat_addr = findSDL2CompatSym(handle, name, __builtin_return_address(0));
-    if (sdl2_compat_addr)
-        return sdl2_compat_addr;
+    void* sdl_compat_addr = findSDLCompatSym(handle, name, __builtin_return_address(0));
+    if (sdl_compat_addr)
+        return sdl_compat_addr;
 
     /* dlsym() does some work besides the actual function, and that may call
      * other hooked functions that themselves call dlsym(). If we detect a recursion,

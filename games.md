@@ -287,7 +287,9 @@ advancing (the stack is the giveaway, `SaveFile::open` then `debuglogfull` then
 - Whether the native events setting matters for input in the uncontrolled run
   (the page says it is needed; the game runs without it).
 
-## sdl2-compat
+## sdl2-compat and sdl12-compat
+
+Fixed in 4cc32a10 for sdl2-compat.
 
 `sdl2-compat` provides `libSDL2-2.0.so.0` and implements it on top of `libSDL3`.
 Its constructor loads SDL3 with `dlopen(RTLD_LOCAL)` and all its functions with
@@ -328,6 +330,29 @@ between both libraries; the rest of the movie was not compared.
 with `-m32` has inputs, the OSD, the same picture over two runs and with a savestate,
 and only the OSD differs from the regular 32-bit SDL2 at frame 200. La-Mulana and
 Shovel Knight are not concerned: they bundle their own SDL2 through their `RPATH`.
+
+`sdl12-compat` provides `libSDL-1.2.so.0` on top of a private `libSDL2`, which can
+itself be sdl2-compat, so that a game can load three SDL libraries. It uses the same
+design: the game is an SDL1 game, `dlsym()` returns the real function when
+`libSDL-1.2` looks up an `SDL_` symbol in `libSDL2-2.0` (`isSDL12Compat()`), and
+`SDL_DYNAPI_entry()` doesn't hook this SDL2. Without this, the game aborted in
+`ImGui::NewFrame()`: sdl12-compat presents with OpenGL inside `SDL_SetVideoMode()`,
+and this swap ran a frame boundary with `RenderHUD_GL`, which created the ImGui
+context. The next `SDL_Flip()` then used the base `RenderHUD`, which starts ImGui
+frames without ever rendering them. Now `glXSwapBuffers()` and `eglSwapBuffers()`
+called from these private libraries (`isSDLCompatInternal()`) only swap, and their
+sleeps don't count either.
+
+libTAS sets `SDL12COMPAT_OPENGL_SCALING=0`: otherwise the OpenGL of the game goes
+to a framebuffer of sdl12-compat, copied to the window at the swap, over our OSD.
+Nothing draws the OSD for an SDL1 game using surfaces (`SDL_Flip()`), as with the
+regular SDL 1.2.
+
+Checked with sdl12-compat 1.2.68 on sdl2-compat, on `simplestsdl12game` (inputs, same
+picture over two runs and with a savestate) and an OpenGL program (OSD). No
+comparison with the regular SDL 1.2 library, which is not available here, so
+movies recorded with it are not checked. There is no 32-bit package of sdl12-compat
+in the repositories, so 32-bit is not tested.
 
 To compare with the regular SDL2 library without uninstalling sdl2-compat, extract an
 `sdl2` package from `/var/cache/pacman/pkg` and export `LD_LIBRARY_PATH` to its
@@ -373,9 +398,10 @@ of `lsdl2srb2legacy` (save at 520, load at 570) gives the same picture at frame
   `mySDL_GameControllerIsOpen()`. Setting `joyids` would be closer to real SDL,
   but would add `SDL_JOY*` events and could desync existing movies, so these
   events are still not generated.
-- `utils/simplestgame.c` (SDL2) and `utils/simplestsdl3game.c` (SDL3) are minimal
-  games with the SDL renderer: `gcc utils/simplestsdl3game.c -o
-  utils/simplestsdl3game $(pkg-config --cflags --libs sdl3)`. The arrow keys move
+- `utils/simplestsdl12game.c` (SDL 1.2), `utils/simplestgame.c` (SDL2) and
+  `utils/simplestsdl3game.c` (SDL3) are minimal games: `gcc
+  utils/simplestsdl3game.c -o utils/simplestsdl3game $(pkg-config --cflags --libs
+  sdl3)`, or `$(sdl-config --cflags --libs)` for SDL 1.2. The arrow keys move
   the square, so a Lua script calling `input.setKey()` from `callback.onInput()`
   checks that inputs reach the game. Lua `print()` doesn't go to stdout.
 - With a fresh `XDG_CONFIG_HOME`, add `-s allow_downloads=0` (or `1`): `-n` still

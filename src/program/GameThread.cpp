@@ -352,6 +352,10 @@ void GameThread::set_env_variables(Context *context, int gameArch)
          * have the correct calling convention. */
         setenv("SDL_DYNAMIC_API", context->libtaspath.c_str(), 1);
         setenv("SDL3_DYNAMIC_API", context->libtaspath.c_str(), 1);
+
+        /* sdl12-compat otherwise draws OpenGL games into its own framebuffer,
+         * which it copies to the window over our OSD. */
+        setenv("SDL12COMPAT_OPENGL_SCALING", "0", 1);
     }
 
     /* Apply user-defined environment variables last so they override previous values. */
