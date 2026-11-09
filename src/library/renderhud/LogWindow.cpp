@@ -25,30 +25,44 @@
 
 namespace libtas {
 
-static ImGuiTextBuffer buffer;
 static ImGuiTextFilter filter;
-static ImVector<int> lineOffsets; // Index to lines offset. We maintain this with AddLog() calls.
+
+struct LogData {
+    ImGuiTextBuffer buffer;
+    ImVector<int> lineOffsets; // Index to lines offset. We maintain this with AddLog() calls.
+};
+
+/* Created on first use and never destroyed. Logs can come before the static
+ * objects of this library are constructed (our constructor can be called from
+ * the dlsym() of a library that initializes before us), and after they are
+ * destroyed (libraries of the game that are torn down at exit and call hooked
+ * functions). */
+static LogData& logData()
+{
+    static LogData* data = new LogData;
+    return *data;
+}
 static bool autoScroll;  // Keep scrolling if already at the bottom.
 static std::mutex mutex;
 
 void LogWindow::clear()
 {
-    buffer.clear();
-    lineOffsets.clear();
-    lineOffsets.push_back(0);
+    logData().buffer.clear();
+    logData().lineOffsets.clear();
+    logData().lineOffsets.push_back(0);
 }
 
 void LogWindow::addLog(const char* beg, const char* end, bool newline)
 {
     /* Logs can be added from multiple threads */
     std::lock_guard<std::mutex> lock(mutex);
-    if (buffer.size() > 1000000) {
+    if (logData().buffer.size() > 1000000) {
         clear();
     }
-    buffer.append(beg, end);
+    logData().buffer.append(beg, end);
     /* We always push a string with at most one `\n` character at the end */
     if (newline)
-        lineOffsets.push_back(buffer.size());
+        logData().lineOffsets.push_back(logData().buffer.size());
 }
 
 void LogWindow::draw(bool* p_open = nullptr)
@@ -88,18 +102,18 @@ void LogWindow::draw(bool* p_open = nullptr)
             ImGui::LogToClipboard();
 
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
-        const char* buf = buffer.begin();
-        const char* buf_end = buffer.end();
+        const char* buf = logData().buffer.begin();
+        const char* buf_end = logData().buffer.end();
         if (filter.IsActive())
         {
             // In this example we don't use the clipper when filter is enabled.
             // This is because we don't have random access to the result of our filter.
             // A real application processing logs with ten of thousands of entries may want to store the result of
             // search/filter.. especially if the filtering function is not trivial (e.g. reg-exp).
-            for (int line_no = 0; line_no < lineOffsets.Size; line_no++)
+            for (int line_no = 0; line_no < logData().lineOffsets.Size; line_no++)
             {
-                const char* line_start = buf + lineOffsets[line_no];
-                const char* line_end = (line_no + 1 < lineOffsets.Size) ? (buf + lineOffsets[line_no + 1] - 1) : buf_end;
+                const char* line_start = buf + logData().lineOffsets[line_no];
+                const char* line_end = (line_no + 1 < logData().lineOffsets.Size) ? (buf + logData().lineOffsets[line_no + 1] - 1) : buf_end;
                 if (filter.PassFilter(line_start, line_end))
                     ImGui::TextUnformatted(line_start, line_end);
             }
@@ -120,13 +134,13 @@ void LogWindow::draw(bool* p_open = nullptr)
             // anymore, which is why we don't use the clipper. Storing or skimming through the search result would make
             // it possible (and would be recommended if you want to search through tens of thousands of entries).
             ImGuiListClipper clipper;
-            clipper.Begin(lineOffsets.Size);
+            clipper.Begin(logData().lineOffsets.Size);
             while (clipper.Step())
             {
                 for (int line_no = clipper.DisplayStart; line_no < clipper.DisplayEnd; line_no++)
                 {
-                    const char* line_start = buf + lineOffsets[line_no];
-                    const char* line_end = (line_no + 1 < lineOffsets.Size) ? (buf + lineOffsets[line_no + 1] - 1) : buf_end;
+                    const char* line_start = buf + logData().lineOffsets[line_no];
+                    const char* line_end = (line_no + 1 < logData().lineOffsets.Size) ? (buf + logData().lineOffsets[line_no + 1] - 1) : buf_end;
                     ImGui::TextUnformatted(line_start, line_end);
                 }
             }

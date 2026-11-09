@@ -65,6 +65,23 @@
 #include <cstdlib>
 #include <filesystem>
 
+/* Names of the sleep handling modes, as shown in the runtime settings */
+static QString sleepHandlingName(int sleep_handling)
+{
+    switch (sleep_handling) {
+        case SharedConfig::SLEEP_NEVER:
+            return "Never advance time";
+        case SharedConfig::SLEEP_MAIN:
+            return "Advance time on main thread";
+        case SharedConfig::SLEEP_ALWAYS:
+            return "Always advance time";
+        case SharedConfig::SLEEP_OTHERS_WAIT:
+            return "Main thread advances time, other threads wait";
+        default:
+            return QString("unknown (%1)").arg(sleep_handling);
+    }
+}
+
 GameLoop::GameLoop(Context* c) : movie(MovieFile(c)), context(c)
 {
 #ifdef __unix__
@@ -258,6 +275,19 @@ void GameLoop::init()
             /* Check md5 match */
             if ((!movie.header->md5_movie.empty()) && (context->md5_game.compare(movie.header->md5_movie) != 0))
                 emit alertToShow(QString("Game executable hash does not match with the hash stored in the movie!"));
+
+            /* Check sleep handling match. It is not stored as a setting of the
+             * movie to enforce, but a movie will not sync with another value.
+             * Don't warn if the user asked to change the settings of the movie. */
+            if ((movie.header->sleep_handling >= 0) && !movie.header->skipLoadSettings &&
+                (movie.header->sleep_handling != context->config.sc.sleep_handling)) {
+                QString alert = QString("Sleep handling does not match with the movie, which may desync: the movie was made with \"%1\", and it is currently \"%2\". Set it in the runtime settings before starting the game.")
+                    .arg(sleepHandlingName(movie.header->sleep_handling))
+                    .arg(sleepHandlingName(context->config.sc.sleep_handling));
+                /* The alert is not shown in non-interactive mode */
+                std::cerr << "Warning: " << alert.toStdString() << std::endl;
+                emit alertToShow(alert);
+            }
 
         }
         else {

@@ -97,6 +97,7 @@ void MovieFileHeader::load()
     context->rerecord_count = config.value("rerecord_count").toUInt();
     authors = config.value("authors").toString().toStdString();
     md5_movie = config.value("md5").toString().toStdString();
+    sleep_handling = config.value("sleep_handling", -1).toInt();
     savestate_framecount = config.value("savestate_frame_count").toULongLong();
 }
 
@@ -153,6 +154,7 @@ void MovieFileHeader::save(uint64_t tot_frames, uint64_t nb_frames)
     config.setValue("savestate_frame_count", static_cast<unsigned long long>(nb_frames));
     config.setValue("auto_restart", context->config.auto_restart);
     config.setValue("variable_framerate", variable_framerate);
+    config.setValue("sleep_handling", context->config.sc.sleep_handling);
 
     if (!context->md5_game.empty())
         config.setValue("md5", context->md5_game.c_str());

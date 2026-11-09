@@ -323,6 +323,37 @@ static pid_t findBusyThread(pid_t self)
 }
 #endif
 
+bool DeterministicTimer::othersWaitForTime() const
+{
+    return (Global::shared_config.sleep_handling == SharedConfig::SLEEP_OTHERS_WAIT) &&
+        !(Global::shared_config.debug_state & SharedConfig::DEBUG_UNCONTROLLED_TIME);
+}
+
+bool DeterministicTimer::hasPendingWake()
+{
+    std::lock_guard<std::mutex> lock(ticks_mutex);
+    for (int i = 0; i < MAX_WAITING_THREADS; i++)
+        if (waiting_used[i] && !(ticks < waiting_deadlines[i]))
+            return true;
+    return false;
+}
+
+void DeterministicTimer::addDelaySynced(struct timespec delayTicks)
+{
+    waitForIdleThreads();
+
+    /* Another thread may have reached a frame boundary while we were waiting,
+     * and taken over the main thread. Adding the delay would then depend on
+     * which thread was the fastest. */
+    if (!ThreadManager::isMainThread()) {
+        waitDeterministicDelay(delayTicks);
+        return;
+    }
+
+    addDelay(delayTicks);
+    waitForIdleThreads();
+}
+
 void DeterministicTimer::waitForIdleThreads(int64_t timeout_ns)
 {
 #ifdef __linux__
@@ -331,8 +362,20 @@ void DeterministicTimer::waitForIdleThreads(int64_t timeout_ns)
     struct timespec start, now;
     NATIVECALL(clock_gettime(CLOCK_MONOTONIC, &start));
 
+    /* Threads that load data between two frames must be waited for, however
+     * long it takes, for the frame of the end of the loading to not depend on
+     * the speed of the machine */
+    const bool others_wait = othersWaitForTime();
+    if (others_wait)
+        timeout_ns = 5000000000LL;
+
     mainWaitingForThreads = true;
-    while (pid_t busy = findBusyThread(self)) {
+    while (!(others_wait && Global::is_exiting)) {
+        pid_t busy = findBusyThread(self);
+        const bool pending = others_wait && hasPendingWake();
+        if (!busy && !pending)
+            break;
+
         NATIVECALL(clock_gettime(CLOCK_MONOTONIC, &now));
         int64_t waited = (now.tv_sec - start.tv_sec) * 1000000000LL + (now.tv_nsec - start.tv_nsec);
         if (waited > timeout_ns) {
@@ -341,6 +384,12 @@ void DeterministicTimer::waitForIdleThreads(int64_t timeout_ns)
             readThreadFile(busy, "wchan", wchan, sizeof(wchan));
             comm[strcspn(comm, "\n")] = '\0';
             LOG(LL_WARN, LCF_WAIT, "Thread %d (%s, wchan %s) still busy after %lld ms", busy, comm, wchan, static_cast<long long>(timeout_ns / 1000000));
+            if (pending) {
+                /* A thread that was cancelled while sleeping */
+                std::lock_guard<std::mutex> lock(ticks_mutex);
+                for (int i = 0; i < MAX_WAITING_THREADS; i++)
+                    waiting_used[i] = false;
+            }
             break;
         }
         struct timespec pause = {0, 100000};
@@ -353,28 +402,62 @@ void DeterministicTimer::waitForIdleThreads(int64_t timeout_ns)
 void DeterministicTimer::waitDeterministicDelay(struct timespec delayTicks)
 {
 #ifdef __linux__
+    const bool others_wait = othersWaitForTime();
     TimeHolder deadline;
+    int slot = -1;
     {
         std::lock_guard<std::mutex> lock(ticks_mutex);
         deadline = ticks + delayTicks;
+        if (others_wait) {
+            for (int i = 0; (i < MAX_WAITING_THREADS) && (slot < 0); i++) {
+                if (!waiting_used[i]) {
+                    slot = i;
+                    waiting_used[i] = true;
+                    waiting_deadlines[i] = deadline;
+                }
+            }
+        }
     }
+
+    /* The main thread can wait for an instant on a lock or on the GPU driver,
+     * which must not end the sleep at a point that depends on the machine. Only
+     * a main thread that stays blocked is waiting for us. */
+    static const int blocked_samples = 500; // about 100 ms
+    int blocked_count = 0;
 
     pid_t main_tid = ThreadManager::getMainThreadTid();
     while (!Global::is_exiting) {
         {
             std::lock_guard<std::mutex> lock(ticks_mutex);
-            if (!(ticks < deadline))
+            /* Wake up after the frame boundary, not while it is running, so
+             * that a savestate never sees a thread in the middle of its work */
+            if (!(ticks < deadline) && !(others_wait && insideFrameBoundary))
                 break;
         }
 
         /* The main thread may be waiting for us (end of a loading), and
          * would never advance the time */
-        if (!insideFrameBoundary && !mainWaitingForThreads && isThreadBlockedOnWait(main_tid))
-            break;
+        if (!insideFrameBoundary && !mainWaitingForThreads && isThreadBlockedOnWait(main_tid)) {
+            if (!others_wait || (++blocked_count >= blocked_samples))
+                break;
+        }
+        else {
+            blocked_count = 0;
+        }
 
         struct timespec pause = {0, 200000};
         NATIVECALL(nanosleep(&pause, nullptr));
     }
+
+    if (slot >= 0) {
+        std::lock_guard<std::mutex> lock(ticks_mutex);
+        waiting_used[slot] = false;
+    }
+
+    /* Time doesn't advance anymore, and a thread that sleeps in a loop must not
+     * become a busy loop during the shutdown of the game */
+    if (others_wait && Global::is_exiting)
+        NATIVECALL(nanosleep(&delayTicks, nullptr));
 #endif
 }
 

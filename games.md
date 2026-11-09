@@ -10,8 +10,8 @@ Tested setup: Arch Linux, Mesa llvmpipe (`opengl_soft=true`), rootful Xwayland
 display, libTAS built from `next` with `cmake`. Games used for testing:
 
 - **La-Mulana** (Steam app 230700, Nigoro, version 1.5.5.2, 32-bit ELF, its
-  own SDL2, OpenAL and `libsteam_api.so` in `lib/`, OpenGL 2). See
-  [La-Mulana](#la-mulana).
+  own SDL2, OpenAL and `libsteam_api.so` in `lib/`, OpenGL 2). Works with
+  `sleep_handling=3` and `virtual_steam=true`, see [La-Mulana](#la-mulana).
 
 ## Basics that matter for a native game
 
@@ -24,11 +24,26 @@ display, libTAS built from `next` with `cmake`. Games used for testing:
   `--libtas32-so-path`:
   `cmake -S . -B /somewhere/build32 -DLIBTAS_I386_LIB_ONLY=ON -DCMAKE_CXX_FLAGS="-O2 -g" -DCMAKE_C_FLAGS="-O2 -g"`.
   Without `-g` nothing in a crash inside `libtas32.so` can be resolved.
+- Audio mixing and encoding need a 32-bit `libswresample` at runtime: without
+  it, the log says `Could not link to swr_alloc, disable audio mixing`, and the
+  game runs silently. The `lib32-ffmpeg` package of the AUR is not used here (it
+  pulls many dependencies, some orphaned, which is a security risk). The libraries
+  of Ubuntu's i386 packages, from a distrobox, work on the host without installing
+  anything: only four files are not already provided by the Arch `lib32-*`
+  packages, and libTAS adds `<datadir>/lib_i386` (`~/.local/share/libTAS/lib_i386`)
+  to the library path of a 32-bit game. libswresample is loaded with `dlopen()`,
+  from `.so.2` to `.so.6`, so there is no need to rebuild:
+  `distrobox enter ubuntu -- sh -c 'cd /usr/lib/i386-linux-gnu && cp -L
+  libswresample.so.6 libavutil.so.60 libsoxr.so.0 libOpenCL.so.1
+  ~/.local/share/libTAS/lib_i386/'` (with `libswresample6:i386` in the box,
+  Ubuntu 26.04). These were tested with `libtas32.so` built with the headers of
+  FFmpeg 9 of Arch and the libraries of FFmpeg 8 of Ubuntu.
 - libTAS has one "main thread": the thread that last reached a frame boundary
   (a buffer swap, or enough accumulated sleep). The frame count, the
   deterministic time and the audio mixing advance only at its boundaries.
   Which threads advance game time with their sleeps is the `sleep_handling`
-  setting (`0` never, `1` only the main thread, `2` every thread). The
+  setting (`0` never, `1` only the main thread, `2` every thread, `3` only the
+  main thread while the other threads wait for the game time). The
   settings of the debug pane are `debug_state` (bits: `1` uncontrolled time,
   `2` native events, `4` keep main thread as first thread, `8` native file
   I/O, `16` native internet); it can be set with `-s debug_state=N` (added
@@ -41,6 +56,12 @@ display, libTAS built from `next` with `cmake`. Games used for testing:
   ini win over `-s` only for the logging keys that the ini holds.
 
 ## La-Mulana
+
+The game works with controlled time: use `sleep_handling=3` ("Main thread
+advances time, other threads wait" in the runtime settings) and
+`virtual_steam=true`. Inputs, movies and savestates work, and runs are
+deterministic (see [Results](#results-with-sleep_handling3)). It needs
+`libtas32.so`.
 
 The TASVideos compatibility page says: "Only run with Uncontrolled time and
 Native events. At least three different threads render on screen". Findings:
@@ -93,7 +114,7 @@ because the ptrace scope is 0.
 | `sleep_handling=2` | frames advance (1400 frames in 26 s, the system thread triggers them with its sleeps), 3 of them draws, then a still picture with a few blue marks (checked over 40 s); state 3, `initDraw` never runs (the system thread is starved, see below) |
 | `sleep_handling=2` with Idle Threads sync (`game_specific_sync=64`), or native events (`debug_state=2`), or `async_events=3` | same as above |
 | `sleep_handling=0` | `initDraw` runs (`0x89688c4 = 2`), but the frame counter stays at 1 (checked 8 s apart): stuck in state 3 |
-| `sleep_handling=2` with the two changes of the prototype below | works with controlled time: state 4, the intro ("Long ago... Before humanity came into existence."), 59.9 fps, 110 non-draw frames in the first 833; the picture at frame 500 is identical in two runs, at frames 900 and 1300 it is not |
+| `sleep_handling=3` | works, deterministic, see below: state 4, the intro, the menu and the village at frame 1500, 60 fps |
 | `debug_state=1` (uncontrolled time), with or without native events | works: state 4, the intro text ("It is where I belong. Children, please help"), 150 to 250 fps, frame counter counts draws |
 
 Reasons, from the traces:
@@ -125,33 +146,105 @@ Reasons, from the traces:
   with `SDL_GetTicks()` called 56 000 times in 766 frames by the thread that
   draws (a spin on the clock), and 1100 `glXMakeCurrent()` pairs.
 
-### Prototype that works with controlled time (not in the tree)
+### The `sleep_handling=3` mode
 
-Two changes, both under `sleep_handling=2`, were enough to get the game
-through loading and into its intro with controlled time (saved as a patch,
-not committed, because they were switched by environment variables):
+Design, in `DeterministicTimer`, `transfer_sleep()` and `SDL_PollEvent()`:
 
-1. In `transfer_sleep()` (`general/sleepwrappers.cpp`), a thread that is not the
-   main thread calls `DeterministicTimer::waitDeterministicDelay(ts)` (it
-   waits until the game time has advanced by the duration of its sleep)
-   instead of `addDelay()`. This is what `ntdll.cpp` already does for the
-   Wine Idle Threads sync. The debt then only comes from the main thread.
-   Alone it deadlocks earlier (state 0): nobody advances the time, because the
-   main thread, until another thread draws, is the first thread.
-2. In `SDL_PollEvent()` (`sdl/sdlevents.cpp`, SDL2 path), after 16
-   consecutive empty polls by the main thread, `addDelay(1 ms)`. The first
-   thread of this game is a pure event pump that spins on `SDL_PollEvent()`, so
-   it is the only thread that can drive the clock before the loading screen
-   draws. libTAS' busy loop detection only counts calls of the time
-   functions.
+- A sleep of a secondary thread calls `waitDeterministicDelay()`: it ends when
+  the game time has advanced by its duration, and does not add to the delay.
+  The debt that made `sleep_handling=2` starve the system thread is gone.
+- 16 empty `SDL_PollEvent()` calls in one frame (`countEmptyPoll()`) count as a
+  1 ms sleep. The first thread is a pure event pump that spins on it, and it is
+  the only thread that can drive the clock before the loading screen draws.
+  Once another thread is main, the pump waits for the next frame instead of
+  spinning. The threshold is per frame, so that a game that drains its queue
+  once per iteration is not affected. Busy loop detection only counts the time
+  functions, so it does not see this loop.
+- The main thread waits for the other threads to be idle before and after each
+  of its sleeps (`addDelaySynced()`) and each frame boundary, for up to 5 s
+  (100 ms for the Idle Threads sync of Wine, which is not enough for loadings).
+  This is what makes the number of frames of a loading independent of the speed
+  of the machine. Before it, a run under CPU load had 84 non-draw frames instead
+  of 89 and another RNG seed (`first_seed` is taken from the time).
+- A sleeping thread is registered with its deadline (`waiting_deadlines`), so
+  that the main thread also waits for a thread that should wake up but has not
+  been scheduled yet, and it wakes up after a frame boundary, not during it, so
+  that a savestate does not catch it in the middle of its work.
+- A sleep is ended early if the main thread stays blocked on a wait for about
+  100 ms, to avoid a deadlock when it waits for that thread. It takes that long
+  because the main thread regularly blocks for an instant on a lock or on the
+  driver, which would end sleeps at a point that depends on the machine.
+- `is_exiting` turns all of this off: time does not advance anymore, so waiting
+  threads do real sleeps and the main thread no longer waits for them. Without
+  it, the sleeping loops become busy loops and the game takes 5 s per sleep to
+  exit, and the movie is not saved in time.
 
-Result: state 4 and the intro, 60 fps. Determinism is not there yet: pausing
-at a fixed frame with a Lua script (`runtime.playPause()` from `onInput`) and
-comparing screenshots of two runs, frame 500 is identical and frames 900 and
-1300 are not. The three game threads (logic, system, music) still interleave
-freely; the time is shared but each thread's work between two frames is not
-synchronized (the Idle Threads sync of `wine.md` does this for Wine games, in
-`NtDelayExecution` only).
+This is a separate mode, and only the code paths above check for it, so that
+the Wine Idle Threads sync behaves as before. The mode implies the waits of
+that sync, so `game_specific_sync=64` is not needed.
+
+### Results with `sleep_handling=3`
+
+Inputs are read on the logic thread with `SDL_GetKeyboardState()` and the SDL
+controller API (`getKeyb()`, `getCont()`), not from the events of the pump
+thread, so they do not race with it. Tested with keys from a Lua script
+(Return, `z` and space to skip the intro and the menu, then arrows to walk and
+jump), which reach the village around frame 1400. Comparison at frame 1500 of
+the screenshot and of a dump of `.data` and `.bss` (1.48M words), ignoring words
+that are pointers in both runs (allocations differ):
+
+| Compared with a live run | Non-pointer differences | Picture |
+|---|---|---|
+| Another live run, and one with 16 busy processes at the same time | 0 | identical |
+| A run that saves at frame 1400 and loads at 1450 (0.12 s and 0.16 s) | 0 | identical except the FPS of the OSD |
+| Playback of the recorded movie, without any live input | 0 | identical except the OSD (`1500/1510`) |
+
+These runs were at normal speed, without fast-forward, on llvmpipe.
+
+Fast-forward (`fastforward=true`) does not change the game state. Frame 1500 has
+no non-pointer difference with the run at normal speed, in about 6 s instead of
+27 s, and the picture is identical (with `fastforward_render=0`) except for the
+FPS of the OSD and the pointer. Longer runs, with random inputs from frame 1500
+(walks, jumps, attacks), leave the village for a room with snakes and pick up
+coins, so that they use the RNG. All of them are compared with a fast-forwarded
+live run, with no non-pointer difference:
+
+| Compared with a live run | Checked at frame |
+|---|---|
+| Another live run | 9000 |
+| A run that saves at frame 7000 and loads at 7500 | 8000 |
+| Playback of the movie recorded at that speed | 8000 |
+
+Audio mixing (see [Basics](#basics-that-matter-for-a-native-game)) was compared
+with encodes, whose decoded audio and raw video were hashed. `audio_mute=true`
+with an encode still mixes, because encoding forces it, without playing anything
+on the speakers. Over 1510 frames with inputs, two runs at normal speed and one
+fast-forwarded have the same audio and the same video on all frames. So does the
+audio of a recorded movie and of its playback. Mixing does not change the game
+state (no non-pointer difference at frame 1500 with a run without mixing). Over
+3800 fast-forwarded frames with the random inputs, two runs have the same audio
+and video. The audio is not silent (-15 dB on average).
+
+A run with 16 busy processes reached frame 7786 before the 30 s limit, and its
+trace is identical to the live run up to there (its memory was not compared).
+No run went past frame 9000, and past frame 1510 nothing was compared with a run
+at normal speed, which would take about 150 s.
+
+### Making a movie
+
+- A movie stores the framerate, the initial times, the time-tracking, the
+  controllers and the mouse, which are enforced when it is loaded. It also stores
+  `sleep_handling`, which is not enforced: libTAS warns when playing the movie
+  with another value (a dialog, and on stderr, as `-n` shows no dialog), except
+  with "Don't enforce movie settings" or for older movies that don't have it.
+  `virtual_steam` is not stored, so it must be given with the movie.
+- All tests started without any file of the game, in a private `XDG_DATA_HOME`.
+  The game keeps `config.ini` and `save/` in `$XDG_DATA_HOME/nigoro/la-mulana`,
+  and reads what is there: "Prevent writing to disk" stops writes, not reads.
+  A movie made with existing files is not expected to sync without the same
+  files (not tested). `XDG_DATA_HOME` also moves the data directory of libTAS,
+  including `lib_i386`, if set for libTAS and not only for the game.
+- Avoid inputs on frames 280 to 283, see Open problems.
 
 ### Logs were lost: the game reopens stderr
 
@@ -167,6 +260,15 @@ reopens or closes its stderr. In the traces, log lines carry the thread id
 (`t:<tid>`, with an `M` suffix for the main thread), which is how the threads
 above were told apart.
 
+The same logging change had a deadlock: to know if the log goes to a terminal,
+`debuglogfull()` called the hooked `fileno()`, which takes the lock of the
+savefile list, and `SaveFileList::openSaveFile()` already holds it while
+`SaveFile::open()` logs. Any game that opened a savefile with `INFO` logs enabled
+froze; La-Mulana stayed on a black screen in `createNandArea()` while frames kept
+advancing (the stack is the giveaway, `SaveFile::open` then `debuglogfull` then
+`fileno`). `GlobalNoLog` only disables logging, not the hooks, so it needs
+`NATIVECALL`.
+
 ### Steam
 
 `main()` calls `SteamAPI_Init()` and shows a message box when it fails
@@ -176,15 +278,39 @@ above were told apart.
 
 ### Not done / not checked
 
-- Inputs: no key or controller was sent to the game.
-- Savestates, movies and determinism: not tested, and there is no
-  deterministic configuration yet.
+- Only a few rooms near the village were played (9000 frames at most), with
+  random inputs: no boss, no save with the in-game tablet, no reload of a save.
+- A controller: only the keyboard was tested.
+- Playing the audio on a real device (`audio_mute=false` was not used, to keep
+  the tests silent). It only sends the mixed samples to ALSA.
+- A real GPU (`opengl_soft=false`).
 - Whether the native events setting matters for input in the uncontrolled run
   (the page says it is needed; the game runs without it).
-- The shutdown crash described in Open problems.
+
+## Regression check of the changes for La-Mulana
+
+Old build (the commit before) against new build, two runs each at normal speed
+with the default sleep handling, comparing the draw/non-draw list and a screenshot
+at a fixed frame:
+
+| Program | Frame | Result |
+|---|---|---|
+| `glxgears` | 300 | same frames, picture differs only in the FPS of the OSD (also between two old runs) |
+| `simplestgame` (no window) | 300 | same frames |
+| `lsdl2srb2legacy` (menu inputs, `-opengl`) | 640 | same frames, no differing pixel in the whole display |
+| Boshy (Wine, private prefix, menu inputs) | 800 | same frames, no differing pixel, with and without Idle Threads sync |
+
+The old build needed `logging_level=2` for these comparisons, because of the
+deadlock on savefiles above: at the level 3, it froze `lsdl2srb2legacy` at frame
+587 (`G_SaveGame()`), and Boshy never reached its first frame. Also, a savestate
+of `lsdl2srb2legacy` (save at 520, load at 570) gives the same picture at frame
+640. Sonic Generations, the main user of Idle Threads sync, was not run.
 
 ## Testing and debugging
 
+- With a fresh `XDG_CONFIG_HOME`, add `-s allow_downloads=0` (or `1`): `-n` still
+  shows the libraries download dialog when the setting was never answered, and
+  nothing happens, without any window from the game or a line in the output.
 - Test in a scratch copy of the game: the game writes next to itself (logs,
   saves) and `LaMulana.bin.x86` is a normal copy of 116 MB. Use a private
   `XDG_CONFIG_HOME` with its own `libTAS.ini` (data, savestate and movie
@@ -212,6 +338,22 @@ above were told apart.
 - Game state: with symbols in the binary, `objdump -d -M intel
   --no-show-raw-insn` and `nm -C` locate the globals and the functions; read
   the globals of the live process through `/proc/<pid>/mem`.
+- Determinism: pause at a fixed frame from Lua (`runtime.playPause()` in
+  `onFrame`), then dump `.data` and `.bss` through `/proc/<pid>/mem` (addresses
+  from `readelf -S`) and compare two runs word by word, with `nm -CS` to name the
+  symbols. Ignore the words that are pointers in both runs. This names the cause
+  directly (`first_seed`, `game_timer`...), and it is much stronger than a
+  screenshot. A trace of a few globals can hide a lot: the state and the counter
+  of La-Mulana do not change with the inputs at all. Crop the screenshots to the
+  game window, and expect differences in the FPS of the OSD and in the pointer.
+- Lua state is unreliable across savestates: keep "already saved" flags in files.
+- Flush Lua files that are watched from outside. Lua buffers its writes, so a
+  trace only moves at multiples of 4096 bytes: two full-render runs looked stuck
+  at the same frame (4238), which looked like a deterministic hang.
+- With `fastforward_render` at its default, the window keeps the last frame that
+  was drawn: a pause at frame 1500 showed frame 1465 (the OSD says so). Use
+  `fastforward_render=0` to compare pictures, at about 140 fps here instead of
+  about 350, or compare memory.
 - shell: zsh does not split an unquoted variable into words, so a list of
   `-s` options in a variable reaches libTAS as one argument
   (`Unknown setting key`). Use a shell function with `"$@"`.
@@ -219,22 +361,18 @@ above were told apart.
 
 ## Open problems
 
-- La-Mulana: turn the prototype into real options and make it deterministic.
-  Ideas: a sleep mode where the sleeps of other threads wait for the game time
-  (a new `sleep_handling` value, with the UI choice), and an option (or an
-  extension of the busy loop detection) so that repeated empty
-  `SDL_PollEvent()` calls of the main thread let time pass. Then make the
-  threads deterministic: the sleeps of the other threads must end at a
-  deterministic point of the main thread (the Idle Threads sync idea, for
-  native sleeps and condition waits). The SDL3 path of `SDL_PollEvent()` and the
-  case where the first thread stops being the main thread also need handling.
-  Not tested: inputs, savestates, a movie, `sleep_handling=2` with other games
-  (it makes all sleeping threads add to the debt, which is a problem by
-  itself for any game with several sleeping threads).
-- Crash at exit with debug logging: during `_dl_fini`, the OpenAL teardown of
-  La-Mulana calls the hooked `pthread_key_delete()`, whose `link_function()`
-  logs through `LogWindow::addLog()` into an ImGui text buffer that is already
-  destroyed (`ImGuiTextBuffer::append`, SIGSEGV in `memcpy`). It only happens
-  when the game exits with a logging level that prints that call.
+- La-Mulana: one non-draw frame around the handover of the main thread moves
+  between frames 280 and 283 (about 1 run out of 4; 6 out of 20 in the last
+  count). It happens when the system thread hands over to the logic thread,
+  which starts to draw while the system thread is still adding its sleeps. The
+  length of the delay is the same, so that the state is identical afterwards
+  (checked at frames 1500 and 9000 between runs with a different position), but an input
+  on these frames (the first frames of the logo, which take no input as far as
+  seen) could be read one game frame apart. Requiring 3 idle scans in a row in
+  `waitForIdleThreads()` did not change it. It disappears with debug logging.
+- The mode only handles the empty polls of `SDL_PollEvent()`. A pump built on
+  another function (`SDL_PeepEvents()`, `XPending()`...) is not detected.
+- `sleep_handling=3` was only tested with La-Mulana. A thread that really spins
+  makes the main thread wait 5 s at each frame (logged as `still busy`).
 - Reading an unchecked result of `createBuffer()` was a crash class in the
   audio hooks (fixed for ALSA, SDL and cubeb, see `wine.md`).

@@ -140,6 +140,7 @@ void RuntimePane::initLayout()
     sleepChoice->addItem(tr("Never advance time"), SharedConfig::SLEEP_NEVER);
     sleepChoice->addItem(tr("Advance time on main thread"), SharedConfig::SLEEP_MAIN);
     sleepChoice->addItem(tr("Always advance time"), SharedConfig::SLEEP_ALWAYS);
+    sleepChoice->addItem(tr("Main thread advances time, other threads wait"), SharedConfig::SLEEP_OTHERS_WAIT);
 
     QGroupBox* asyncBox = new QGroupBox(tr("Asynchronous events"));
     QGridLayout* asyncLayout = new QGridLayout;
@@ -296,7 +297,13 @@ void RuntimePane::initToolTips()
     "waits for another thread to finish by sleeping.<br><br>"
     "<b>Always advance time:</b> Always advance time when a sleep function is "
     "called from any thread. This will likely cause desyncs and odd behaviour, "
-    "but can prevent softlocks in some games."
+    "but can prevent softlocks in some games.<br><br>"
+    "<b>Main thread advances time, other threads wait:</b> A sleep function called "
+    "from a secondary thread ends when the game time has advanced by its duration, "
+    "without advancing time itself, and the main thread waits for the other threads "
+    "to be idle at each frame. Many empty calls of <code>SDL_PollEvent()</code> "
+    "in one frame count as a sleep. Use it for games where several threads sleep, "
+    "and where the thread that draws is not the first one (La-Mulana)."
     "<br><br><em>If unsure, leave this to 'Advance time on main thread'</em>");
 
     asyncJsBox->setTitle("Sync jsdev events");

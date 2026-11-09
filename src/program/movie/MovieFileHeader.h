@@ -64,6 +64,11 @@ public:
     /* Store if movie has variable framerate */
     bool variable_framerate;
 
+    /* Sleep handling that the movie was made with, or -1 if the movie does not
+     * have this information. It is not enforced when loading a movie, the same
+     * way as other runtime settings. */
+    int sleep_handling = -1;
+
 private:
     Context* context;
 

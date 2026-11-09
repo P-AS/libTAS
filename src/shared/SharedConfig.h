@@ -229,6 +229,7 @@ struct __attribute__((packed, aligned(8))) SharedConfig {
         SLEEP_NEVER,
         SLEEP_MAIN,
         SLEEP_ALWAYS,
+        SLEEP_OTHERS_WAIT, // main thread advances time, other threads wait for it
     };
 
     /* How are we handling sleeps */

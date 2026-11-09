@@ -74,6 +74,10 @@
 * Docs: add a guide to run Rayman 2 (GOG, with Ray2Fix) through Wine
 * Add the debug_state setting to the command-line option -s (uncontrolled time,
   native events, ...)
+* Add a sleep handling mode where only the main thread advances time and other
+  threads wait for it, which makes La-Mulana run deterministically
+* Store the sleep handling in movies and warn when playing a movie with another
+  value
 
 ### Changed
 
@@ -287,6 +291,8 @@
   their message waits
 * Silence the repeated Qt text input warning when the UI regains focus on
   Wayland compositors using text-input-v3, such as niri
+* Fix a deadlock when a game opens a savefile while logging is enabled
+* Fix a crash at game exit when libraries log during their teardown
 
 ## [1.4.8] - 2026-05-14
 ### Added

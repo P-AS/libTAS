@@ -188,7 +188,8 @@ void frameBoundary(std::function<void()> draw, RenderHUD& hud)
         ThreadSync::detWait();
     }
 
-    if (Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_IDLE_THREADS) {
+    if ((Global::shared_config.game_specific_sync & SharedConfig::GC_SYNC_IDLE_THREADS) ||
+        DeterministicTimer::get().othersWaitForTime()) {
         DeterministicTimer::get().waitForIdleThreads();
     }
 
@@ -521,7 +522,12 @@ void frameBoundary(std::function<void()> draw, RenderHUD& hud)
     perfTimer.switchTimer(PerfTimer::GameTimer);
 
     detTimer.exitFrameBoundary(); // Also releasing the lock on frame boundary
-    
+
+    /* Threads whose sleep ended with this frame do their work now, and not at
+     * the same time as the next frame of the main thread */
+    if (detTimer.othersWaitForTime())
+        detTimer.waitForIdleThreads();
+
     Profiler::newFrame();
     
     // if ((framecount % 10000) == 9999)

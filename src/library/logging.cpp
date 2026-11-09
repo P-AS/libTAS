@@ -120,7 +120,12 @@ void debuglogfull(LogLevel ll, LogCategoryFlag lcf, const char* file, int line, 
     int size = 0;
 
     /* We only print colors if displayed on a terminal */
-    bool isTerm = isatty(log_stream ? fileno(log_stream) : STDERR_FILENO);
+    /* fileno() is hooked and locks the savefile list, which can be held by this
+     * thread (a log inside SaveFile::open()) */
+    int log_fd = STDERR_FILENO;
+    if (log_stream)
+        NATIVECALL(log_fd = fileno(log_stream));
+    bool isTerm = isatty(log_fd);
     if (isTerm) {
         /* Write the header text in white */
         strncat(s, ANSI_COLOR_LIGHT_GRAY, maxsize-size-1);

@@ -18,6 +18,9 @@
  */
 
 #include "sdlevents.h"
+#include "checkpoint/ThreadManager.h"
+#include "DeterministicTimer.h"
+#include "frame.h"
 #include "sdlversion.h"
 #include "SDLEventQueue.h"
 #include "sdltimer.h"
@@ -305,6 +308,36 @@ void pushNativeSDLEvents(void)
     return 0;
 }
 
+/* A thread that only pumps events spins on SDL_PollEvent() without calling
+ * any time function or sleeping, so that the busy loop detection doesn't see
+ * it. Many empty polls in one frame are treated as a sleep: the main thread
+ * lets the time pass, which is what makes frames until another thread draws,
+ * and other threads wait for the next frame. A loop that drains the queue once
+ * per iteration doesn't reach the threshold. */
+static int countEmptyPoll(int popped)
+{
+    if (!DeterministicTimer::get().othersWaitForTime())
+        return popped;
+
+    static thread_local uint64_t last_frame = 0;
+    static thread_local int empty_polls = 0;
+
+    if (popped || (last_frame != framecount)) {
+        last_frame = framecount;
+        empty_polls = 0;
+    }
+
+    if (!popped && (++empty_polls >= 16)) {
+        empty_polls = 0;
+        struct timespec ts = {0, 1000000};
+        if (ThreadManager::isMainThread())
+            DeterministicTimer::get().addDelaySynced(ts);
+        else
+            DeterministicTimer::get().waitDeterministicDelay(ts);
+    }
+    return popped;
+}
+
 /* Override */ int SDL_PollEvent(sdl2::SDL_Event *event)
 {
     LOGTRACE_SIMPLE(LCF_SDL | LCF_EVENTS);
@@ -323,11 +356,11 @@ void pushNativeSDLEvents(void)
     if (event) {
         /* Fetch one event with update using our helper function */
         if (SDLver == 1)
-            return sdlEventQueue.pop(reinterpret_cast<sdl1::SDL_Event*>(event), 1, sdl1::SDL_ALLEVENTS, true);
+            return countEmptyPoll(sdlEventQueue.pop(reinterpret_cast<sdl1::SDL_Event*>(event), 1, sdl1::SDL_ALLEVENTS, true));
         if (SDLver == 2)
-            return sdlEventQueue.pop(event, 1, sdl2::SDL_FIRSTEVENT, sdl2::SDL_LASTEVENT, true);
+            return countEmptyPoll(sdlEventQueue.pop(event, 1, sdl2::SDL_FIRSTEVENT, sdl2::SDL_LASTEVENT, true));
         if (SDLver == 3)
-            return sdlEventQueue.pop(reinterpret_cast<sdl3::SDL_Event*>(event), 1, sdl3::SDL_EVENT_FIRST, sdl3::SDL_EVENT_LAST, true);
+            return countEmptyPoll(sdlEventQueue.pop(reinterpret_cast<sdl3::SDL_Event*>(event), 1, sdl3::SDL_EVENT_FIRST, sdl3::SDL_EVENT_LAST, true));
     } else {
         /*
          * In the case the event pointer is NULL, SDL doc says to

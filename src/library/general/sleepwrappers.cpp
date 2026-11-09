@@ -39,7 +39,16 @@ DEFINE_ORIG_POINTER(nanosleep)
  * Returns if the call was transfered.
  */
 void transfer_sleep(const struct timespec &ts, struct timespec *rem)
-{    
+{
+    /* Sleeps of secondary threads end when the game time has advanced by their
+     * duration, so that they don't add to the delay that the main thread must
+     * pay with frame boundaries. With several threads that sleep in a loop,
+     * the delay would grow faster than the main thread can pay it. */
+    if (DeterministicTimer::get().othersWaitForTime() && !ThreadManager::isMainThread()) {
+        DeterministicTimer::get().waitDeterministicDelay(ts);
+        return;
+    }
+
     /* Skip sleeping when main thread and fast-forwarding */
     if (!ThreadManager::isMainThread() || !Global::shared_config.fastforward) {
         LINK_NAMESPACE_GLOBAL(nanosleep);
@@ -59,6 +68,12 @@ void transfer_sleep(const struct timespec &ts, struct timespec *rem)
         case SharedConfig::SLEEP_MAIN:
             if (!ThreadManager::isMainThread())
                 return;
+            /* Pass through */
+        case SharedConfig::SLEEP_OTHERS_WAIT:
+            if (DeterministicTimer::get().othersWaitForTime()) {
+                DeterministicTimer::get().addDelaySynced(ts);
+                return;
+            }
             /* Pass through */
         case SharedConfig::SLEEP_ALWAYS:
             DeterministicTimer::get().addDelay(ts);

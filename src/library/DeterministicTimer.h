@@ -87,6 +87,14 @@ public:
     /* Set by the main thread while it waits for other threads to be idle */
     std::atomic<bool> mainWaitingForThreads{false};
 
+    /* Is the sleep handling the one where secondary threads wait for the game
+     * time, and does it apply (time is controlled) */
+    bool othersWaitForTime() const;
+
+    /* Advance time from a sleep of the main thread, leaving the secondary
+     * threads the time to end what they do before and because of it */
+    void addDelaySynced(struct timespec delayTicks);
+
     /* Flush the accumulated timer delay. Used when game is exiting */
 	void flushDelay();
 
@@ -123,6 +131,16 @@ public:
 private:
 
     bool insideFrameBoundary = false;
+
+    /* Deadlines of the secondary threads inside waitDeterministicDelay(), for
+     * the main thread to know that a thread is about to wake up, even if it is
+     * still sleeping. Protected by ticks_mutex. */
+    static const int MAX_WAITING_THREADS = 32;
+    TimeHolder waiting_deadlines[MAX_WAITING_THREADS];
+    bool waiting_used[MAX_WAITING_THREADS] = {};
+
+    /* Is a thread waiting for a deadline that is already reached */
+    bool hasPendingWake();
 
     /* By how much time do we increment the timer, excluding fractional part.
      * It only depends on the framerate setting.
