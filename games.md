@@ -385,9 +385,6 @@ of `lsdl2srb2legacy` (save at 520, load at 570) gives the same picture at frame
 
 ## Open problems
 
-- SDL3: `sdl3::SDL_EventFilter` is declared as returning `int`, but it returns a
-  `bool` in SDL3, so a filter that returns false can be read as true, and the
-  event is kept (seen with a filter using `sete %al`).
 - La-Mulana: one non-draw frame around the handover of the main thread moves
   between frames 280 and 283 (about 1 run out of 4; 6 out of 20 in the last
   count). It happens when the system thread hands over to the logic thread,

@@ -305,6 +305,7 @@
 * Fix SDL_MixAudio() reading the wrong arguments and calling the wrong function
   in SDL3 games
 * Fix SDL3 not being detected in SDL_Init(), which disabled inputs of the game
+* Fix SDL3 event filters not dropping events when returning false
 
 ## [1.4.8] - 2026-05-14
 ### Added

@@ -2938,7 +2938,7 @@ typedef int SDL_errorcode;
 typedef void (*SDL_HintCallback)(void *userdata, const char *name, const char *oldValue, const char *newValue);
 typedef void (*SDL_LogOutputFunction)(void *userdata, int category, SDL_LogPriority priority, const char *message);
 typedef int (*SDL_ThreadFunction)(void *data);
-typedef int (*SDL_EventFilter)(void *userdata, SDL_Event *event);
+typedef bool (*SDL_EventFilter)(void *userdata, SDL_Event *event);
 typedef int (*SDL_CompareCallback)(const void *a, const void *b);
 typedef int SDL_SpinLock;
 typedef int SDL_ThreadPriority;

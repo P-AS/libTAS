@@ -79,7 +79,7 @@ int SDLEventQueue::insert(sdl3::SDL_Event* event)
 
     /* 2. Run the event filter if set, and check the returned value */
     if (filterFunc3 != nullptr) {
-        int isInserted = filterFunc3(filterData, event);
+        bool isInserted = filterFunc3(filterData, event);
         if (!isInserted)
             return 0;
     }
@@ -359,7 +359,7 @@ void SDLEventQueue::applyFilter(sdl3::SDL_EventFilter filter, void* userdata)
         sdl3::SDL_Event* ev = static_cast<sdl3::SDL_Event*>(*it);
 
         /* Run the filter function and check the result */
-        int isKept = filter(userdata, ev);
+        bool isKept = filter(userdata, ev);
         if (!isKept) {
             /* Deleting the object and removing it from the list */
             delete ev;
