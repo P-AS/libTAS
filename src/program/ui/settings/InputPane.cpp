@@ -21,6 +21,7 @@
 #include "tooltip/ToolTipCheckBox.h"
 
 #include "Context.h"
+#include "pointer/GlobalPointer.h"
 
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QGroupBox>
@@ -53,6 +54,18 @@ void InputPane::initLayout()
     mouseLayout->addWidget(mouseGameWarpBox);
     mouseLayout->addWidget(mouseIgnoreWindowCoordsBox);
 
+    mouseOutsideChoice = new QComboBox();
+    mouseOutsideChoice->addItem(tr("Disabled"), GlobalPointer::SOURCE_NONE);
+    mouseOutsideChoice->addItem(tr("Automatic"), GlobalPointer::SOURCE_AUTO);
+    mouseOutsideChoice->addItem(tr("Image capture protocol (sway, Wayfire, COSMIC, niri...)"), GlobalPointer::SOURCE_IMAGE_CAPTURE);
+    mouseOutsideChoice->addItem(tr("KWin script"), GlobalPointer::SOURCE_KWIN);
+    mouseOutsideChoice->addItem(tr("Hyprland IPC"), GlobalPointer::SOURCE_HYPRLAND);
+    mouseOutsideChoice->addItem(tr("Screencast (GNOME, niri)"), GlobalPointer::SOURCE_SCREENCAST);
+
+    QFormLayout* mouseFormLayout = new QFormLayout;
+    mouseFormLayout->addRow(new QLabel(tr("Read mouse outside of windows on Wayland:")), mouseOutsideChoice);
+    mouseLayout->addLayout(mouseFormLayout);
+
     QGroupBox* joyBox = new QGroupBox(tr("Joystick"));
     QFormLayout* joyLayout = new QFormLayout;
     joyLayout->setFormAlignment(Qt::AlignLeft | Qt::AlignTop);
@@ -83,6 +96,7 @@ void InputPane::initSignals()
     connect(mouseGameWarpBox, &QAbstractButton::clicked, this, &InputPane::saveConfig);
     connect(mouseIgnoreWindowCoordsBox, &QAbstractButton::clicked, this, &InputPane::saveConfig);
     connect(joyChoice, static_cast<void (QComboBox::*)(int)>(&QComboBox::activated), this, &InputPane::saveConfig);
+    connect(mouseOutsideChoice, static_cast<void (QComboBox::*)(int)>(&QComboBox::activated), this, &InputPane::saveConfig);
 }
 
 void InputPane::initToolTips()
@@ -93,6 +107,10 @@ void InputPane::initToolTips()
     "This is useful in combination with relative mode, to ease mouse inputs. "
     "On Wayland, the cursor is hidden and held in the game window while the game is running.");
     mouseGameWarpBox->setDescription("Prevents games from warping the mouse cursor.");
+    mouseOutsideChoice->setToolTip(tr("Xwayland only knows the mouse position on X11 windows. This reads it from "
+    "the compositor, so that the game gets the position when the mouse is outside of its window, like on a real X "
+    "server. The screencast shares the screen with libTAS only to read the cursor: it has a cost and you may be "
+    "notified of it, so that Automatic never uses it."));
     mouseIgnoreWindowCoordsBox->setDescription("Always report the game window position as (0,0). "
     "This fixes mouse input in some engines such as Godot.");
 }
@@ -109,6 +127,9 @@ void InputPane::loadConfig()
     mouseGameWarpBox->setChecked(context->config.sc.mouse_prevent_warp);
     mouseIgnoreWindowCoordsBox->setChecked(context->config.sc.mouse_ignore_window_coords);
 
+    int outsideIndex = mouseOutsideChoice->findData(context->config.mouse_outside_source);
+    if (outsideIndex != -1) mouseOutsideChoice->setCurrentIndex(outsideIndex);
+
     int index = joyChoice->findData(context->config.sc.nb_controllers);
     if (index != -1) joyChoice->setCurrentIndex(index);
 }
@@ -119,6 +140,7 @@ void InputPane::saveConfig()
     context->config.mouse_warp = mouseWarpBox->isChecked();
     context->config.sc.mouse_prevent_warp = mouseGameWarpBox->isChecked();
     context->config.sc.mouse_ignore_window_coords = mouseIgnoreWindowCoordsBox->isChecked();
+    context->config.mouse_outside_source = mouseOutsideChoice->currentData().toInt();
 
     context->config.sc.nb_controllers = joyChoice->itemData(joyChoice->currentIndex()).toInt();
     context->config.sc_modified = true;

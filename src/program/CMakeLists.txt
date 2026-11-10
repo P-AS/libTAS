@@ -118,6 +118,12 @@ set(LIBTAS_PROGRAM_SOURCES
     LogOutput.cpp
     KeyMapping.cpp
     KeyMappingXcb.cpp
+    pointer/GlobalPointer.cpp
+    pointer/GlobalPointerHyprland.cpp
+    pointer/GlobalPointerImageCapture.cpp
+    pointer/GlobalPointerKWin.cpp
+    pointer/GlobalPointerScreenCast.cpp
+    pointer/PointerCalibration.cpp
     main.cpp
     SaveState.cpp
     SaveStateList.cpp
@@ -251,6 +257,56 @@ target_include_directories(libTAS PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${PROJECT_BINARY_DIR}
     ${PROJECT_SOURCE_DIR}/src/external/qhexview/include)
+
+# Optional ways of reading the pointer position outside of X11 windows on Wayland
+pkg_check_modules(WAYLAND_CLIENT IMPORTED_TARGET wayland-client)
+pkg_check_modules(WAYLAND_PROTOCOLS wayland-protocols)
+pkg_check_modules(GIO IMPORTED_TARGET gio-2.0)
+pkg_check_modules(PIPEWIRE IMPORTED_TARGET libpipewire-0.3)
+find_program(WAYLAND_SCANNER wayland-scanner)
+
+if(WAYLAND_CLIENT_FOUND AND WAYLAND_PROTOCOLS_FOUND AND WAYLAND_SCANNER)
+    pkg_get_variable(WAYLAND_PROTOCOLS_DIR wayland-protocols pkgdatadir)
+endif()
+if(WAYLAND_PROTOCOLS_DIR AND EXISTS "${WAYLAND_PROTOCOLS_DIR}/staging/ext-image-copy-capture/ext-image-copy-capture-v1.xml")
+    enable_language(C)
+    set(LIBTAS_POINTER_PROTOCOLS
+        staging/ext-foreign-toplevel-list/ext-foreign-toplevel-list-v1
+        staging/ext-image-capture-source/ext-image-capture-source-v1
+        staging/ext-image-copy-capture/ext-image-copy-capture-v1
+        unstable/xdg-output/xdg-output-unstable-v1)
+    foreach(protocol ${LIBTAS_POINTER_PROTOCOLS})
+        get_filename_component(protocol_name ${protocol} NAME)
+        set(protocol_xml "${WAYLAND_PROTOCOLS_DIR}/${protocol}.xml")
+        set(protocol_header "${CMAKE_CURRENT_BINARY_DIR}/${protocol_name}-client-protocol.h")
+        set(protocol_code "${CMAKE_CURRENT_BINARY_DIR}/${protocol_name}-protocol.c")
+        add_custom_command(OUTPUT ${protocol_header}
+            COMMAND ${WAYLAND_SCANNER} client-header ${protocol_xml} ${protocol_header}
+            DEPENDS ${protocol_xml})
+        add_custom_command(OUTPUT ${protocol_code}
+            COMMAND ${WAYLAND_SCANNER} private-code ${protocol_xml} ${protocol_code}
+            DEPENDS ${protocol_xml})
+        target_sources(libTAS PRIVATE ${protocol_header} ${protocol_code})
+    endforeach()
+    target_include_directories(libTAS PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+    target_compile_definitions(libTAS PRIVATE LIBTAS_HAS_WAYLAND_POINTER)
+    target_link_libraries(libTAS PRIVATE PkgConfig::WAYLAND_CLIENT)
+else()
+    message(STATUS "wayland-client or wayland-protocols >= 1.37 not found, disabling the image capture protocol to read the mouse")
+endif()
+
+if(GIO_FOUND)
+    target_compile_definitions(libTAS PRIVATE LIBTAS_HAS_GIO)
+    target_link_libraries(libTAS PRIVATE PkgConfig::GIO)
+    if(PIPEWIRE_FOUND)
+        target_compile_definitions(libTAS PRIVATE LIBTAS_HAS_SCREENCAST_POINTER)
+        target_link_libraries(libTAS PRIVATE PkgConfig::PIPEWIRE)
+    else()
+        message(STATUS "libpipewire-0.3 not found, disabling the screencast to read the mouse")
+    endif()
+else()
+    message(STATUS "gio-2.0 not found, disabling KWin and the screencast to read the mouse")
+endif()
 
 target_link_libraries(libTAS PRIVATE
     Qt${QT_VERSION_MAJOR}::Core

@@ -418,8 +418,117 @@ program. This is independent of the game, so it also concerns Windows games.
   the pointer stays held. Why the confinement does not limit it here, while it does
   in a small Xlib test, was not investigated.
 
+## Pointer position outside of X11 windows
+
+Rootless Xwayland only knows the position of the pointer on its windows. Elsewhere,
+`XQueryPointer()` keeps returning the last position and success. When the pointer is
+over another X window, it even returns coordinates relative to that window, as
+xwayland-satellite places all windows at (0,0) of the root. A game then gets wrong
+positions, instead of the ones outside of its window that it gets on a real X server.
+
+There is no common Wayland way to get the position, but most compositors have one.
+`src/program/pointer/` has an implementation of `GlobalPointer` for each, selected by
+`mouse_outside_source` (0 disabled, 1 automatic, 2 image capture, 3 KWin, 4 Hyprland,
+5 screencast), and only used on Xwayland (`XWAYLAND` extension):
+
+| Compositor | Way | Tested with |
+|---|---|---|
+| niri >= v26.04-276, cosmic-comp, sway and wlroots, Wayfire, Hyprland | `ext_image_copy_capture` cursor session on each output (`SOURCE_IMAGE_CAPTURE`) | libTAS on niri-git and cosmic-comp, own client on a real niri-git session; sources only for the others |
+| KWin 6.8 | Script loaded over D-Bus, calling us on `workspace.cursorPosChanged` | libTAS |
+| Hyprland | `/cursorpos` on `.socket.sock`, in a new connection each time | Fake socket only; sources |
+| Mutter 51, gnome-shell, niri 26.04 | `org.gnome.Mutter.ScreenCast` with `cursor-mode=2`, read from `SPA_META_Cursor` | libTAS on Mutter; own client on gnome-shell, on a nested niri-git and on a real niri-git session |
+
+Design choices:
+
+- The screencast session is stopped with `Session.Stop` when we are done. Mutter ends
+  it when our D-Bus connection closes, but niri keeps it, listed as inactive in
+  `niri msg casts`.
+- The screencast is never picked automatically: it is a real screencast, with a cost,
+  and users may be notified. A shell extension is not used on GNOME, as it needs a new
+  login to be loaded. `org.gnome.Shell.Eval` returns `(false, '')` outside of
+  `--unsafe-mode`.
+- The screencast only offers formats without a modifier, to get shared memory buffers.
+  We don't look at the images, and with modifiers niri 26.04 stopped the cast (`wrong
+  modifier choice type`): when a single modifier is common with us, it gets one value
+  instead of the list that it expects. This only shows on a real session.
+- A cursor session on a window source is useless: the protocol sends no position for a
+  cursor outside of the source. So we use the outputs.
+- No backend gives the position of the window. `PointerCalibration` compares the
+  position from the compositor with the one from Xwayland while the pointer is on the
+  window, and measures a scale and an offset for each axis. So nothing depends on how a
+  compositor exposes windows, and Xwayland scaling should be handled.
+- We can't rely on the output transform: on the same flipped winit output, niri reports
+  the top-left as (64,40) and cosmic-comp as (64,760). Measuring a negative scale
+  handles this, but not a rotation by 90 degrees.
+- The child of the root in `xcb_query_pointer()` tells if the pointer is on the game:
+  it is the top-level of the window under the pointer, or 0 when it is on no X window
+  (Xwayland resets the sprite trace in `sprite_check_lost_focus()`). This is not enough:
+- Xwayland can keep saying that the pointer is on the window with a stale position, so
+  a sample is only used if Xwayland moved when the compositor did (seen on rootful
+  Xwayland). Before any motion it also gives a meaningless position that it says is on
+  the game, so samples are only used after seeing it move. Otherwise, one bad sample
+  breaks all positions outside of the window.
+- Staleness is "on some axis, the compositor moved and Xwayland did not, since they
+  last agreed, for 3 reads". Only whether each axis moved is compared, as the scale
+  and the direction of an axis may not be known yet. A first version compared with
+  the compositor position at the last Xwayland motion, which broke on Mutter: the
+  screencast is a frame behind Xwayland, so its catch-up looked like a lost pointer
+  and every later position was stale.
+- The first sample may be taken while the pointer moves, and then pair positions of
+  different times (a 3 px offset on Mutter). It is kept until the first sample taken
+  at rest, and the check that rejects samples where only the compositor moved only
+  compares with samples taken at rest, or that bad sample would block all others.
+- Queries never block for long. Wayland and D-Bus events are read without waiting, and
+  Hyprland is given 10 ms before reusing the last position.
+- `mouse_warp` does not use this: while we hold the pointer, it can't leave.
+
+Limits: a window moved while the pointer is outside keeps the old offset until the
+pointer comes back. A scale needs two measurements of at least 64 pixels, taken while
+the pointer rests on the window for 150 ms, and until then it is assumed to be 1. Clicks outside
+the window still go to what is under the pointer. Hyprland only gives the cursor session
+if `ecosystem:enforce_permissions` allows it, but its socket does not need this.
+
+Testing: a niri nested in headless weston only offers the Mutter D-Bus interfaces with
+`debug { dbus-interfaces-in-non-session-instances; }` in its config, run inside its own
+`dbus-run-session`. With shared memory buffers, its screencast then works even without
+a GBM device.
+
+Not done:
+
+- Several monitors are only implemented, not checked: the session of each output and
+  `zxdg_output` for the image capture, `GetCurrentState` for the screencast. Rotated
+  outputs are not handled.
+- Weston: `pointer_position` is only in its test plugin (`weston-test.so`), which is
+  not installed. It would need a plugin of ours passed with `--modules`, so that rootful
+  Xwayland is the answer there.
+- WSLg, an idea not tried, as it needs a Windows machine. WSLg runs a Weston with the
+  RDP backend, and `WSLGd` hardcodes its arguments (`--backend=rdp-backend.so
+  --modules=wslgd-notify.so --xwayland`), so no plugin. Pointer input only comes from
+  mstsc over RDP while the pointer is on one of its windows, so nothing on the Linux
+  side can know the position. But the Windows host knows it, and WSL can start Windows
+  programs (`WSL_INTEROP` being set is also how to detect it):
+  - Build a small `libtas-cursorpos.exe` with mingw, as we already do for the xinput
+    dlls, that prints `GetCursorPos()` when asked on stdin, and start it once so that
+    each query is only a pipe round trip. PowerShell would work to prototype, but takes
+    about a second to start.
+  - This gives Windows virtual screen coordinates. `PointerCalibration` should cope with
+    WSLg scaling as with any compositor, which is the first thing to check, along with
+    `GetPhysicalCursorPos()` on displays with different DPI, and whether window moves on
+    the host are seen as often as the calibration needs.
+  - The helper has to live somewhere Windows can execute, and interop can be disabled
+    (`[interop] enabled=false` in `wsl.conf`), so it must fail quietly.
+
 ## Testing and debugging
 
+- To test `mouse_outside_source`, run libTAS in absolute mouse mode and log
+  `input.getMouseCoords()` from Lua while moving the pointer. A compositor can be nested in
+  the private niri (`cosmic-comp`), or use its own input: `kwin_wayland --virtual
+  --xwayland` with `org_kde_kwin_fake_input` and `KWIN_WAYLAND_NO_PERMISSION_CHECKS=1`,
+  `mutter --headless` with `org.gnome.Mutter.RemoteDesktop` (its Xwayland needs
+  `XAUTHORITY=$XDG_RUNTIME_DIR/.mutter-Xwaylandauth.*`). Use `dbus-run-session`.
+  `kwin_wayland --wayland-display` crashes on the headless weston, and niri can't start a
+  screencast when nested (`no GBM device available`). With a fake input device, Qt 6 crashes
+  in `xi2HandleDeviceChangedEvent()`: set `QT_XCB_NO_XI2=1`.
 - Pointer behavior can be tested on the real stack without touching the pointer of
   the session or showing a window: `weston --backend=headless --renderer=gl
   --socket=X`, a private `niri -c cfg -- cmd` with `WAYLAND_DISPLAY=X` and without
@@ -525,11 +634,9 @@ program. This is independent of the game, so it also concerns Windows games.
 
 ## Open problems
 
-- Rootless Xwayland: the position of the pointer is unknown outside of the X11
-  windows. `XQueryPointer()` keeps returning the last position and success, and no
-  Wayland protocol gives a global position. It only works with a button held
-  (implicit grab; the top and left clamp to 0 with xwayland-satellite) or on the root
-  of a rootful Xwayland, where `(-50,-50)` relative to the game is read correctly.
+- Reading the mouse outside of X11 windows on Wayland: see the section "Pointer
+  position outside of X11 windows" for what is left (several monitors, rotated
+  outputs, Weston, WSLg).
 - La-Mulana: one non-draw frame around the handover of the main thread moves
   between frames 280 and 283 (about 1 run out of 4; 6 out of 20 in the last
   count). It happens when the system thread hands over to the logic thread,

@@ -21,7 +21,10 @@
 #define LIBTAS_KEYMAPPING_XCB_H_INCLUDED
 
 #include "KeyMapping.h"
+#include "pointer/GlobalPointer.h"
+#include "pointer/PointerCalibration.h"
 
+#include <memory>
 #include <string>
 #include <xcb/xcb.h>
 #include <xcb/xcb_keysyms.h>
@@ -79,6 +82,8 @@ class KeyMappingXcb : public KeyMapping {
          */
         void capturePointer(uint32_t window, bool capture);
 
+        void setPointerOutsideSource(int source);
+
     private:
         /* Connection to the X11 server */
         xcb_connection_t *conn;
@@ -107,6 +112,20 @@ class KeyMappingXcb : public KeyMapping {
         /* Warp the pointer at the center of a window of the given size, in a
          * way that really moves the pointer. */
         void warpPointer(xcb_window_t window, int width, int height);
+
+        /* Where to read the pointer position when Xwayland can't tell */
+        int pointer_outside_source = GlobalPointer::SOURCE_NONE;
+        std::unique_ptr<GlobalPointer> global_pointer;
+        bool global_pointer_started = false;
+        PointerCalibration pointer_calibration;
+        xcb_window_t calibrated_window = XCB_NONE;
+
+        /* Top-level window of the window that was last asked */
+        xcb_window_t toplevel_of = XCB_NONE;
+        xcb_window_t toplevel = XCB_NONE;
+
+        /* Is this direct child of the root the one holding the window */
+        bool isToplevelOf(xcb_window_t root_child, xcb_window_t window);
 };
 
 #endif // LIBTAS_KEYMAPPING_XCB_H_INCLUDED

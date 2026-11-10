@@ -33,6 +33,7 @@
 #endif
 
 #include "Context.h"
+#include "pointer/GlobalPointer.h"
 #include "utils.h"
 #include "AutoSave.h"
 #include "SaveStateList.h"
@@ -663,6 +664,7 @@ void GameLoop::updatePointerCapture()
         gameEvents->haveFocus();
 
     context->config.km->capturePointer(context->game_window, capture);
+    context->config.km->setPointerOutsideSource(context->config.mouse_outside_source);
 }
 
 void GameLoop::sleepSendPreview()
@@ -954,6 +956,7 @@ void GameLoop::loopExit()
     context->game_pid = 0;
 
     context->config.km->capturePointer(context->game_window, false);
+    context->config.km->setPointerOutsideSource(GlobalPointer::SOURCE_NONE);
 
     /* The file that gave the controllers to the xinput dlls of Windows games */
     unlink(GameThread::xinputSharedFile(getpid()).c_str());

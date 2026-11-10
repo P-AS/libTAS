@@ -205,6 +205,10 @@ class KeyMapping {
          * the display server needs it for warping to work, or stop holding it
          * if `capture` is false. */
         virtual void capturePointer(uint32_t window, bool capture) {}
+
+        /* Set where to read the pointer position from when it is outside of the
+         * X11 windows (see GlobalPointer.h), if the display server needs it. */
+        virtual void setPointerOutsideSource(int source) {}
 };
 
 #endif // LIBTAS_KEYMAPPING_H_INCLUDED

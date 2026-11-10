@@ -148,6 +148,7 @@ bool Config::applyCliSetting(const std::string& key, const std::string& value)
     else if (key == "autosave_count")           autosave_count = intValue();
     else if (key == "auto_restart")             auto_restart = boolValue();
     else if (key == "mouse_warp")               mouse_warp = boolValue();
+    else if (key == "mouse_outside_source")     mouse_outside_source = intValue();
     else if (key == "use_proton")               use_proton = boolValue();
     else if (key == "proton_path")              proton_path = value;
     /* General settings (libTAS.ini) */
@@ -270,6 +271,7 @@ void Config::save(const std::filesystem::path& gamepath) {
     settings.setValue("autosave_count", autosave_count);
     settings.setValue("auto_restart", auto_restart);
     settings.setValue("mouse_warp", mouse_warp);
+    settings.setValue("mouse_outside_source", mouse_outside_source);
     settings.setValue("use_proton", use_proton);
     settings.setValue("proton_path", proton_path.c_str());
 
@@ -502,6 +504,7 @@ void Config::load(const std::filesystem::path& gamepath) {
     autosave_count = settings.value("autosave_count", autosave_count).toInt();
     auto_restart = settings.value("auto_restart", auto_restart).toBool();
     mouse_warp = settings.value("mouse_warp", mouse_warp).toBool();
+    mouse_outside_source = settings.value("mouse_outside_source", mouse_outside_source).toInt();
     use_proton = settings.value("use_proton", use_proton).toBool();
     proton_path = settings.value("proton_path", "").toString().toStdString();
 

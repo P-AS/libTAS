@@ -78,6 +78,9 @@
   threads wait for it, which makes La-Mulana run deterministically
 * Store the sleep handling in movies and warn when playing a movie with another
   value
+* Xwayland: Read the mouse position outside of X11 windows from the compositor
+  (niri, COSMIC, KWin, Hyprland, wlroots-based compositors, or GNOME through
+  a screencast), with a new setting in the input settings
 
 ### Changed
 

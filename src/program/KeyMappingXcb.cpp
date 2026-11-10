@@ -329,6 +329,44 @@ void KeyMappingXcb::capturePointer(uint32_t window, bool capture)
     free(geometry_reply);
 }
 
+void KeyMappingXcb::setPointerOutsideSource(int source)
+{
+    if (!is_xwayland || (source == pointer_outside_source))
+        return;
+
+    pointer_outside_source = source;
+    global_pointer.reset();
+    global_pointer_started = false;
+    pointer_calibration.reset();
+    calibrated_window = XCB_NONE;
+}
+
+bool KeyMappingXcb::isToplevelOf(xcb_window_t root_child, xcb_window_t window)
+{
+    if (root_child == XCB_NONE)
+        return false;
+
+    /* Only walk the tree when needed, the window can be reparented at any time */
+    if ((toplevel_of == window) && (toplevel == root_child))
+        return true;
+
+    toplevel_of = window;
+    toplevel = window;
+    while (true) {
+        xcb_query_tree_cookie_t cookie = xcb_query_tree(conn, toplevel);
+        xcb_query_tree_reply_t* reply = xcb_query_tree_reply(conn, cookie, nullptr);
+        if (!reply)
+            return false;
+        bool at_top = (reply->parent == reply->root) || (reply->parent == XCB_NONE);
+        if (!at_top)
+            toplevel = reply->parent;
+        free(reply);
+        if (at_top)
+            break;
+    }
+    return toplevel == root_child;
+}
+
 void KeyMappingXcb::warpPointer(xcb_window_t window, int width, int height)
 {
     /* While the pointer is not held (frame advance while paused, where it must
@@ -371,8 +409,28 @@ void KeyMappingXcb::buildAllInputs(AllInputs& ai, uint32_t window, SharedConfig&
     /* Get mouse inputs */
     xcb_query_pointer_cookie_t pointer_cookie;
     xcb_get_geometry_cookie_t geometry_cookie;
+    xcb_query_pointer_cookie_t root_pointer_cookie;
+    bool use_global_pointer = false;
     if (sc.mouse_support) {
         pointer_cookie = xcb_query_pointer(conn, window);
+
+        /* While we hold the pointer, it can't be anywhere else */
+        if ((pointer_outside_source != GlobalPointer::SOURCE_NONE) && (captured_window == XCB_NONE)) {
+            if (!global_pointer_started) {
+                global_pointer_started = true;
+                global_pointer = GlobalPointer::create(pointer_outside_source);
+                if (global_pointer)
+                    std::cerr << "Reading the mouse outside of X11 windows using " << global_pointer->name() << std::endl;
+                else if (pointer_outside_source != GlobalPointer::SOURCE_AUTO)
+                    std::cerr << "Could not read the mouse outside of X11 windows from the selected source" << std::endl;
+            }
+            if (global_pointer) {
+                use_global_pointer = true;
+                xcb_window_t root = xcb_setup_roots_iterator(xcb_get_setup(conn)).data->root;
+                root_pointer_cookie = xcb_query_pointer(conn, root);
+            }
+        }
+
         if (sc.mouse_mode_relative) {
             geometry_cookie = xcb_get_geometry(conn, window);
         }
@@ -486,6 +544,33 @@ void KeyMappingXcb::buildAllInputs(AllInputs& ai, uint32_t window, SharedConfig&
             return;
         }
 
+        int pointer_x = pointer_reply->win_x;
+        int pointer_y = pointer_reply->win_y;
+
+        if (use_global_pointer) {
+            xcb_query_pointer_reply_t* root_reply = xcb_query_pointer_reply(conn, root_pointer_cookie, nullptr);
+            int global_x, global_y;
+
+            if (calibrated_window != window) {
+                pointer_calibration.reset();
+                calibrated_window = window;
+            }
+
+            if (root_reply && global_pointer->query(global_x, global_y)) {
+                /* Xwayland knows the position when the pointer is on the window.
+                 * Otherwise, its position is the last one known, or is relative to
+                 * another window that may not be placed like on the screen. */
+                bool stale = pointer_calibration.isStale(global_x, global_y, pointer_x, pointer_y);
+                if (!stale && isToplevelOf(root_reply->child, window))
+                    pointer_calibration.update(global_x, global_y, pointer_x, pointer_y);
+                else {
+                    pointer_calibration.left();
+                    pointer_calibration.toWindow(global_x, global_y, pointer_x, pointer_y);
+                }
+            }
+            free(root_reply);
+        }
+
         if (!ai.pointer)
             ai.pointer.reset(new MouseInputs{});
 
@@ -498,8 +583,8 @@ void KeyMappingXcb::buildAllInputs(AllInputs& ai, uint32_t window, SharedConfig&
                 free(error);
                 return;
             }
-            ai.pointer->x = pointer_reply->win_x - geometry_reply->width/2;
-            ai.pointer->y = pointer_reply->win_y - geometry_reply->height/2;
+            ai.pointer->x = pointer_x - geometry_reply->width/2;
+            ai.pointer->y = pointer_y - geometry_reply->height/2;
 
             /* Warp pointer if needed */
             if (mouse_warp)
@@ -508,8 +593,8 @@ void KeyMappingXcb::buildAllInputs(AllInputs& ai, uint32_t window, SharedConfig&
             free(geometry_reply);
         }
         else {
-            ai.pointer->x = pointer_reply->win_x;
-            ai.pointer->y = pointer_reply->win_y;
+            ai.pointer->x = pointer_x;
+            ai.pointer->y = pointer_y;
         }
 
         /* We only care about the five mouse buttons */

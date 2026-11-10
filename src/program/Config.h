@@ -137,6 +137,10 @@ public:
     /* Warp the pointer at the center of the game screen after each frame */
     bool mouse_warp = false;
 
+    /* Where to read the pointer position from when it is outside of the X11
+     * windows on Wayland (see GlobalPointer::Source) */
+    int mouse_outside_source = 1;
+
     /* Use proton to launch Windows executables */
     bool use_proton = false;
 

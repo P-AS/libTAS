@@ -57,7 +57,9 @@ A PKGBUILD is available for Arch Linux on the [AUR](https://aur.archlinux.org/pa
 You will need to download and install the following to build libTAS:
 
 * Deb: `apt-get install build-essential cmake pkg-config libx11-dev libx11-xcb-dev qt6-base-dev libxcb1-dev libxcb-keysyms1-dev libxcb-xkb-dev libxcb-randr0-dev libxkbcommon-dev libxi-dev libgl-dev libegl-dev libudev-dev liblua5.4-dev libasound2-dev libavutil-dev libswresample-dev libswscale-dev ffmpeg libcap-dev`
+  (optional, to read the mouse outside of windows on Wayland: `libwayland-dev wayland-protocols libglib2.0-dev libpipewire-0.3-dev`)
 * Arch: `pacman -S base-devel cmake pkgconf qt6-base xcb-util-cursor alsa-lib lua ffmpeg libcap`
+  (optional, to read the mouse outside of windows on Wayland: `wayland wayland-protocols glib2 pipewire`)
 
 ### Cloning
 
