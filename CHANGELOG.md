@@ -110,6 +110,7 @@
 * Wine: hook win32u.so input syscalls instead of user32.dll.so
 * Wine: block winepulse.so so that wine falls back to alsa
 * Wine: keep the first thread as main thread
+* Rename the native game notes from games.md to libtas.md
 * Wine: transfer message wait timeouts to the deterministic timer
 * Wine: disable wined3d CSMT
 * Wine: advance time while games wait for messages
