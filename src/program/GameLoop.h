@@ -74,6 +74,11 @@ private:
 
     void processInputs(AllInputs &ai);
 
+    /* Get the keyboard and mouse inputs of this frame, if the game has the focus.
+     * Otherwise, only get the mouse position, when it is read from outside of the
+     * X11 windows. */
+    void buildInputs(AllInputs &ai, bool mouse_warp);
+
     void endFrameMessages(AllInputs &ai);
 
     void loopExit();

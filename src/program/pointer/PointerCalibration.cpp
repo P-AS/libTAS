@@ -57,18 +57,29 @@ void PointerCalibration::Axis::update(int compositor, int window)
 
 void PointerCalibration::update(int compositor_x, int compositor_y, int window_x, int window_y)
 {
-    /* Time that the pointer must rest for a sample to be trusted */
-    static const auto STABLE_TIME = std::chrono::milliseconds(150);
+    /* Time that the offset between both positions must stay the same for a
+     * sample to be trusted */
+    static const auto STABLE_TIME = std::chrono::milliseconds(100);
 
     auto now = std::chrono::steady_clock::now();
 
     if (has_last && ((window_x != last_window_x) || (window_y != last_window_y)))
         tracking = true;
 
+    /* Xwayland and the compositor don't update at the same time, so a pair of
+     * positions may be from different times while the pointer moves. Then the
+     * offset that they give jumps. When it stays the same, either the pointer
+     * rests or both follow it, and the pair can be trusted. This also measures
+     * again a window that moved or was resized, without the pointer having to
+     * rest on it. */
+    double implied_x = window_x - x_axis.scale * compositor_x;
+    double implied_y = window_y - y_axis.scale * compositor_y;
     if (!has_last ||
-        (compositor_x != last_compositor_x) || (compositor_y != last_compositor_y) ||
-        (window_x != last_window_x) || (window_y != last_window_y))
+        (std::abs(implied_x - last_implied_x) > 1.0) || (std::abs(implied_y - last_implied_y) > 1.0)) {
         last_change = now;
+        last_implied_x = implied_x;
+        last_implied_y = implied_y;
+    }
 
     last_compositor_x = compositor_x;
     last_compositor_y = compositor_y;

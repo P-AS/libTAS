@@ -341,6 +341,12 @@ void KeyMappingXcb::setPointerOutsideSource(int source)
     calibrated_window = XCB_NONE;
 }
 
+bool KeyMappingXcb::readsPointerOutside() const
+{
+    return is_xwayland && (pointer_outside_source != GlobalPointer::SOURCE_NONE) &&
+        (!global_pointer_started || global_pointer);
+}
+
 bool KeyMappingXcb::isToplevelOf(xcb_window_t root_child, xcb_window_t window)
 {
     if (root_child == XCB_NONE)

@@ -478,13 +478,26 @@ Design choices:
   different times (a 3 px offset on Mutter). It is kept until the first sample taken
   at rest, and the check that rejects samples where only the compositor moved only
   compares with samples taken at rest, or that bad sample would block all others.
+- A sample is trusted once the offset between the compositor position and the
+  Xwayland position has not changed for 100 ms, whether the pointer moves or not.
+  Requiring the pointer to rest for 150 ms broke on SRB2 on a real session: the game
+  resized its window after starting, and the pointer never rested on it again, so
+  every position outside of the window kept the old offset (off by (800,440)). When
+  both follow the pointer, the offset stays the same, and a pair from different
+  times shows as a jump in it.
+- libTAS only takes inputs while the game window has the X focus. With
+  `focus-follows-mouse` (niri), moving the pointer over another window sent no inputs
+  at all, the mouse being (0,0), which looked like this feature not working on a real
+  session. So while this feature is active (absolute mode), an unfocused game still
+  gets the mouse position, but no keys or buttons, so that what is typed elsewhere
+  never reaches it (`GameLoop::buildInputs()`).
 - Queries never block for long. Wayland and D-Bus events are read without waiting, and
   Hyprland is given 10 ms before reusing the last position.
 - `mouse_warp` does not use this: while we hold the pointer, it can't leave.
 
 Limits: a window moved while the pointer is outside keeps the old offset until the
-pointer comes back. A scale needs two measurements of at least 64 pixels, taken while
-the pointer rests on the window for 150 ms, and until then it is assumed to be 1. Clicks outside
+pointer comes back. A scale needs two trusted samples at least 64 pixels apart, and
+until then it is assumed to be 1. Clicks outside
 the window still go to what is under the pointer. Hyprland only gives the cursor session
 if `ecosystem:enforce_permissions` allows it, but its socket does not need this.
 

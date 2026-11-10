@@ -68,9 +68,10 @@ private:
     bool calibrated = false;
 
     /* Xwayland and the compositor don't update at the same time, and a screencast
-     * only gives positions with its frames, so only trust samples taken after
-     * the pointer has not moved for a while. */
+     * only gives positions with its frames, so only trust samples once the offset
+     * between both positions has not changed for a while. */
     std::chrono::steady_clock::time_point last_change;
+    double last_implied_x = 0.0, last_implied_y = 0.0;
     bool has_last = false;
     int last_compositor_x = 0, last_compositor_y = 0;
     int last_window_x = 0, last_window_y = 0;

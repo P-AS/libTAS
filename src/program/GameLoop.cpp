@@ -693,10 +693,7 @@ void GameLoop::sleepSendPreview()
     }
 
     static AllInputs preview_ai, last_preview_ai;
-    if (gameEvents->haveFocus()) {
-        /* Format the keyboard and mouse state and save it in the AllInputs struct */
-        context->config.km->buildAllInputs(preview_ai, context->game_window, context->config.sc, false);
-    }
+    buildInputs(preview_ai, false);
 
     /* Fill controller inputs from the controller input window. */
     for (int j = 0; j < AllInputs::MAXJOYS; j++) {
@@ -715,6 +712,36 @@ void GameLoop::sleepSendPreview()
 }
 
 
+void GameLoop::buildInputs(AllInputs &ai, bool mouse_warp)
+{
+    /* Get inputs if we have input focus */
+    if (gameEvents->haveFocus()) {
+        /* Format the keyboard and mouse state and save it in the AllInputs struct */
+        context->config.km->buildAllInputs(ai, context->game_window, context->config.sc, mouse_warp);
+        return;
+    }
+
+    /* With focus following the mouse, the game loses the focus as soon as the
+     * pointer goes over another window, which would make reading the pointer
+     * outside of the window useless. So keep the position, but nothing else, so
+     * that what is typed in other windows never goes to the game. */
+    if (!context->config.sc.mouse_support || context->config.sc.mouse_mode_relative ||
+        !context->config.km->readsPointerOutside())
+        return;
+
+    AllInputs focusless_ai;
+    focusless_ai.clear();
+    context->config.km->buildAllInputs(focusless_ai, context->game_window, context->config.sc, false);
+    ai.clear();
+    if (focusless_ai.pointer) {
+        ai.pointer.reset(new MouseInputs{});
+        ai.pointer->clear();
+        ai.pointer->x = focusless_ai.pointer->x;
+        ai.pointer->y = focusless_ai.pointer->y;
+        ai.pointer->mode = focusless_ai.pointer->mode;
+    }
+}
+
 void GameLoop::processInputs(AllInputs &ai)
 {
     ai.clear();
@@ -728,11 +755,7 @@ void GameLoop::processInputs(AllInputs &ai)
         case SharedConfig::NO_RECORDING:
         case SharedConfig::RECORDING_WRITE:
 
-            /* Get inputs if we have input focus */
-            if (gameEvents->haveFocus()) {
-                /* Format the keyboard and mouse state and save it in the AllInputs struct */
-                context->config.km->buildAllInputs(ai, context->game_window, context->config.sc, context->config.mouse_warp);
-            }
+            buildInputs(ai, context->config.mouse_warp);
             
             /* Scale mouse inputs in case the game window is detached */
             if (context->config.sc.mouse_support && ai.pointer) {
