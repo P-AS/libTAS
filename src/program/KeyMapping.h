@@ -209,9 +209,6 @@ class KeyMapping {
         /* Set where to read the pointer position from when it is outside of the
          * X11 windows (see GlobalPointer.h), if the display server needs it. */
         virtual void setPointerOutsideSource(int source) {}
-
-        /* If the pointer position is read from outside of the X11 windows */
-        virtual bool readsPointerOutside() const { return false; }
 };
 
 #endif // LIBTAS_KEYMAPPING_H_INCLUDED

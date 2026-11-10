@@ -141,6 +141,10 @@ public:
      * windows on Wayland (see GlobalPointer::Source) */
     int mouse_outside_source = 1;
 
+    /* Keep reading the mouse position, but no other input, when the game window
+     * does not have the focus (absolute mode only) */
+    bool mouse_read_unfocused = false;
+
     /* Use proton to launch Windows executables */
     bool use_proton = false;
 

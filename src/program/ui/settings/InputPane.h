@@ -47,6 +47,7 @@ private:
     ToolTipCheckBox* mouseWarpBox;
     ToolTipCheckBox* mouseGameWarpBox;
     ToolTipCheckBox* mouseIgnoreWindowCoordsBox;
+    ToolTipCheckBox* mouseUnfocusedBox;
     QComboBox* mouseOutsideChoice;
 
     QComboBox* joyChoice;

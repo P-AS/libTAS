@@ -80,8 +80,9 @@
   value
 * Xwayland: Read the mouse position outside of X11 windows from the compositor
   (niri, COSMIC, KWin, Hyprland, wlroots-based compositors, or GNOME through
-  a screencast), with a new setting in the input settings. The position is kept
-  when the game loses the focus to another window
+  a screencast), with a new setting in the input settings
+* Add an option to keep reading the mouse position, but no other input, when
+  the game window is unfocused, for focus following the mouse
 
 ### Changed
 

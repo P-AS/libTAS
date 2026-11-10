@@ -488,9 +488,11 @@ Design choices:
 - libTAS only takes inputs while the game window has the X focus. With
   `focus-follows-mouse` (niri), moving the pointer over another window sent no inputs
   at all, the mouse being (0,0), which looked like this feature not working on a real
-  session. So while this feature is active (absolute mode), an unfocused game still
-  gets the mouse position, but no keys or buttons, so that what is typed elsewhere
-  never reaches it (`GameLoop::buildInputs()`).
+  session. The `mouse_read_unfocused` setting (off by default, "Read mouse position
+  when the game is unfocused") makes an unfocused game still get the mouse position in
+  absolute mode, but no keys or buttons, so that what is typed elsewhere never reaches
+  it (`GameLoop::buildInputs()`). It is not tied to Xwayland, as focus can follow the
+  mouse with X window managers too.
 - Queries never block for long. Wayland and D-Bus events are read without waiting, and
   Hyprland is given 10 ms before reusing the last position.
 - `mouse_warp` does not use this: while we hold the pointer, it can't leave.

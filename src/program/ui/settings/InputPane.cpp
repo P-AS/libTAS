@@ -48,11 +48,13 @@ void InputPane::initLayout()
     mouseWarpBox = new ToolTipCheckBox(tr("Warp mouse to center"));
     mouseGameWarpBox = new ToolTipCheckBox(tr("Prevent mouse warping"));
     mouseIgnoreWindowCoordsBox = new ToolTipCheckBox(tr("Ignore window coordinates"));
+    mouseUnfocusedBox = new ToolTipCheckBox(tr("Read mouse position when the game is unfocused"));
 
     mouseLayout->addWidget(mouseSupportBox);
     mouseLayout->addWidget(mouseWarpBox);
     mouseLayout->addWidget(mouseGameWarpBox);
     mouseLayout->addWidget(mouseIgnoreWindowCoordsBox);
+    mouseLayout->addWidget(mouseUnfocusedBox);
 
     mouseOutsideChoice = new QComboBox();
     mouseOutsideChoice->addItem(tr("Disabled"), GlobalPointer::SOURCE_NONE);
@@ -95,6 +97,7 @@ void InputPane::initSignals()
     connect(mouseWarpBox, &QAbstractButton::clicked, this, &InputPane::saveConfig);
     connect(mouseGameWarpBox, &QAbstractButton::clicked, this, &InputPane::saveConfig);
     connect(mouseIgnoreWindowCoordsBox, &QAbstractButton::clicked, this, &InputPane::saveConfig);
+    connect(mouseUnfocusedBox, &QAbstractButton::clicked, this, &InputPane::saveConfig);
     connect(joyChoice, static_cast<void (QComboBox::*)(int)>(&QComboBox::activated), this, &InputPane::saveConfig);
     connect(mouseOutsideChoice, static_cast<void (QComboBox::*)(int)>(&QComboBox::activated), this, &InputPane::saveConfig);
 }
@@ -111,6 +114,10 @@ void InputPane::initToolTips()
     "the compositor, so that the game gets the position when the mouse is outside of its window, like on a real X "
     "server. The screencast shares the screen with libTAS only to read the cursor: it has a cost and you may be "
     "notified of it, so that Automatic never uses it."));
+    mouseUnfocusedBox->setDescription("Inputs are only taken while the game window has the focus. "
+    "With this, the mouse position is still recorded when another window has it, but no key or button, "
+    "so that what you type elsewhere never reaches the game. Useful with a window manager or compositor "
+    "where the focus follows the mouse. Only in absolute mode.");
     mouseIgnoreWindowCoordsBox->setDescription("Always report the game window position as (0,0). "
     "This fixes mouse input in some engines such as Godot.");
 }
@@ -126,6 +133,7 @@ void InputPane::loadConfig()
     mouseWarpBox->setChecked(context->config.mouse_warp);
     mouseGameWarpBox->setChecked(context->config.sc.mouse_prevent_warp);
     mouseIgnoreWindowCoordsBox->setChecked(context->config.sc.mouse_ignore_window_coords);
+    mouseUnfocusedBox->setChecked(context->config.mouse_read_unfocused);
 
     int outsideIndex = mouseOutsideChoice->findData(context->config.mouse_outside_source);
     if (outsideIndex != -1) mouseOutsideChoice->setCurrentIndex(outsideIndex);
@@ -140,6 +148,7 @@ void InputPane::saveConfig()
     context->config.mouse_warp = mouseWarpBox->isChecked();
     context->config.sc.mouse_prevent_warp = mouseGameWarpBox->isChecked();
     context->config.sc.mouse_ignore_window_coords = mouseIgnoreWindowCoordsBox->isChecked();
+    context->config.mouse_read_unfocused = mouseUnfocusedBox->isChecked();
     context->config.mouse_outside_source = mouseOutsideChoice->currentData().toInt();
 
     context->config.sc.nb_controllers = joyChoice->itemData(joyChoice->currentIndex()).toInt();

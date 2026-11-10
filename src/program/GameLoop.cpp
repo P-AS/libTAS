@@ -722,11 +722,11 @@ void GameLoop::buildInputs(AllInputs &ai, bool mouse_warp)
     }
 
     /* With focus following the mouse, the game loses the focus as soon as the
-     * pointer goes over another window, which would make reading the pointer
-     * outside of the window useless. So keep the position, but nothing else, so
-     * that what is typed in other windows never goes to the game. */
-    if (!context->config.sc.mouse_support || context->config.sc.mouse_mode_relative ||
-        !context->config.km->readsPointerOutside())
+     * pointer goes over another window, which makes positions outside of the
+     * window unusable. If asked, keep the position, but nothing else, so that
+     * what is typed in other windows never goes to the game. */
+    if (!context->config.mouse_read_unfocused || !context->config.sc.mouse_support ||
+        context->config.sc.mouse_mode_relative)
         return;
 
     AllInputs focusless_ai;

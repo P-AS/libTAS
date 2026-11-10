@@ -84,8 +84,6 @@ class KeyMappingXcb : public KeyMapping {
 
         void setPointerOutsideSource(int source);
 
-        bool readsPointerOutside() const;
-
     private:
         /* Connection to the X11 server */
         xcb_connection_t *conn;
