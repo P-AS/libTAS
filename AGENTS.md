@@ -10,7 +10,8 @@ as the change itself. Do not wait to be asked.
   `### Changed` (behavior changes to existing features) or `### Fixed`
   (bug fixes). Create the subsection if it is missing, keeping the order
   Added, Changed, Fixed.
-* Append the entry at the end of the subsection's list.
+* Append the entry at the end of the subsection's list: newest entries go at
+  the bottom, so never insert one above existing entries.
 * Follow the existing style:
   * One bullet per change, starting with `* ` and a capitalized verb or
     subject (e.g. `* Add hooks for Unity 2023`, `* Fix SDL_RenderSetLogicalSize being called with 0s`).
@@ -46,7 +47,7 @@ problems found, how they were fixed, design choices, and what is still open.
 
 ## Native Linux games
 
-`games.md` documents everything about running native Linux games: how the
+`libtas.md` documents everything about running native Linux games: how the
 games are built, what makes them fail under libTAS, how they were fixed, design
 choices, debugging techniques, and what is still open.
 
@@ -54,7 +55,7 @@ choices, debugging techniques, and what is still open.
   a Windows game through Wine: those are in `wine.md`).
 - When you fix a problem of a native game, make a design choice, find a
   limitation, or learn something worth knowing (including debugging
-  techniques), add it to `games.md` in the matching section, with the commit
+  techniques), add it to `libtas.md` in the matching section, with the commit
   hash when there is one.
 - Keep the "Open problems" section current: add what you could not solve and
   remove what you fixed.

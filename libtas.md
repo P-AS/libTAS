@@ -1,4 +1,4 @@
-# Running native Linux games
+# libTAS
 
 This document records what was learned while testing native Linux games under
 libTAS: problems found, how they were fixed, design choices, and what is still
