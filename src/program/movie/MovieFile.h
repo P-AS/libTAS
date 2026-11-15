@@ -65,9 +65,11 @@ public:
     int extractMovie(const std::filesystem::path& moviefile);
 
     /* Import the inputs into a list, and all the parameters.
+     * If `keep_inputs` is set, the inputs and input editor columns currently
+     * in memory are kept, and only the other parameters are imported.
      * Returns 0 if no error, or a negative value if an error occured */
-    int loadMovie();
-    int loadMovie(const std::filesystem::path& moviefile);
+    int loadMovie(bool keep_inputs = false);
+    int loadMovie(const std::filesystem::path& moviefile, bool keep_inputs = false);
 
     /* Import only relevant data used for savestate movies.
      * Returns 0 if no error, or a negative value if an error occured */

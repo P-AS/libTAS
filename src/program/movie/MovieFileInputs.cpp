@@ -45,6 +45,7 @@ MovieFileInputs::MovieFileInputs(Context* c) : context(c)
     modifiedSinceLastSave = false;
     modifiedSinceLastAutoSave = false;
     modifiedSinceLastStateLoad = false;
+    modifiedWhileInactive = false;
 }
 
 void MovieFileInputs::setChangeLog(MovieFileChangeLog* mcl)
@@ -68,6 +69,7 @@ void MovieFileInputs::clear()
     modifiedSinceLastSave = false;
     modifiedSinceLastAutoSave = false;
     modifiedSinceLastStateLoad = false;
+    modifiedWhileInactive = false;
     emit inputsToBeReset();
     input_list.clear();
     movie_changelog->clear();
@@ -81,6 +83,7 @@ void MovieFileInputs::load()
     modifiedSinceLastSave = false;
     modifiedSinceLastAutoSave = false;
     modifiedSinceLastStateLoad = false;
+    modifiedWhileInactive = false;
 
     /* Clear structures */
     input_list.clear();
@@ -133,7 +136,7 @@ int MovieFileInputs::setInputs(const AllInputs& inputs, uint64_t pos, bool keep_
 {
     /* Check that we are writing to the next frame */
     if (pos == input_list.size()) {
-        action_queue.push(new MovieActionInsertFrames(pos, inputs, this));
+        queueAction(new MovieActionInsertFrames(pos, inputs, this));
         return 0;
     }
     else if (pos < input_list.size()) {
@@ -142,11 +145,11 @@ int MovieFileInputs::setInputs(const AllInputs& inputs, uint64_t pos, bool keep_
          * the end.
          */
         if (keep_inputs) {
-            action_queue.push(new MovieActionEditFrames(pos, inputs, this));
+            queueAction(new MovieActionEditFrames(pos, inputs, this));
         }
         else {
-            action_queue.push(new MovieActionRemoveFrames(pos+1, input_list.size()-1, this));
-            action_queue.push(new MovieActionEditFrames(pos, inputs, this));
+            queueAction(new MovieActionRemoveFrames(pos+1, input_list.size()-1, this));
+            queueAction(new MovieActionEditFrames(pos, inputs, this));
         }
         return 0;
     }
@@ -182,47 +185,47 @@ const AllInputs& MovieFileInputs::getInputsUnprotected(uint64_t pos)
 
 void MovieFileInputs::clearInputs(int minFrame, int maxFrame)
 {
-    action_queue.push(new MovieActionEditFrames(minFrame, maxFrame, this));
+    queueAction(new MovieActionEditFrames(minFrame, maxFrame, this));
 }
 
 void MovieFileInputs::paintInput(SingleInput si, int value, int minFrame, int maxFrame)
 {
-    action_queue.push(new MovieActionPaint(minFrame, maxFrame, si, value, this));
+    queueAction(new MovieActionPaint(minFrame, maxFrame, si, value, this));
 }
 
 void MovieFileInputs::paintInput(SingleInput si, std::vector<int>& values, int minFrame)
 {
-    action_queue.push(new MovieActionPaint(minFrame, si, values, this));
+    queueAction(new MovieActionPaint(minFrame, si, values, this));
 }
 
 void MovieFileInputs::editInputs(const std::vector<AllInputs>& inputs, uint64_t pos)
 {
     if (!inputs.empty())
-        action_queue.push(new MovieActionEditFrames(pos, inputs, this));
+        queueAction(new MovieActionEditFrames(pos, inputs, this));
 }
 
 void MovieFileInputs::editInputs(const std::vector<AllInputs>& inputs, uint64_t pos, int count)
 {
     if ((count > 0) && (inputs.size() >= static_cast<size_t>(count)))
-        action_queue.push(new MovieActionEditFrames(pos, pos+count-1, inputs, this));
+        queueAction(new MovieActionEditFrames(pos, pos+count-1, inputs, this));
 }
 
 void MovieFileInputs::insertInputsBefore(uint64_t pos, int count)
 {
     if (count > 0)
-        action_queue.push(new MovieActionInsertFrames(pos, count, this));
+        queueAction(new MovieActionInsertFrames(pos, count, this));
 }
 
 void MovieFileInputs::insertInputsBefore(const std::vector<AllInputs>& inputs, uint64_t pos)
 {
     if (!inputs.empty())
-        action_queue.push(new MovieActionInsertFrames(pos, inputs, this));
+        queueAction(new MovieActionInsertFrames(pos, inputs, this));
 }
 
 void MovieFileInputs::deleteInputs(uint64_t pos, int count)
 {
     if (count > 0)
-        action_queue.push(new MovieActionRemoveFrames(pos, pos+count-1, this));
+        queueAction(new MovieActionRemoveFrames(pos, pos+count-1, this));
 }
 
 void MovieFileInputs::extractInputs(std::set<SingleInput> &set)
@@ -250,6 +253,7 @@ void MovieFileInputs::copyFrom(const MovieFileInputs* movie_inputs)
 void MovieFileInputs::close()
 {
     input_list.clear();
+    modifiedWhileInactive = false;
 }
 
 bool MovieFileInputs::isEqual(const MovieFileInputs* movie, unsigned int start_frame, unsigned int end_frame) const
@@ -274,6 +278,18 @@ void MovieFileInputs::wasModified()
      * This can save a bit of time during fast-forward. */
     if (context->config.sc.recording != SharedConfig::NO_RECORDING)
         updateLength();
+}
+
+void MovieFileInputs::queueAction(IMovieAction* action)
+{
+    action_queue.push(action);
+
+    /* Pending actions are processed by the game loop thread. When the game is
+     * not running, there is no such thread, so process them right away. */
+    if (context->status == Context::INACTIVE) {
+        processPendingActions();
+        modifiedWhileInactive = true;
+    }
 }
 
 void MovieFileInputs::processPendingActions()

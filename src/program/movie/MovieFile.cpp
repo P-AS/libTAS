@@ -115,7 +115,7 @@ int MovieFile::extractMovie()
     return extractMovie(context->config.moviefile);
 }
 
-int MovieFile::loadMovie(const std::filesystem::path& moviefile)
+int MovieFile::loadMovie(const std::filesystem::path& moviefile, bool keep_inputs)
 {
     /* Extract the moviefile in the temp directory */
     int ret = extractMovie(moviefile);
@@ -128,9 +128,11 @@ int MovieFile::loadMovie(const std::filesystem::path& moviefile)
      * editor columns and inputs->load() imports actual inputs, then it adds
      * more columns for inputs inside the movie that don't have a column yet.
      * Then it resets the input editor view */
-    editor->load();
+    if (!keep_inputs)
+        editor->load();
     header->load();
-    inputs->load();
+    if (!keep_inputs)
+        inputs->load();
     annotations->load();
 
     /* Copy framerate values to inputs */
@@ -139,16 +141,18 @@ int MovieFile::loadMovie(const std::filesystem::path& moviefile)
     inputs->length_nsec = header->length_nsec;
 
     if (context->config.sc.movie_framecount != inputs->nbFrames()) {
-        std::cerr << "Warning: movie framecount and movie config mismatch!" << std::endl;
+        /* Kept inputs may have a different length than the movie file */
+        if (!keep_inputs)
+            std::cerr << "Warning: movie framecount and movie config mismatch!" << std::endl;
         context->config.sc.movie_framecount = inputs->nbFrames();
     }
 
     return 0;
 }
 
-int MovieFile::loadMovie()
+int MovieFile::loadMovie(bool keep_inputs)
 {
-    return loadMovie(context->config.moviefile);
+    return loadMovie(context->config.moviefile, keep_inputs);
 }
 
 int MovieFile::loadSavestateMovie(const std::filesystem::path& moviefile)

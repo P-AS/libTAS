@@ -489,12 +489,14 @@ void MainWindow::closeEvent(QCloseEvent *event)
         return;
     }
 
-    if (context->status == Context::INACTIVE) {
-        event->accept();
-        return;
-    }
+    /* When the game is not running, only inputs modified in the input editor
+     * since the movie was loaded can be unsaved */
+    bool unsaved = (context->status == Context::INACTIVE) ?
+        (gameLoop->movie.inputs->modifiedWhileInactive &&
+         (context->config.sc.recording != SharedConfig::NO_RECORDING)) :
+        gameLoop->movie.inputs->modifiedSinceLastSave;
 
-    if (gameLoop->movie.inputs->modifiedSinceLastSave) {
+    if (unsaved) {
         QMessageBox::StandardButton result = QMessageBox::question(
             this, tr("Unsaved Work"), 
             tr("You have unsaved work. Would you like to save it?"),
@@ -1066,8 +1068,13 @@ void MainWindow::updateUIFrame()
 
 void MainWindow::updateMovieParams()
 {
-    bool movieLoaded = (context->config.sc.recording != SharedConfig::NO_RECORDING) &&
-        (gameLoop->movie.loadMovie() == 0);
+    bool movieLoaded = (context->config.sc.recording != SharedConfig::NO_RECORDING);
+
+    /* When the game is running, the game loop thread owns the movie and has
+     * already loaded it. Loading it again here would race with that thread,
+     * and discard the inputs it kept from the input editor. */
+    if (movieLoaded && (context->status == Context::INACTIVE))
+        movieLoaded = (gameLoop->movie.loadMovie() == 0);
 
     updateMovieLoadedState(movieLoaded);
     windowManager->resetInputEditorWindow();

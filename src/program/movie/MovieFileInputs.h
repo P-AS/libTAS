@@ -52,6 +52,10 @@ public:
      * Used to determine when a state loading increments the rerecord count. */
     bool modifiedSinceLastStateLoad;
 
+    /* Flag storing if the inputs were modified while the game was not running,
+     * since the movie was loaded. They are kept when the game is launched. */
+    bool modifiedWhileInactive;
+
     /* Queue of movie input changes that where pushed by the UI, to process by the main thread */
     ConcurrentQueue<IMovieAction*> action_queue;
 
@@ -143,6 +147,9 @@ public:
     
     /* Process all input events pushed by the UI thread */
     void processPendingActions();
+
+    /* Queue an action, and process it right away if the game is not running */
+    void queueAction(IMovieAction* action);
     
     /* Return the movie frame count */
     uint64_t size();

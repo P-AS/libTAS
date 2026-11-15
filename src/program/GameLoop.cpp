@@ -274,7 +274,9 @@ void GameLoop::init()
          * or prepare a movie if in write mode.
          */
         if (context->config.sc.recording == SharedConfig::RECORDING_READ) {
-            int ret = movie.loadMovie();
+            /* Keep the inputs that were edited in the input editor while the
+             * game was not running, instead of reloading them from the file */
+            int ret = movie.loadMovie(movie.inputs->modifiedWhileInactive);
             if (ret < 0) {
                 emit alertToShow(MovieFile::errorString(ret));
                 context->config.sc.recording = SharedConfig::NO_RECORDING;
