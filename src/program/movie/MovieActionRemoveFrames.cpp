@@ -47,9 +47,12 @@ void MovieActionRemoveFrames::storeOldInputs()
 void MovieActionRemoveFrames::undo() {
     if (first_frame < movie_inputs->context->framecount) return;
 
-    std::unique_lock<std::mutex> lock(movie_inputs->input_list_mutex);
     emit movie_inputs->inputsToBeInserted(first_frame, first_frame+old_frames.size()-1);
-    movie_inputs->input_list.insert(movie_inputs->input_list.begin() + first_frame, old_frames.begin(), old_frames.end());
+    {
+        /* Emit signals unlocked: their slots may read inputs back */
+        std::unique_lock<std::mutex> lock(movie_inputs->input_list_mutex);
+        movie_inputs->input_list.insert(movie_inputs->input_list.begin() + first_frame, old_frames.begin(), old_frames.end());
+    }
     emit movie_inputs->inputsInserted(first_frame, first_frame+old_frames.size()-1);
     movie_inputs->wasModified();
 }
@@ -57,15 +60,15 @@ void MovieActionRemoveFrames::undo() {
 void MovieActionRemoveFrames::redo() {
     if (first_frame < movie_inputs->context->framecount) return;
 
-    std::unique_lock<std::mutex> lock(movie_inputs->input_list_mutex);
-    
     emit movie_inputs->inputsToBeRemoved(first_frame, last_frame);
-
-    if ((last_frame + 1) == movie_inputs->input_list.size())
-        movie_inputs->input_list.resize(first_frame);
-    else
-        movie_inputs->input_list.erase(movie_inputs->input_list.begin() + first_frame, movie_inputs->input_list.begin() + last_frame + 1);
-
+    {
+        /* Emit signals unlocked: their slots may read inputs back */
+        std::unique_lock<std::mutex> lock(movie_inputs->input_list_mutex);
+        if ((last_frame + 1) == movie_inputs->input_list.size())
+            movie_inputs->input_list.resize(first_frame);
+        else
+            movie_inputs->input_list.erase(movie_inputs->input_list.begin() + first_frame, movie_inputs->input_list.begin() + last_frame + 1);
+    }
     emit movie_inputs->inputsRemoved(first_frame, last_frame);
     movie_inputs->wasModified();
 }

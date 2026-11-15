@@ -319,6 +319,8 @@
 * Fix "Warp mouse to center" discarding all mouse motion of each frame
 * Xwayland: Fix "Warp mouse to center", by hiding the cursor and holding it in
   the game window while the game is running and has the focus
+* Input editor: fix libTAS freezing when an input of the row being edited
+  changes, such as from auto-hold or auto-fire while seeking
 
 ## [1.4.8] - 2026-05-14
 ### Added

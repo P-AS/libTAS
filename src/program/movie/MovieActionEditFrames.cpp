@@ -82,10 +82,12 @@ void MovieActionEditFrames::storeOldInputs()
 void MovieActionEditFrames::undo() {
     if (first_frame < movie_inputs->context->framecount) return;
     
-    std::unique_lock<std::mutex> lock(movie_inputs->input_list_mutex);
-
     emit movie_inputs->inputsToBeEdited(first_frame, first_frame+old_frames.size()-1);
-    std::copy(old_frames.begin(), old_frames.end(), movie_inputs->input_list.begin() + first_frame);
+    {
+        /* Emit signals unlocked: their slots may read inputs back */
+        std::unique_lock<std::mutex> lock(movie_inputs->input_list_mutex);
+        std::copy(old_frames.begin(), old_frames.end(), movie_inputs->input_list.begin() + first_frame);
+    }
     emit movie_inputs->inputsEdited(first_frame, first_frame+old_frames.size()-1);
 
     movie_inputs->wasModified();
@@ -94,15 +96,17 @@ void MovieActionEditFrames::undo() {
 void MovieActionEditFrames::redo() {
     if (first_frame < movie_inputs->context->framecount) return;
 
-    std::unique_lock<std::mutex> lock(movie_inputs->input_list_mutex);
-
     emit movie_inputs->inputsToBeEdited(first_frame, last_frame);
-    if (new_frames.empty()) {
-        for (uint64_t i = first_frame; i <= last_frame; i++)
-            movie_inputs->input_list[i].clear();
-    }
-    else {
-        std::copy(new_frames.begin(), new_frames.end(), movie_inputs->input_list.begin() + first_frame);
+    {
+        /* Emit signals unlocked: their slots may read inputs back */
+        std::unique_lock<std::mutex> lock(movie_inputs->input_list_mutex);
+        if (new_frames.empty()) {
+            for (uint64_t i = first_frame; i <= last_frame; i++)
+                movie_inputs->input_list[i].clear();
+        }
+        else {
+            std::copy(new_frames.begin(), new_frames.end(), movie_inputs->input_list.begin() + first_frame);
+        }
     }
     emit movie_inputs->inputsEdited(first_frame, last_frame);
     movie_inputs->wasModified();

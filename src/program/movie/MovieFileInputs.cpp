@@ -241,11 +241,13 @@ void MovieFileInputs::extractInputs(std::set<SingleInput> &set)
 
 void MovieFileInputs::copyFrom(const MovieFileInputs* movie_inputs)
 {
-    std::unique_lock<std::mutex> lock(input_list_mutex);
-
     emit inputsToBeReset();
-    input_list.resize(movie_inputs->input_list.size());
-    std::copy(movie_inputs->input_list.begin(), movie_inputs->input_list.end(), input_list.begin());
+    {
+        /* Emit signals unlocked: their slots may read inputs back */
+        std::unique_lock<std::mutex> lock(input_list_mutex);
+        input_list.resize(movie_inputs->input_list.size());
+        std::copy(movie_inputs->input_list.begin(), movie_inputs->input_list.end(), input_list.begin());
+    }
     movie_changelog->clear();
     emit inputsReset();
 }

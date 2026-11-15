@@ -67,12 +67,14 @@ void MovieActionPaint::undo() {
 
     if (last_frame >= movie_inputs->input_list.size()) return;
     
-    std::unique_lock<std::mutex> lock(movie_inputs->input_list_mutex);
-
     emit movie_inputs->inputsToBeEdited(first_frame, last_frame);
-    for (size_t i = 0; i < old_values.size(); i++) {
-        AllInputs& ai = movie_inputs->input_list[first_frame+i];
-        ai.setInput(input, old_values[i]);
+    {
+        /* Emit signals unlocked: their slots may read inputs back */
+        std::unique_lock<std::mutex> lock(movie_inputs->input_list_mutex);
+        for (size_t i = 0; i < old_values.size(); i++) {
+            AllInputs& ai = movie_inputs->input_list[first_frame+i];
+            ai.setInput(input, old_values[i]);
+        }
     }
     emit movie_inputs->inputsEdited(first_frame, last_frame);
     movie_inputs->wasModified();
@@ -83,19 +85,21 @@ void MovieActionPaint::redo() {
 
     if (last_frame >= movie_inputs->input_list.size()) return;
     
-    std::unique_lock<std::mutex> lock(movie_inputs->input_list_mutex);
-
     emit movie_inputs->inputsToBeEdited(first_frame, last_frame);
-    if (new_values.empty()) {
-        for (uint64_t i = first_frame; i <= last_frame; i++) {
-            AllInputs& ai = movie_inputs->input_list[i];
-            ai.setInput(input, new_value);
+    {
+        /* Emit signals unlocked: their slots may read inputs back */
+        std::unique_lock<std::mutex> lock(movie_inputs->input_list_mutex);
+        if (new_values.empty()) {
+            for (uint64_t i = first_frame; i <= last_frame; i++) {
+                AllInputs& ai = movie_inputs->input_list[i];
+                ai.setInput(input, new_value);
+            }
         }
-    }
-    else {
-        for (size_t i = 0; i < new_values.size(); i++) {
-            AllInputs& ai = movie_inputs->input_list[first_frame+i];
-            ai.setInput(input, new_values[i]);
+        else {
+            for (size_t i = 0; i < new_values.size(); i++) {
+                AllInputs& ai = movie_inputs->input_list[first_frame+i];
+                ai.setInput(input, new_values[i]);
+            }
         }
     }
     emit movie_inputs->inputsEdited(first_frame, last_frame);
