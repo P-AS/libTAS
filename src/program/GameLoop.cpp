@@ -114,7 +114,16 @@ void GameLoop::start()
 
         emit uiChanged();
         emit newFrame();
-        
+
+        /* Autohold and autofire need to be applied at the beginning of each
+         * frame, only if the input editor is visible. It should not apply when
+         * rewinding to a previous frame. This must run on this thread, which
+         * is the only one allowed to push to the movie undo stack. */
+        bool inputEditorVisible = false;
+        emit isInputEditorVisible(inputEditorVisible);
+        if (inputEditorVisible && !context->seek_frame)
+            movie.applyAutoHoldFire();
+
         /* We are at a frame boundary */
         /* If we did not yet receive the game window id, just make the game running */
         bool endInnerLoop = false;

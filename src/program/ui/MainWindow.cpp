@@ -1059,12 +1059,6 @@ void MainWindow::updateFrequentRuntimeDisplay()
 void MainWindow::updateUIFrame()
 {
     /* Process everything that needs to be performed exactly once per frame */
-    
-    /* Autohold and autofire need to be applied at the beginning of each
-     * frame, only if the input editor is visible. It should not apply when
-     * rewinding to a previous frame. */
-    if (windowManager->isInputEditorVisible() && !context->seek_frame)
-        gameLoop->movie.applyAutoHoldFire();
 
     /* Keep all ram watches frozen */
     windowManager->updateFrameWindowViews();

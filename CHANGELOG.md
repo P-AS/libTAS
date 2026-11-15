@@ -321,6 +321,8 @@
   the game window while the game is running and has the focus
 * Input editor: fix libTAS freezing when an input of the row being edited
   changes, such as from auto-hold or auto-fire while seeking
+* Input editor: fix a crash when auto-hold or auto-fire is enabled and the undo
+  history is full
 
 ## [1.4.8] - 2026-05-14
 ### Added
