@@ -328,6 +328,9 @@
 * Fix framerate changes not being recorded when only the denominator changes
 * Input editor: show edits made while the game is not running right away, and
   keep them when the game is launched instead of reloading the movie file
+* Input editor: keep the size of the marker panel when resizing the window,
+  and resize the window when showing or hiding the panel instead of squeezing
+  the input table
 
 ## [1.4.8] - 2026-05-14
 ### Added

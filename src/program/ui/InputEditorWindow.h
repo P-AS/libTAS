@@ -34,6 +34,8 @@ class MarkerView;
 class InputChangeLogWindow;
 class AnalogInputsWindow;
 
+class QSplitter;
+
 class InputEditorWindow : public QMainWindow {
     Q_OBJECT
 
@@ -47,6 +49,10 @@ public:
     /* Update UI elements when config has changed */
     void update();
     void update_config();
+
+    /* Show or hide the marker panel, resizing the window to keep the size of
+     * the input table */
+    void setMarkerPanelVisible(bool visible);
     
     InputEditorView *inputEditorView;
     MarkerView *markerView;
@@ -62,6 +68,8 @@ private:
     Context *context;
     MovieFile *movie;
     QGroupBox* markerBox;
+    QSplitter* splitter;
+    QWidget* sideWidget;
     QAction* markerPanelAct;
     QAction* scrollingAct;
     QAction* rewindAct;

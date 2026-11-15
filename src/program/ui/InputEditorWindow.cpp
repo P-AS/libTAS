@@ -35,6 +35,7 @@
 #include <QtWidgets/QGroupBox>
 #include <QtWidgets/QStatusBar>
 #include <QtWidgets/QSplitter>
+#include <QtWidgets/QHeaderView>
 
 InputEditorWindow::InputEditorWindow(Context* c, MovieFile *movie, QWidget *parent) : QMainWindow(parent), context(c), movie(movie)
 {
@@ -53,6 +54,10 @@ InputEditorWindow::InputEditorWindow(Context* c, MovieFile *movie, QWidget *pare
     connect(inputEditorView, &InputEditorView::removeMarkerSignal, markerView->markerModel, &MarkerModel::removeMarker);
     connect(inputEditorView->selectionModel(), &QItemSelectionModel::selectionChanged, this, &InputEditorWindow::updateStatusBar);
     connect(inputEditorView->inputEditorModel, &InputEditorModel::stateLoaded, this, &InputEditorWindow::updateProgressBar);
+
+    /* Keep both marker columns visible */
+    markerView->setMinimumWidth(markerView->horizontalHeader()->sectionSize(0) +
+        markerView->fontMetrics().averageCharWidth() * 16);
 
     markerBox = new QGroupBox(tr("Markers"));
     QVBoxLayout* markerLayout = new QVBoxLayout;
@@ -74,7 +79,7 @@ InputEditorWindow::InputEditorWindow(Context* c, MovieFile *movie, QWidget *pare
     QMenu* panelMenu = menuBar()->addMenu(tr("Panels"));
 
     markerPanelAct = panelMenu->addAction(tr("Markers"), this,
-        [=, this](bool checked){context->config.editor_panel_marker = checked; markerBox->setVisible(checked);});
+        [=, this](bool checked){context->config.editor_panel_marker = checked; setMarkerPanelVisible(checked);});
 
     markerPanelAct->setCheckable(true);
 
@@ -120,13 +125,19 @@ InputEditorWindow::InputEditorWindow(Context* c, MovieFile *movie, QWidget *pare
     statusSeek->setMaximumHeight(statusBar()->height()*0.6);
 
     /* Layout */
-    QSplitter *mainLayout = new QSplitter;
-    mainLayout->addWidget(inputEditorView);
-    QWidget *sideWidget = new QWidget;
+    splitter = new QSplitter;
+    splitter->addWidget(inputEditorView);
+    sideWidget = new QWidget;
     sideWidget->setLayout(sideLayout);
-    mainLayout->addWidget(sideWidget);
+    splitter->addWidget(sideWidget);
 
-    setCentralWidget(mainLayout);
+    /* When resizing the window, resize the input table and keep the size of
+     * the side panels. Don't let the splitter collapse any of them. */
+    splitter->setStretchFactor(0, 1);
+    splitter->setStretchFactor(1, 0);
+    splitter->setChildrenCollapsible(false);
+
+    setCentralWidget(splitter);
     
     update_config();
 }
@@ -177,17 +188,38 @@ void InputEditorWindow::showInputChangeLogWindow()
 void InputEditorWindow::update_config()
 {
     markerPanelAct->setChecked(context->config.editor_panel_marker);
-    markerBox->setVisible(context->config.editor_panel_marker);
+    setMarkerPanelVisible(context->config.editor_panel_marker);
     scrollingAct->setChecked(!context->config.editor_autoscroll);
     rewindAct->setChecked(context->config.editor_rewind_seek);
     fastforwardAct->setChecked(!context->config.editor_rewind_fastforward);
     markerPauseAct->setChecked(context->config.editor_marker_pause);
 }
 
+void InputEditorWindow::setMarkerPanelVisible(bool visible)
+{
+    markerBox->setVisible(visible);
+
+    /* The side widget only holds the marker panel for now */
+    if (sideWidget->isVisibleTo(this) == visible)
+        return;
+
+    /* Grow or shrink the window by the width of the side widget, instead of
+     * taking it from the input table */
+    int sideWidth = visible ? sideWidget->sizeHint().width() : sideWidget->width();
+    sideWidth += splitter->handleWidth();
+    sideWidget->setVisible(visible);
+
+    if (isVisible())
+        resize(width() + (visible ? sideWidth : -sideWidth), height());
+}
+
 QSize InputEditorWindow::sizeHint() const
 {
     QSize viewSize = inputEditorView->sizeHint();
-    return QSize(viewSize.width() + inputEditorView->scrollBarWidth, 600);
+    int width = viewSize.width() + inputEditorView->scrollBarWidth;
+    if (sideWidget->isVisibleTo(this))
+        width += sideWidget->sizeHint().width() + splitter->handleWidth();
+    return QSize(width, 600);
 }
 
 void InputEditorWindow::resetInputs()
