@@ -987,7 +987,8 @@ void InputEditorModel::addUniqueInput(const SingleInput &si)
         }
     }
 
-    beginInsertColumns(QModelIndex(), columnCount(), columnCount());
+    /* New inputs are inserted before the add column */
+    beginInsertColumns(QModelIndex(), columnCount() - 1, columnCount() - 1);
     movie->editor->input_set.push_back(si);
     endInsertColumns();
     emit inputSetChanged();
@@ -1024,7 +1025,8 @@ void InputEditorModel::addUniqueInputs(const AllInputs &ai)
                 }
             }
 
-            beginInsertColumns(QModelIndex(), columnCount(), columnCount());
+            /* New inputs are inserted before the add column */
+            beginInsertColumns(QModelIndex(), columnCount() - 1, columnCount() - 1);
             movie->editor->input_set.push_back(si);
             endInsertColumns();
         }

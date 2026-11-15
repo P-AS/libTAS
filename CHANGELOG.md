@@ -334,6 +334,8 @@
 * Input editor: fix keyboard shortcuts such as undo, redo and clear not working
   when the input table has the focus
 * Input editor: remember whether the marker panel is shown
+* Input editor: fix new input columns taking the width of the add column, which
+  made new analog columns too narrow to read
 
 ## [1.4.8] - 2026-05-14
 ### Added
