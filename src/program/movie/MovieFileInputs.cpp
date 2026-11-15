@@ -169,14 +169,9 @@ const AllInputs& MovieFileInputs::getInputs(uint64_t pos)
         pos = input_list.size() - 1;
     }
 
-    /* Special case for zero framerate */
-    if (input_list[pos].misc) {
-        if (!input_list[pos].misc->framerate_num)
-            input_list[pos].misc->framerate_num = framerate_num;
-        if (!input_list[pos].misc->framerate_den)
-            input_list[pos].misc->framerate_den = framerate_den;
-    }
-
+    /* A zero framerate means the default framerate. Readers handle it, so
+     * don't fill it here: that would write the default framerate into the
+     * movie each time a frame is read. */
     return input_list[pos];
 }
 

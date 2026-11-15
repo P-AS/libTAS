@@ -323,6 +323,8 @@
   changes, such as from auto-hold or auto-fire while seeking
 * Input editor: fix a crash when auto-hold or auto-fire is enabled and the undo
   history is full
+* Input editor: fix removed framerate columns coming back while the game is
+  running, and frames getting the default framerate written when displayed
 
 ## [1.4.8] - 2026-05-14
 ### Added
