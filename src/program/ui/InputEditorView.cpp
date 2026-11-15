@@ -26,6 +26,7 @@
 
 #include "Context.h"
 #include "movie/MovieFile.h"
+#include "movie/MovieFileChangeLog.h"
 
 #include <QtWidgets/QInputDialog>
 #include <QtWidgets/QHeaderView>
@@ -252,6 +253,11 @@ void InputEditorView::fillMenu(QMenu* frameMenu)
     redoAct->setShortcutVisibleInContextMenu(true);
 #endif
     this->addAction(redoAct);
+
+    /* Keep the undo/redo actions and their shortcuts enabled whenever the
+     * change log changes, which can happen from the game loop thread */
+    connect(movie->changelog, &QUndoStack::canUndoChanged, undoAct, &QAction::setEnabled, Qt::QueuedConnection);
+    connect(movie->changelog, &QUndoStack::canRedoChanged, redoAct, &QAction::setEnabled, Qt::QueuedConnection);
 }
 
 void InputEditorView::resizeAllColumns()
@@ -562,6 +568,28 @@ void InputEditorView::hideMarkerToolTip()
         markerTimerId = 0;
     }
     BalloonTip::hideBalloon();
+}
+
+bool InputEditorView::event(QEvent *event)
+{
+    /* The table view overrides some shortcuts with its own key handling, such
+     * as Ctrl+Z or Delete, which prevents our menu actions from triggering.
+     * Don't override shortcuts that belong to one of our enabled actions. */
+    if (event->type() == QEvent::ShortcutOverride) {
+        QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+        QKeySequence sequence(keyEvent->keyCombination());
+#else
+        QKeySequence sequence(int(keyEvent->modifiers()) | keyEvent->key());
+#endif
+        for (const QAction *action : actions()) {
+            if (action->isEnabled() && (action->shortcut() == sequence)) {
+                event->ignore();
+                return true;
+            }
+        }
+    }
+    return QTableView::event(event);
 }
 
 void InputEditorView::keyPressEvent(QKeyEvent *event)

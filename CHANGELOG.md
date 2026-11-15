@@ -331,6 +331,8 @@
 * Input editor: keep the size of the marker panel when resizing the window,
   and resize the window when showing or hiding the panel instead of squeezing
   the input table
+* Input editor: fix keyboard shortcuts such as undo, redo and clear not working
+  when the input table has the focus
 
 ## [1.4.8] - 2026-05-14
 ### Added
