@@ -325,6 +325,7 @@
   history is full
 * Input editor: fix removed framerate columns coming back while the game is
   running, and frames getting the default framerate written when displayed
+* Fix framerate changes not being recorded when only the denominator changes
 
 ## [1.4.8] - 2026-05-14
 ### Added

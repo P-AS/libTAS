@@ -794,8 +794,8 @@ void GameLoop::processInputs(AllInputs &ai)
             }
 
             /* Add framerate if necessary */
-            if ((context->current_framerate_num != context->config.sc.initial_framerate_num) || 
-            (context->current_framerate_num != context->config.sc.initial_framerate_num)) {
+            if ((context->current_framerate_num != context->config.sc.initial_framerate_num) ||
+                (context->current_framerate_den != context->config.sc.initial_framerate_den)) {
                 if (!ai.misc)
                     ai.misc.reset(new MiscInputs{});
                 ai.misc->framerate_num = context->current_framerate_num;
