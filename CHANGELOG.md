@@ -333,6 +333,7 @@
   the input table
 * Input editor: fix keyboard shortcuts such as undo, redo and clear not working
   when the input table has the focus
+* Input editor: remember whether the marker panel is shown
 
 ## [1.4.8] - 2026-05-14
 ### Added

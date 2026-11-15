@@ -290,6 +290,7 @@ void Config::save(const std::filesystem::path& gamepath) {
     settings.setValue("editor_autoscroll", editor_autoscroll);
     settings.setValue("editor_rewind_seek", editor_rewind_seek);
     settings.setValue("editor_rewind_fastforward", editor_rewind_fastforward);
+    settings.setValue("editor_panel_marker", editor_panel_marker);
     settings.setValue("editor_marker_pause", editor_marker_pause);
     settings.setValue("editor_move_marker", editor_move_marker);
 
@@ -525,6 +526,7 @@ void Config::load(const std::filesystem::path& gamepath) {
     editor_autoscroll = settings.value("editor_autoscroll", editor_autoscroll).toBool();
     editor_rewind_seek = settings.value("editor_rewind_seek", editor_rewind_seek).toBool();
     editor_rewind_fastforward = settings.value("editor_rewind_fastforward", editor_rewind_fastforward).toBool();
+    editor_panel_marker = settings.value("editor_panel_marker", editor_panel_marker).toBool();
     editor_marker_pause = settings.value("editor_marker_pause", editor_marker_pause).toBool();
     editor_move_marker = settings.value("editor_move_marker", editor_move_marker).toBool();
 
