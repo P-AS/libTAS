@@ -319,10 +319,16 @@ int main(int argc, char **argv)
     if (context.libtaspath.empty()) {
         std::filesystem::path binpath = std::filesystem::read_symlink("/proc/self/exe");
 #ifdef __unix__
-        context.libtaspath = binpath.parent_path() / "libtas.so";
+        const char* libname = "libtas.so";
 #elif defined(__APPLE__) && defined(__MACH__)
-        context.libtaspath = binpath.parent_path() / "libtas.dylib";
+        const char* libname = "libtas.dylib";
 #endif
+        /* Installed, the library is next to the program. In the build
+         * directory, the program is in bin/ and the library in lib/ */
+        context.libtaspath = binpath.parent_path() / libname;
+        std::filesystem::path buildpath = (binpath.parent_path().parent_path() / "lib" / libname).lexically_normal();
+        if (!std::filesystem::exists(context.libtaspath) && std::filesystem::exists(buildpath))
+            context.libtaspath = buildpath;
     }
 
     /* libtas32.so path */

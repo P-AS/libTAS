@@ -13,9 +13,9 @@ under libTAS through Wine on Linux, with the
 
 ## Requirements
 
-* libTAS built from source, so that `libTAS`, `libtas.so`
-  and the `libtas-xinput*.dll` files are in `build/src/program`. The xinput
-  dlls need the mingw-w64 cross compilers (`i686-w64-mingw32-gcc`).
+* libTAS built from source, so that `libTAS` is in `build/bin`, and `libtas.so`
+  and the `libtas-xinput*.dll` files are in `build/lib`. The xinput dlls need
+  the mingw-w64 cross compilers (`i686-w64-mingw32-gcc`).
 * Wine 11 (tested with 11.21, as packaged by Arch Linux). Proton is not needed.
 * The GOG version of Rayman 2, installed with the standalone installer.
 * [Ray2Fix](https://github.com/spitfirex86/Ray2Fix/releases) v1.4.3.

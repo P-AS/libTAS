@@ -75,6 +75,8 @@ This configures the project with CMake into the `build` directory, and builds it
     cmake -S . -B build
     cmake --build build
 
+The build directory then has the program in `bin/libTAS`, and the `libtas.so` library (with `libtas32.so` and the dlls for Windows games, when built) in `lib/`. libTAS can be run from there directly: `build/bin/libTAS`.
+
 The following CMake options are available (the former `configure` flags are still accepted by `build.sh`):
 
 * `-DLIBTAS_BUILD_I386=ON` (`--with-i386`): also build the 32-bit `libtas32.so` library (see Dual-arch)

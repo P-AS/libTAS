@@ -15,8 +15,8 @@ file(GLOB _xinputdll_headers CONFIGURE_DEPENDS
     ${PROJECT_SOURCE_DIR}/src/library/wine/xinputshared.h)
 set(_xinputdll_source ${CMAKE_CURRENT_SOURCE_DIR}/xinput.c)
 
-# Put them next to the launcher and libtas.so, like when installed
-set(_xinputdll_dir ${PROJECT_BINARY_DIR}/src/program)
+# Put them next to libtas.so, where libtas looks for them
+set(_xinputdll_dir ${LIBTAS_OUTPUT_LIBDIR})
 
 # The loader of Wine only takes a dll as one of its own if the dos header
 # starts with this signature (as winebuild writes it)

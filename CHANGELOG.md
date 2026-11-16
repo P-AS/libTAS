@@ -148,6 +148,8 @@
 * SDL3: audio streams are real SDL streams, and libTAS only emulates the
   audio devices, pulling the samples of the bound streams when mixing. This
   brings sample conversion, stream callbacks and SDL3_mixer support
+* The build directory has the program in bin/ and libtas.so, libtas32.so and
+  the Windows dlls in lib/, and libTAS finds the library there
 
 ### Fixed
 
@@ -354,6 +356,7 @@
 * SDL3: fix SDL_GetDesktopDisplayMode() returning the mode of the first call
 * SDL3: fix the window size and surface of SDL keeping their old size after the
   game resizes its window (SRB2 Classic)
+* SDL3: restore the window size when the game leaves fullscreen
 
 ## [1.4.8] - 2026-05-14
 ### Added

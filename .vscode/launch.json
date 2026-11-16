@@ -8,13 +8,10 @@
             "name": "(gdb) Launch",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/src/program/libTAS",
-            "args": [
-                "--libtas-so-path",
-                "${workspaceFolder}/src/library/libtas.so"
-            ],
+            "program": "${workspaceFolder}/build/bin/libTAS",
+            "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/src/program/",
+            "cwd": "${workspaceFolder}/build/bin/",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",

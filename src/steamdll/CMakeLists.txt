@@ -19,8 +19,8 @@ set(_steamdll_flags
     -I${PROJECT_SOURCE_DIR}/src/library
     -static -static-libgcc -static-libstdc++)
 
-# Put them next to the launcher and libtas.so, like when installed
-set(_steamdll_dir ${PROJECT_BINARY_DIR}/src/program)
+# Put them next to libtas.so, where libtas looks for them
+set(_steamdll_dir ${LIBTAS_OUTPUT_LIBDIR})
 
 set(_steamdll_outputs)
 foreach(_arch 32 64)

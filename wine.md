@@ -1194,11 +1194,11 @@ the game config, not in the movie.
 - Check that the running build has the fixes you expect: a libTAS UI started
   before a rebuild keeps its old binary, and the game loads `libtas.so` as it
   was when the game was started. Compare the build time with the commit times.
-  The launcher injects the `libtas.so` next to its binary
-  (`build/src/program/libtas.so`), which `cmake --build` does not update: only
-  `build.sh` (through the AppDir) or a manual copy does. After a plain cmake
-  build, copy `build/src/library/libtas.so` there, or pass
-  `--libtas-so-path build/src/library/libtas.so`.
+  The launcher injects the `libtas.so` next to its binary, or in `../lib` from
+  it: `build/bin/libTAS` uses `build/lib/libtas.so`, which `cmake --build`
+  updates. Before this layout, the build left the program in
+  `build/src/program` and the library in `build/src/library`, so a copy of
+  the library next to the program went stale after each build.
 - Run tests from a copy of the game directory, so that save files of the user
   are not modified.
 - In `-n` (non-interactive) mode the game starts unpaused and fast-forwarded:

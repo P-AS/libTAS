@@ -13,8 +13,8 @@ prefix, so your Steam install and its prefix are left alone.
 
 ## Requirements
 
-* libTAS built from source, so that `libTAS` and `libtas.so` are in
-  `build/src/program`.
+* libTAS built from source, so that `libTAS` is in `build/bin` and `libtas.so`
+  in `build/lib`.
 * Sonic Generations installed through Steam.
 * Proton 11.0 installed through Steam (other versions were not tested).
 * A rootful Xwayland display for the game. libTAS does not work with the game
@@ -201,7 +201,7 @@ the game display, with Proton:
 cd "$TEST/game"
 env -u WAYLAND_DISPLAY QT_QPA_PLATFORM=xcb DISPLAY=:42 \
     WINEDLLOVERRIDES="d3dcompiler_47=n,b;winebus.sys=d" \
-    /path/to/libTAS/build/src/program/libTAS \
+    /path/to/libTAS/build/bin/libTAS \
     -s use_proton=true -s "proton_path=$PROTON" -s opengl_soft=true \
     -s game_specific_sync=64 \
     SonicGenerations.exe

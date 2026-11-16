@@ -19,8 +19,8 @@ display, libTAS built from `next` with `cmake`. Games used for testing:
   dynamic API, OpenGL). Works with the defaults, see [SDL3 games](#sdl3-games).
 - **SRB2 Classic** (2.2.17 beta12 AppImage, extracted, its own SDL 3.4.0 in
   `usr/lib`, software renderer drawing with `SDL_UpdateWindowSurface()`). Works
-  with `SRB2CLASSICWADDIR` set to `usr/share/games/srb2classic` and
-  `-s debug_state=0`, see [SDL3 games](#sdl3-games).
+  with `SRB2CLASSICWADDIR` set to `usr/share/games/srb2classic`, see
+  [SDL3 games](#sdl3-games).
 
 ## Basics that matter for a native game
 
@@ -454,11 +454,32 @@ it would delete the source in use; no game seen does that.
   the window events, which never happens under libTAS. The game kept drawing a
   320x200 surface in a big window. The hook now calls `SDL_SyncWindow()` after
   the resize.
-- SRB2 Classic looks for a UPnP gateway at startup (miniupnpc), and the
-  internet is allowed by default (`debug_state` bit `16`). Some runs stopped for
-  seconds at a random frame while encoding; with `-s debug_state=0` the runs kept
-  a steady speed. It writes its config and logs in `$HOME/.srb2classic`: give it
-  a scratch `HOME` (it ignores `XDG_DATA_HOME`).
+- SRB2 Classic looks for a UPnP gateway at startup (miniupnpc): the internet is
+  allowed by default (`debug_state` bit `16`), so it finds the router. This does
+  not change the runs; `-s debug_state=0` blocks it. It writes its config and
+  logs in `$HOME/.srb2classic`: give it a scratch `HOME` (it ignores
+  `XDG_DATA_HOME`).
+
+### Windowed mode
+
+The SRB2 forks are windowed with `-win`. Moon Child FE has no command-line
+option: "FULLSCREEN" in its settings menu (and Alt+Enter, or keypad Enter) is
+saved in `mc_opts.dat` in its writable directory (`$XDG_DATA_HOME/MoonchildFE`),
+14 little-endian 16-bit values, the second being the fullscreen flag. Without
+the file the game starts fullscreen.
+
+All three run windowed without any libTAS change: Moon Child FE keeps its
+640x480 window and calls `SDL_SetWindowFullscreen(false)`, SRB2 Legacy resizes
+its window to 1280x800 and SRB2 Classic to the size of the display. Moon Child FE
+windowed takes inputs, gives the same picture over two runs and after a
+savestate, and has audio.
+
+Leaving fullscreen kept the window at the size of the screen, because the hook
+only resized the window when entering fullscreen. SDL restores the size of the
+window before fullscreen, and applies the size given by `SDL_SetWindowSize()`
+while fullscreen when leaving it: the hook now does the same, and sends the
+resize events. Checked with Alt+Enter twice in Moon Child FE (640x480 again,
+picture scaled). The SDL2 hook still does not restore the size.
 - The system SDL3 (3.5.0) has more functions than `SDL3_dynapi_procs.h`
   (`The game loaded more functions that intended`): the extra functions are not
   hooked. Nothing used by these two games was missing.
@@ -759,14 +780,27 @@ Not done:
   `showspectrumpic` picture.
 - SDL3 has a `disk` audio driver, to get the audio of a native run without
   playing it: `SDL_AUDIO_DRIVER=disk SDL_AUDIO_DISK_OUTPUT_FILE=out.raw`.
+- `runtime.quit()` from Lua stops the game, but the encode is not finished:
+  ffmpeg keeps waiting for input until `timeout` kills it, and the last segment
+  is empty or unreadable. The encoder lags 60 to 90 frames behind the game, so
+  the frame counter of ffmpeg stops before the quit frame, which looks like a
+  stall of the game (several such "stalls" here were only the quit). Read the
+  audio of a run killed without a quit instead, whose file is readable up to
+  the last written cluster.
 - To see which SDL calls a game makes natively (for example a resize that libTAS
   does not trace), run it under `gdb -batch` with breakpoints on the exported
   SDL functions that print their arguments and continue. Without a window
   manager, a game run natively on the test display stays there after `timeout`
   kills gdb: check for leftovers, they slow the next runs.
-- `build/src/program/libtas.so` is a symlink to `../library/libtas.so`: the
-  program loads the library next to it, and a copy there does not follow the
-  rebuilds (it hid every fix of the library until `--libtas-so-path` was used).
+- The build directory has the program in `bin/` and `libtas.so`, `libtas32.so`
+  and the Windows dlls in `lib/`. The program loads the library next to it
+  (installed layout), or else in `../lib`. Before, the program was in
+  `build/src/program` and the library in `build/src/library`, and a copy of the
+  library next to the program did not follow the rebuilds (it hid every fix of
+  the library until `--libtas-so-path` was used).
+- A build with `-DLIBTAS_I386_LIB_ONLY=ON` in its own directory puts
+  `libtas32.so` in its own `lib/`: copy it to `build/lib`, next to
+  `libtas.so`, or pass `--libtas32-so-path`.
 
 ## Open problems
 
@@ -800,3 +834,5 @@ Not done:
   and maximum sizes, which are not hooked) are not synced, so SDL may keep
   stale values for them.
 - No OSD is drawn on SDL2 or SDL3 software surfaces.
+- An encode is not finished when the game is stopped with Lua `runtime.quit()`.
+- SDL2: leaving fullscreen does not restore the size of the window.

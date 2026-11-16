@@ -104,6 +104,15 @@ configure_file(cmake/config.h.cmake.in ${PROJECT_BINARY_DIR}/config.h)
 
 #### Targets ####
 
+# The build directory gets the program in bin/, and libtas.so, libtas32.so and
+# the Windows dlls in lib/, where libTAS finds them. Installing puts them all
+# in the same directory instead.
+set(LIBTAS_OUTPUT_BINDIR ${PROJECT_BINARY_DIR}/bin)
+set(LIBTAS_OUTPUT_LIBDIR ${PROJECT_BINARY_DIR}/lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${LIBTAS_OUTPUT_BINDIR})
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${LIBTAS_OUTPUT_LIBDIR})
+file(MAKE_DIRECTORY ${LIBTAS_OUTPUT_BINDIR} ${LIBTAS_OUTPUT_LIBDIR})
+
 add_subdirectory(src/library)
 
 if(NOT LIBTAS_I386_LIB_ONLY)
