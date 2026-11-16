@@ -595,6 +595,19 @@ static void pushSDL3FullscreenEvents(SDL_Window *window, bool fullscreen, int w,
     }
 }
 
+/* Resize the game window. SDL3 resizes windows asynchronously, and only
+ * updates the size of the window and of its surface when processing the window
+ * events, which we never do for SDL3 games, so wait for the resize. */
+static void resizeSDL3Window(SDL_Window *window, int w, int h)
+{
+    NATIVECALL(ORIG_SDL3_CALL(SDL_SetWindowSize, (window, w, h)));
+    NATIVECALL(ORIG_SDL3_CALL(SDL_SyncWindow, (window)));
+    ScreenCapture::resize(w, h);
+}
+
+/* Size of the window when not fullscreen, restored when leaving fullscreen */
+static int sdl3_windowed_w = 0, sdl3_windowed_h = 0;
+
 /* Override */ bool sdl3::SDL_SetWindowFullscreen(SDL_Window *window, bool fullscreen)
 {
     LOGTRACE(LCF_SDL | LCF_WINDOW, "%s call with fullscreen %d", __func__, fullscreen);
@@ -603,9 +616,18 @@ static void pushSDL3FullscreenEvents(SDL_Window *window, bool fullscreen, int w,
     windowFullscreen = fullscreen;
 
     if (!fullscreen) { // Windowed
-        if (was_fullscreen)
-            pushSDL3FullscreenEvents(window, false, 0, 0);
+        if (was_fullscreen) {
+            /* SDL restores the size of the window before fullscreen */
+            int w = sdl3_windowed_w, h = sdl3_windowed_h;
+            if (w > 0 && h > 0)
+                resizeSDL3Window(window, w, h);
+            pushSDL3FullscreenEvents(window, false, w, h);
+        }
         return true;
+    }
+
+    if (!was_fullscreen) {
+        NATIVECALL(ORIG_SDL3_CALL(SDL_GetWindowSize, (window, &sdl3_windowed_w, &sdl3_windowed_h)));
     }
 
     /* Resize the window to the screen or fake resolution */
@@ -624,8 +646,7 @@ static void pushSDL3FullscreenEvents(SDL_Window *window, bool fullscreen, int w,
         h = dm->h;
     }
 
-    NATIVECALL(libtas::sdl3::SDL_SetWindowSize(window, w, h));
-    ScreenCapture::resize(w, h);
+    resizeSDL3Window(window, w, h);
 
     if (!was_fullscreen)
         pushSDL3FullscreenEvents(window, true, w, h);
@@ -797,18 +818,15 @@ bool SDL_SetWindowSize(std::uintptr_t p1, std::uintptr_t p2, std::uintptr_t p3)
 
     LOGTRACE(LCF_SDL | LCF_WINDOW, "%s call with new size: %d x %d", __func__, w, h);
 
-    /* Ignored if game window is fullscreen */
-    if (windowFullscreen)
+    /* A fullscreen window keeps its size, and SDL applies the new size when
+     * leaving fullscreen */
+    if (windowFullscreen) {
+        sdl3_windowed_w = w;
+        sdl3_windowed_h = h;
         return true;
-        
-    NATIVECALL(ORIG_SDL3_CALL(SDL_SetWindowSize, (window, w, h)));
+    }
 
-    /* SDL3 resizes windows asynchronously, and only updates the size of the
-     * window and of its surface when processing the window events, which we
-     * never do for SDL3 games. Wait for the resize to be applied. */
-    NATIVECALL(ORIG_SDL3_CALL(SDL_SyncWindow, (window)));
-
-    ScreenCapture::resize(w, h);
+    resizeSDL3Window(window, w, h);
 
     return true;
 }
