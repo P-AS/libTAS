@@ -83,6 +83,8 @@
   a screencast), with a new setting in the input settings
 * Add an option to keep reading the mouse position, but no other input, when
   the game window is unfocused, for focus following the mouse
+* Add the time-tracking thresholds to the --set command-line option, as
+  main_gettimes_threshold.<function> and sec_gettimes_threshold.<function>
 
 ### Changed
 
@@ -142,6 +144,9 @@
   number of frames before the game starts (Sonic Mania). The game-specific
   timing option "Startup sleep advances time" restores the old behavior
 * Rename the native game notes from games.md to libtas.md
+* SDL3: audio streams are real SDL streams, and libTAS only emulates the
+  audio devices, pulling the samples of the bound streams when mixing. This
+  brings sample conversion, stream callbacks and SDL3_mixer support
 
 ### Fixed
 
@@ -336,6 +341,13 @@
 * Input editor: remember whether the marker panel is shown
 * Input editor: fix new input columns taking the width of the add column, which
   made new analog columns too narrow to read
+* SDL3: fix a crash of SDL3_mixer games at startup (SRB2 Legacy)
+* SDL3: fix silent audio when the game converts its samples with an audio
+  stream (Moon Child FE)
+* SDL3: fix a crash when the game switches to fullscreen without a fake
+  screen resolution
+* SDL3: send the window events of a fullscreen switch, so that games scale
+  their picture to the window (Moon Child FE)
 
 ## [1.4.8] - 2026-05-14
 ### Added

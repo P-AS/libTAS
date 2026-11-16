@@ -138,6 +138,33 @@ bool Config::applyCliSetting(const std::string& key, const std::string& value)
     else if (key == "initial_time_nsec")        sc.initial_time_nsec = int64Value();
     else if (key == "initial_monotonic_time_sec")  sc.initial_monotonic_time_sec = int64Value();
     else if (key == "initial_monotonic_time_nsec") sc.initial_monotonic_time_nsec = int64Value();
+    /* Time-tracking: main_gettimes_threshold.<function>=N (or sec_ for the
+     * secondary threads), -1 to disable */
+    else if (key.rfind("main_gettimes_threshold.", 0) == 0 || key.rfind("sec_gettimes_threshold.", 0) == 0) {
+        static const char* const names[SharedConfig::TIMETYPE_NUMTRACKEDTYPES] = {
+            "time", "gettimeofday", "clock", "clock_gettime_realtime",
+            "clock_gettime_monotonic", "sdl_getticks", "sdl_getperformancecounter",
+            "gettickcount", "gettickcount64", "queryperformancecounter"};
+        size_t dot = key.find('.');
+        std::string array = key.substr(0, dot);
+        std::string name = key.substr(dot + 1);
+        int t = 0;
+        while (t < SharedConfig::TIMETYPE_NUMTRACKEDTYPES && name != names[t])
+            t++;
+        if (t == SharedConfig::TIMETYPE_NUMTRACKEDTYPES) {
+            std::string list;
+            for (const char* n : names)
+                list += std::string(list.empty() ? "" : ", ") + n;
+            throw std::invalid_argument("Unknown time function \"" + name + "\" for " + array + ", expected one of: " + list);
+        }
+        if (array == "main_gettimes_threshold")
+            sc.main_gettimes_threshold[t] = intValue();
+        else
+            sc.sec_gettimes_threshold[t] = intValue();
+        /* Record the key of the ini file, so that the value is not saved */
+        cli_overridden_keys.insert(array + "/" + std::to_string(t + 1) + "/value");
+        return true;
+    }
     /* Game settings outside SharedConfig */
     else if (key == "libdir")                   libdir = value;
     else if (key == "rundir")                   rundir = value;

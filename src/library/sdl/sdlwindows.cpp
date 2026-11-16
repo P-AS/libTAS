@@ -571,14 +571,42 @@ int SDL_SetWindowFullscreen(std::uintptr_t p1, std::uintptr_t p2)
     return 0; // success
 }
 
+/* Push the window events that SDL sends when the fullscreen state of a
+ * window changes, because we don't let the window change its state. Games
+ * may only update their viewport from these events. */
+static void pushSDL3FullscreenEvents(SDL_Window *window, bool fullscreen, int w, int h)
+{
+    struct timespec time = DeterministicTimer::get().getTicks();
+
+    sdl3::SDL_Event event = {};
+    event.window.timestamp = time.tv_sec * 1000000000ull + time.tv_nsec;
+    NATIVECALL(event.window.windowID = ORIG_SDL3_CALL(SDL_GetWindowID, (window)));
+
+    event.window.type = fullscreen ? sdl3::SDL_EVENT_WINDOW_ENTER_FULLSCREEN : sdl3::SDL_EVENT_WINDOW_LEAVE_FULLSCREEN;
+    sdlEventQueue.insert(&event);
+
+    if (w > 0 && h > 0) {
+        event.window.data1 = w;
+        event.window.data2 = h;
+        event.window.type = sdl3::SDL_EVENT_WINDOW_RESIZED;
+        sdlEventQueue.insert(&event);
+        event.window.type = sdl3::SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED;
+        sdlEventQueue.insert(&event);
+    }
+}
+
 /* Override */ bool sdl3::SDL_SetWindowFullscreen(SDL_Window *window, bool fullscreen)
 {
     LOGTRACE(LCF_SDL | LCF_WINDOW, "%s call with fullscreen %d", __func__, fullscreen);
 
+    bool was_fullscreen = windowFullscreen;
     windowFullscreen = fullscreen;
 
-    if (!fullscreen) // Windowed
-        return 0;
+    if (!fullscreen) { // Windowed
+        if (was_fullscreen)
+            pushSDL3FullscreenEvents(window, false, 0, 0);
+        return true;
+    }
 
     /* Resize the window to the screen or fake resolution */
     int w, h;
@@ -589,7 +617,7 @@ int SDL_SetWindowFullscreen(std::uintptr_t p1, std::uintptr_t p2)
     else {
         /* Change the window size to monitor size */
         sdl3::SDL_DisplayID display_id;
-        NATIVECALL(display_id = libtas::sdl3::SDL_GetPrimaryDisplay());
+        NATIVECALL(display_id = ORIG_SDL3_CALL(SDL_GetPrimaryDisplay, ()));
         const sdl3::SDL_DisplayMode* dm;
         NATIVECALL(dm = libtas::sdl3::SDL_GetCurrentDisplayMode(display_id));
         w = dm->w;
@@ -598,7 +626,10 @@ int SDL_SetWindowFullscreen(std::uintptr_t p1, std::uintptr_t p2)
 
     NATIVECALL(libtas::sdl3::SDL_SetWindowSize(window, w, h));
     ScreenCapture::resize(w, h);
-    return 0; // success
+
+    if (!was_fullscreen)
+        pushSDL3FullscreenEvents(window, true, w, h);
+    return true;
 }
 
 /* Override */ bool SDL_SetWindowResizable(SDL_Window * window, SDL_bool resizable)
@@ -816,6 +847,42 @@ bool SDL_GetWindowSize(std::uintptr_t p1, std::uintptr_t p2, std::uintptr_t p3)
 
     /* Return our saved dimension, because user may have resized the window and
      * game window may be detached */
+    int width = 0, height = 0;
+    ScreenCapture::getDimensions(width, height);
+
+    if (w) *w = width;
+    if (h) *h = height;
+
+    return true;
+}
+
+bool SDL_GetWindowSizeInPixels(std::uintptr_t p1, std::uintptr_t p2, std::uintptr_t p3)
+{
+    const std::uintptr_t storage[] = {p1, p2, p3};
+    return invoke_sdl2_or_sdl3_from_storage(&sdl2::SDL_GetWindowSizeInPixels, &sdl3::SDL_GetWindowSizeInPixels, storage);
+}
+
+/* Override */ void sdl2::SDL_GetWindowSizeInPixels(SDL_Window *window, int *w, int *h)
+{
+    if (GlobalState::isNative() || !ScreenCapture::isInited())
+        return ORIG_SDL2_CALL(SDL_GetWindowSizeInPixels, (window, w, h));
+
+    LOGTRACE_SIMPLE(LCF_SDL | LCF_WINDOW);
+
+    int width = 0, height = 0;
+    ScreenCapture::getDimensions(width, height);
+
+    if (w) *w = width;
+    if (h) *h = height;
+}
+
+/* Override */ bool sdl3::SDL_GetWindowSizeInPixels(SDL_Window *window, int *w, int *h)
+{
+    if (GlobalState::isNative() || !ScreenCapture::isInited())
+        return ORIG_SDL3_CALL(SDL_GetWindowSizeInPixels, (window, w, h));
+
+    LOGTRACE_SIMPLE(LCF_SDL | LCF_WINDOW);
+
     int width = 0, height = 0;
     ScreenCapture::getDimensions(width, height);
 

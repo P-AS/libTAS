@@ -33,6 +33,7 @@
 #include <mutex>
 #include <vector>
 #include <algorithm>
+#include <map>
 
 namespace libtas {
 
@@ -143,22 +144,6 @@ static AudioBuffer::SampleFormat sdlFormatToFormat(SDL_AudioFormat sdlFormat)
         default:
             LOG(LL_DEBUG, LCF_SDL | LCF_SOUND, "Unsupported audio format: %x", sdlFormat);
             return AudioBuffer::SAMPLE_FMT_UNKNOWN;
-    }
-}
-
-static SDL_AudioFormat formatToSdlFormat(AudioBuffer::SampleFormat format)
-{
-    switch(format) {
-        case AudioBuffer::SAMPLE_FMT_U8:
-            return SDL_AUDIO_U8;
-        case AudioBuffer::SAMPLE_FMT_S16:
-            return SDL_AUDIO_S16;
-        case AudioBuffer::SAMPLE_FMT_S32:
-            return SDL_AUDIO_S32;
-        case AudioBuffer::SAMPLE_FMT_FLT:
-            return SDL_AUDIO_F32;
-        default:
-            return SDL_AUDIO_UNKNOWN;
     }
 }
 
@@ -479,6 +464,11 @@ static int open_audio_device(const sdl2::SDL_AudioSpec * desired, sdl2::SDL_Audi
         specs_sdl2.freq = spec->freq;
         specs_sdl2.format = static_cast<SDL_AudioFormat>(spec->format);
         specs_sdl2.channels = spec->channels;
+
+        /* Streams convert to the device format, so the device only needs a
+         * format that we can mix */
+        if (sdlFormatToFormat(static_cast<SDL_AudioFormat>(specs_sdl2.format)) == AudioBuffer::SAMPLE_FMT_UNKNOWN)
+            specs_sdl2.format = SDL_AUDIO_F32;
     }
     else {
         specs_sdl2.freq = Global::shared_config.audio_frequency;
@@ -731,27 +721,158 @@ bool SDL_MixAudio(Uint8 * dst, const Uint8 * src, Uint32 p3, int p4, float sdl3_
     sdl_source->setPosition(sdl_source->queueSize());
 }
 
+/* SDL3 audio streams
+ *
+ * An SDL3 audio stream only converts audio: the game puts samples in one
+ * format and gets them in another, and the stream never accesses an audio
+ * device by itself. So the game uses real SDL streams, with all their
+ * functions, and we only emulate the devices. When a stream is bound to one of
+ * our devices, an audio source pulls the converted samples from the stream
+ * when we mix the audio at the frame boundary. Getting these samples calls the
+ * get-callback of the stream when it runs short, like the audio thread of SDL
+ * does, but at a deterministic time. */
+
+struct SdlBoundStream
+{
+    int device;
+    AudioSource* source;
+};
+
+/* Streams that are bound to one of our devices */
+static std::map<SDL_AudioStream*, SdlBoundStream> sdl3_bound_streams;
+
+/* Streams created by SDL_OpenAudioDeviceStream(), with the device that they
+ * opened, which is closed when the stream is destroyed */
+static std::map<SDL_AudioStream*, int> sdl3_device_streams;
+
+/* Number of sample frames that SDL asks from the streams of a device at once */
+static int sdl3SampleFrames(int freq)
+{
+    if (freq <= 22050)
+        return 512;
+    if (freq <= 48000)
+        return 1024;
+    if (freq <= 96000)
+        return 2048;
+    return 4096;
+}
+
+static bool bindStream(int devid, SDL_AudioStream *stream)
+{
+    std::lock_guard<std::recursive_mutex> lock(mutex);
+
+    if (sdl3_bound_streams.count(stream)) {
+        LOG(LL_DEBUG, LCF_SDL | LCF_SOUND, "   stream already bound");
+        return false;
+    }
+
+    const SdlDevice& device = sdl_devices[devid];
+
+    /* The device sets the output format of the stream */
+    sdl3::SDL_AudioSpec dst_spec;
+    dst_spec.format = static_cast<SDL_AudioFormat>(device.format);
+    dst_spec.channels = device.channels;
+    dst_spec.freq = device.freq;
+    bool ret;
+    NATIVECALL(ret = ORIG_SDL3_CALL(SDL_SetAudioStreamFormat, (stream, nullptr, &dst_spec)));
+    if (!ret)
+        return false;
+
+    AudioContext& audiocontext = AudioContext::get();
+    std::lock_guard<std::mutex> lock_context(audiocontext.mutex);
+
+    auto buffer = audiocontext.createBuffer();
+    if (!buffer) {
+        LOG(LL_WARN, LCF_SDL | LCF_SOUND, "No more audio buffers available");
+        return false;
+    }
+
+    std::shared_ptr<AudioSource> source = audiocontext.createSource();
+    source->channels = device.channels;
+    source->format = sdlFormatToFormat(device.format);
+    source->frequency = device.freq;
+
+    buffer->frequency = source->frequency;
+    buffer->channels = source->channels;
+    buffer->format = source->format;
+    buffer->update();
+    buffer->size = sdl3SampleFrames(device.freq) * buffer->alignSize;
+    buffer->update(); // Yes, a second time, to fill sampleSize based on size.
+    buffer->samples.resize(buffer->size);
+
+    source->source = AudioSource::SOURCE_CALLBACK;
+    source->callback = [stream](AudioBuffer* ab) {
+        /* What the stream does not have is played as silence */
+        ab->makeSilent();
+
+        /* The get-callback of the stream may call our audio functions */
+        AudioContext::get().mutex.unlock();
+        ORIG_SDL3_CALL(SDL_GetAudioStreamData, (stream, ab->samples.data(), ab->size));
+        AudioContext::get().mutex.lock();
+    };
+
+    /* We simulate an empty buffer by setting the position at the end */
+    source->position = buffer->sampleSize;
+    source->queueBuffer(buffer);
+
+    /* The stream follows the paused state of the device */
+    bool paused = !sdl_device_sources[devid].empty() &&
+        (sdl_device_sources[devid][0]->state == AudioSource::SOURCE_PAUSED);
+    source->state = paused ? AudioSource::SOURCE_PAUSED : AudioSource::SOURCE_PLAYING;
+
+    sdl_device_sources[devid].push_back(source.get());
+    sdl3_bound_streams[stream] = {devid, source.get()};
+    return true;
+}
+
+static void unbindStream(SDL_AudioStream *stream)
+{
+    std::lock_guard<std::recursive_mutex> lock(mutex);
+
+    auto it = sdl3_bound_streams.find(stream);
+    if (it == sdl3_bound_streams.end())
+        return;
+
+    AudioContext& audiocontext = AudioContext::get();
+    std::lock_guard<std::mutex> lock_context(audiocontext.mutex);
+
+    AudioSource* source = it->second.source;
+    auto& sources = sdl_device_sources[it->second.device];
+    sources.erase(std::remove(sources.begin(), sources.end(), source), sources.end());
+    audiocontext.deleteSource(source->id);
+
+    sdl3_bound_streams.erase(it);
+}
+
+/* Get the device that a stream is bound to, or 0 */
+static int getDeviceFromStream(SDL_AudioStream *stream)
+{
+    std::lock_guard<std::recursive_mutex> lock(mutex);
+    auto it = sdl3_bound_streams.find(stream);
+    if (it == sdl3_bound_streams.end())
+        return 0;
+    return it->second.device;
+}
+
 /* Override */ bool SDL_BindAudioStreams(sdl3::SDL_AudioDeviceID devid, SDL_AudioStream * const *streams, int num_streams)
 {
     LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND);
 
-    if ((devid <= 1) || (devid > MAX_SDL_DEVICES) || (sdl_devices[devid].id == 0))
+    if ((devid <= 1) || (devid >= MAX_SDL_DEVICES) || (sdl_devices[devid].id == 0))
         return false;
 
-    /* SDL_AudioStream type is just our AudioSource object. For now, mapping a stream to a device
-     * means that we start playing it. */
     for (int i = 0; i < num_streams; i++) {
-        if (!streams[i]) {
+        if (!streams[i] || getDeviceFromStream(streams[i]))
+            return false;
+    }
+
+    for (int i = 0; i < num_streams; i++) {
+        if (!bindStream(devid, streams[i])) {
+            /* SDL binds all the streams or none */
+            for (int j = 0; j < i; j++)
+                unbindStream(streams[j]);
             return false;
         }
-
-        AudioSource* source = reinterpret_cast<AudioSource*>(streams[i]);
-
-        if (source->state != AudioSource::SOURCE_INITIAL) {
-            return false;
-        }
-        source->state = AudioSource::SOURCE_PLAYING;
-        sdl_device_sources[devid].push_back(source);
     }
 
     return true;
@@ -759,343 +880,83 @@ bool SDL_MixAudio(Uint8 * dst, const Uint8 * src, Uint32 p3, int p4, float sdl3_
 
 /* Override */ bool SDL_BindAudioStream(sdl3::SDL_AudioDeviceID devid, SDL_AudioStream *stream)
 {
-    LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND);
-
-    if ((devid <= 1) || (devid > MAX_SDL_DEVICES) || (sdl_devices[devid].id == 0))
-        return false;
-
-    if (!stream) {
-        return false;
-    }
-    AudioSource* source = reinterpret_cast<AudioSource*>(stream);
-
-    if (source->state != AudioSource::SOURCE_INITIAL) {
-        return false;
-    }
-    source->state = AudioSource::SOURCE_PLAYING;
-    sdl_device_sources[devid].push_back(source);
-
-    return true;
+    return SDL_BindAudioStreams(devid, &stream, 1);
 }
 
 /* Override */ void SDL_UnbindAudioStreams(SDL_AudioStream * const *streams, int num_streams)
 {
     LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND);
 
-    for (int i = 0; i < num_streams; i++) {
-        if (!streams[i]) {
-            continue;
-        }
-        AudioSource* source = reinterpret_cast<AudioSource*>(streams[i]);
-        source->state = AudioSource::SOURCE_INITIAL;
+    if (!streams)
+        return;
 
-        /* Remove source from all devices */
-        for (int d = 1; d < MAX_SDL_DEVICES; d++) {
-            if (sdl_devices[d].id != 0) {
-                auto& sources = sdl_device_sources[d];
-                sources.erase(std::remove_if(sources.begin(), sources.end(),
-                    [&source](const AudioSource* s) { return s->id == source->id; }),
-                    sources.end());
-            }
-        }
+    for (int i = 0; i < num_streams; i++) {
+        if (streams[i])
+            unbindStream(streams[i]);
     }
 }
 
 /* Override */ void SDL_UnbindAudioStream(SDL_AudioStream *stream)
 {
-    LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND);
-
-    if (!stream) {
-        return;
-    }
-    AudioSource* source = reinterpret_cast<AudioSource*>(stream);
-    source->state = AudioSource::SOURCE_INITIAL;
-
-    /* Remove source from all devices */
-    for (int d = 1; d < MAX_SDL_DEVICES; d++) {
-        if (sdl_devices[d].id != 0) {
-            auto& sources = sdl_device_sources[d];
-            sources.erase(std::remove_if(sources.begin(), sources.end(),
-                [&source](const AudioSource* s) { return s->id == source->id; }),
-                sources.end());
-        }
-    }
-}
-
-/* Get the device associated with a stream. This will be used on several functions. */
-static int getDeviceFromStream(SDL_AudioStream *stream)
-{
-    AudioSource* source = reinterpret_cast<AudioSource*>(stream);
-    for (int d = 1; d < MAX_SDL_DEVICES; d++) {
-        if (sdl_devices[d].id != 0) {
-            for (const auto& sdl_source : sdl_device_sources[d]) {
-                if (sdl_source->id == source->id) {
-                    return d;
-                }
-            }
-        }
-    }
-
-    return 0;
+    SDL_UnbindAudioStreams(&stream, 1);
 }
 
 /* Override */ sdl3::SDL_AudioDeviceID SDL_GetAudioStreamDevice(SDL_AudioStream *stream)
 {
     LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND);
 
-    if (!stream) {
+    if (!stream)
         return 0;
-    }
 
     return getDeviceFromStream(stream);
-}
-
-/* Override */ SDL_AudioStream * SDL_CreateAudioStream(const sdl3::SDL_AudioSpec *src_spec, const sdl3::SDL_AudioSpec *dst_spec)
-{
-    LOGTRACE(LCF_SDL | LCF_SOUND, "%s call with input format %d, input channels %d and input freq %d", __func__, src_spec->format, src_spec->channels, src_spec->freq);
-    auto source = AudioContext::get().createSource();
-
-    source->format = sdlFormatToFormat(src_spec->format);
-    source->channels = src_spec->channels;
-    source->frequency = src_spec->freq;
-    source->state = AudioSource::SOURCE_INITIAL;
-
-    return reinterpret_cast<SDL_AudioStream*>(source.get());
-}
-
-/* Override */ bool SDL_GetAudioStreamFormat(SDL_AudioStream *stream, sdl3::SDL_AudioSpec *src_spec, sdl3::SDL_AudioSpec *dst_spec)
-{
-    LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND);
-
-    AudioSource* source = reinterpret_cast<AudioSource*>(stream);
-    if (src_spec) {
-        src_spec->format = formatToSdlFormat(source->format);
-        src_spec->channels = source->channels;
-        src_spec->freq = source->frequency;
-    }
-    return true;
 }
 
 /* Override */ bool SDL_SetAudioStreamFormat(SDL_AudioStream *stream, const sdl3::SDL_AudioSpec *src_spec, const sdl3::SDL_AudioSpec *dst_spec)
 {
     LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND);
 
-    AudioSource* source = reinterpret_cast<AudioSource*>(stream);
-    if (src_spec && source) {
-        source->format = sdlFormatToFormat(src_spec->format);
-        source->channels = src_spec->channels;
-        source->frequency = src_spec->freq;
-    }
-    return true;
+    /* The output format of a stream bound to a device is the device format */
+    if (getDeviceFromStream(stream))
+        dst_spec = nullptr;
+
+    return ORIG_SDL3_CALL(SDL_SetAudioStreamFormat, (stream, src_spec, dst_spec));
 }
 
-/* Override */ float SDL_GetAudioStreamFrequencyRatio(SDL_AudioStream *stream)
+static bool setStreamDevicePaused(SDL_AudioStream *stream, bool paused)
 {
-    LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND);
-
-    AudioSource* source = reinterpret_cast<AudioSource*>(stream);
-    return source->pitch;
-}
-
-/* Override */ bool SDL_SetAudioStreamFrequencyRatio(SDL_AudioStream *stream, float ratio)
-{
-    LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND);
-
-    AudioSource* source = reinterpret_cast<AudioSource*>(stream);
-    source->pitch = ratio;
-    return true;
-}
-
-/* Override */ float SDL_GetAudioStreamGain(SDL_AudioStream *stream)
-{
-    LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND);
-
-    AudioSource* source = reinterpret_cast<AudioSource*>(stream);
-    return source->volume;
-}
-
-/* Override */ bool SDL_SetAudioStreamGain(SDL_AudioStream *stream, float gain)
-{
-    LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND);
-
-    AudioSource* source = reinterpret_cast<AudioSource*>(stream);
-    source->volume = gain;
-    return true;
-}
-
-/* Override */ int * SDL_GetAudioStreamInputChannelMap(SDL_AudioStream *stream, int *count)
-{
-    LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND);
-    return nullptr;
-}
-
-/* Override */ int * SDL_GetAudioStreamOutputChannelMap(SDL_AudioStream *stream, int *count)
-{
-    LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND);
-    return nullptr;
-}
-
-/* Override */ bool SDL_SetAudioStreamInputChannelMap(SDL_AudioStream *stream, const int *chmap, int count)
-{
-    LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND | LCF_TODO);
-    return true;
-}
-
-/* Override */ bool SDL_SetAudioStreamOutputChannelMap(SDL_AudioStream *stream, const int *chmap, int count)
-{
-    LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND | LCF_TODO);
-    return true;
-}
-
-/* Override */ bool SDL_PutAudioStreamData(SDL_AudioStream *stream, const void *buf, int len)
-{
-    LOGTRACE(LCF_SDL | LCF_SOUND, "%s called with %d bytes", __func__, len);
-    AudioSource* source = reinterpret_cast<AudioSource*>(stream);
-
-    AudioContext& audiocontext = AudioContext::get();
-    std::lock_guard<std::mutex> lock(audiocontext.mutex);
-
-    /* We try to reuse a buffer that has been processed from the source */
-    std::shared_ptr<AudioBuffer> ab = audiocontext.reuseBufferFromSourceOrCreate(source);
-    if (!ab) {
-        /* No more audio buffers, they are only processed at frame boundaries */
-        LOG(LL_WARN, LCF_SDL | LCF_SOUND, "    No more audio buffers available");
+    int stream_device = stream ? getDeviceFromStream(stream) : 0;
+    if (stream_device == 0)
         return false;
-    }
-
-    /* Filling buffer */
-    ab->samples.clear();
-    ab->samples.insert(ab->samples.end(), static_cast<const uint8_t*>(buf), &(static_cast<const uint8_t*>(buf))[len]);
-    ab->size = len;
-    ab->update();
-    source->queueBuffer(ab);
-
-    /* If an underrun occurred, resume the playback */
-    if (source->state == AudioSource::SOURCE_UNDERRUN)
-        source->state = AudioSource::SOURCE_PLAYING;
-
-    return true;
-}
-
-/* Override */ int SDL_GetAudioStreamData(SDL_AudioStream *stream, void *buf, int len)
-{
-    LOGTRACE(LCF_SDL | LCF_SOUND | LCF_TODO, "%s called with %d bytes", __func__, len);
-    AudioSource* source = reinterpret_cast<AudioSource*>(stream);
 
     std::lock_guard<std::mutex> lock(AudioContext::get().mutex);
-
-    /* TODO: For now, we just return samples from the first buffer. */
-
-    std::shared_ptr<AudioBuffer> ab = source->buffer(0);
-    if (!ab)
-        return 0;
-
-    uint8_t* samples;
-    int returned_samples = ab->getSamples(samples, len / source->frameToByteRatio(), 0, false);
-    int returned_bytes = returned_samples * source->frameToByteRatio();
-
-    if (returned_samples > 0) {
-        if (returned_bytes > len)
-            returned_bytes = len;
-
-        memcpy(buf, samples, returned_bytes);
+    for (auto& sdl_source : sdl_device_sources[stream_device]) {
+        sdl_source->state = paused ? AudioSource::SOURCE_PAUSED : AudioSource::SOURCE_PLAYING;
     }
-
-    return returned_bytes;
-}
-
-/* Override */ int SDL_GetAudioStreamAvailable(SDL_AudioStream *stream)
-{
-    LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND | LCF_TODO);
-
-    /* TODO: For now, we just return the number of available unconverted bytes */
-    AudioSource* source = reinterpret_cast<AudioSource*>(stream);
-    if (!source)
-        return -1;
-
-    int available_samples = source->queueSize() - source->getPosition();
-    return available_samples * source->frameToByteRatio();
-}
-
-/* Override */ int SDL_GetAudioStreamQueued(SDL_AudioStream *stream)
-{
-    LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND);
-
-    AudioSource* source = reinterpret_cast<AudioSource*>(stream);
-    if (!source)
-        return -1;
-
-    int available_samples = source->queueSize() - source->getPosition();
-    return available_samples * source->frameToByteRatio();
-}
-
-/* Override */ bool SDL_FlushAudioStream(SDL_AudioStream *stream)
-{
-    LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND);
-    return true;
-}
-
-/* Override */ bool SDL_ClearAudioStream(SDL_AudioStream *stream)
-{
-    LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND);
-
-    AudioSource* source = reinterpret_cast<AudioSource*>(stream);
-    if (!source)
-        return -1;
-
-    std::lock_guard<std::mutex> lock(AudioContext::get().mutex);
-    source->clearBuffers();
     return true;
 }
 
 /* Override */ bool SDL_PauseAudioStreamDevice(SDL_AudioStream *stream)
 {
     LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND);
-
-    if (!stream)
-        return -1;
-
-    int stream_device = getDeviceFromStream(stream);
-
-    if (stream_device == 0)
-        return false;
-
-    std::lock_guard<std::mutex> lock(AudioContext::get().mutex);
-    for (auto& sdl_source : sdl_device_sources[stream_device]) {
-        sdl_source->state = AudioSource::SOURCE_PAUSED;
-    }
-    return true;
+    return setStreamDevicePaused(stream, true);
 }
 
 /* Override */ bool SDL_ResumeAudioStreamDevice(SDL_AudioStream *stream)
 {
     LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND);
-
-    if (!stream)
-        return -1;
-
-    int stream_device = getDeviceFromStream(stream);
-
-    if (stream_device == 0)
-        return false;
-
-    std::lock_guard<std::mutex> lock(AudioContext::get().mutex);
-    for (auto& sdl_source : sdl_device_sources[stream_device]) {
-        sdl_source->state = AudioSource::SOURCE_PLAYING;
-    }
-    return true;
+    return setStreamDevicePaused(stream, false);
 }
 
 /* Override */ bool SDL_AudioStreamDevicePaused(SDL_AudioStream *stream)
 {
     LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND);
 
-    /* Only check this stream status */
-    AudioSource* source = reinterpret_cast<AudioSource*>(stream);
-    if (!source)
+    std::lock_guard<std::recursive_mutex> lock(mutex);
+    auto it = sdl3_bound_streams.find(stream);
+    if (it == sdl3_bound_streams.end())
         return false;
 
-    return source->state == AudioSource::SOURCE_PAUSED;
+    return it->second.source->state == AudioSource::SOURCE_PAUSED;
 }
 
 /* Override */ void SDL_LockAudio(void)
@@ -1112,18 +973,6 @@ static int getDeviceFromStream(SDL_AudioStream *stream)
     mutex.lock();
 }
 
-/* Override */ bool SDL_LockAudioStream(SDL_AudioStream *stream)
-{
-    LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND);
-
-    if (!stream)
-        return false;
-
-    /* There is no per-source mutex currently */
-    // AudioSource* source = reinterpret_cast<AudioSource*>(stream);
-    mutex.lock();
-    return true;
-}
 
 /* Override */ void SDL_UnlockAudio(void)
 {
@@ -1139,62 +988,30 @@ static int getDeviceFromStream(SDL_AudioStream *stream)
     mutex.unlock();
 }
 
-/* Override */ bool SDL_UnlockAudioStream(SDL_AudioStream *stream)
-{
-    LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND);
-
-    if (!stream)
-        return false;
-
-    /* There is no per-source mutex currently */
-    // AudioSource* source = reinterpret_cast<AudioSource*>(stream);
-    mutex.unlock();
-    return true;
-}
-
-/* Override */ bool SDL_SetAudioStreamGetCallback(SDL_AudioStream *stream, SDL_AudioStreamCallback callback, void *userdata)
-{
-    LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND | LCF_TODO);
-    return true;
-}
-
-/* Override */ bool SDL_SetAudioStreamPutCallback(SDL_AudioStream *stream, SDL_AudioStreamCallback callback, void *userdata)
-{
-    LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND | LCF_TODO);
-    return true;
-}
 
 /* Override */ void SDL_DestroyAudioStream(SDL_AudioStream *stream)
 {
     LOGTRACE_SIMPLE(LCF_SDL | LCF_SOUND);
 
-    AudioContext& audiocontext = AudioContext::get();
-    AudioSource* source = reinterpret_cast<AudioSource*>(stream);
-    if (!source)
+    if (!stream)
         return;
 
-    /* Remove source from all devices */
-    int last_device_removed_source = 0;
-    for (int d = 1; d < MAX_SDL_DEVICES; d++) {
-        if (sdl_devices[d].id != 0) {
-            auto& sources = sdl_device_sources[d];
-            sources.erase(std::remove_if(sources.begin(), sources.end(),
-                [&source, &last_device_removed_source, d](const AudioSource* s) {
-                    if (s->id == source->id) {
-                        last_device_removed_source = d;
-                        return true;
-                    } return false; }),
-                sources.end());
+    unbindStream(stream);
+
+    /* A stream created with SDL_OpenAudioDeviceStream() closes its device */
+    int device = 0;
+    {
+        std::lock_guard<std::recursive_mutex> lock(mutex);
+        auto it = sdl3_device_streams.find(stream);
+        if (it != sdl3_device_streams.end()) {
+            device = it->second;
+            sdl3_device_streams.erase(it);
         }
     }
+    if (device)
+        SDL_CloseAudioDevice(device);
 
-    audiocontext.deleteSource(source->id);
-
-    /* If the device does not have any source left, it means that it was created
-     * with SDL_OpenAudioDeviceStream(), so it must be closed as well. */
-    if (last_device_removed_source && sdl_device_sources[last_device_removed_source].empty()) {
-        sdl_devices[last_device_removed_source].id = 0;
-    }
+    ORIG_SDL3_CALL(SDL_DestroyAudioStream, (stream));
 }
 
 /* Override */ SDL_AudioStream * SDL_OpenAudioDeviceStream(sdl3::SDL_AudioDeviceID devid, const sdl3::SDL_AudioSpec *spec, SDL_AudioStreamCallback callback, void *userdata)
@@ -1215,6 +1032,11 @@ static int getDeviceFromStream(SDL_AudioStream *stream)
         specs_sdl2.freq = spec->freq;
         specs_sdl2.format = static_cast<SDL_AudioFormat>(spec->format);
         specs_sdl2.channels = spec->channels;
+
+        /* The stream converts from any format, so the device only needs a
+         * format that we can mix */
+        if (sdlFormatToFormat(static_cast<SDL_AudioFormat>(specs_sdl2.format)) == AudioBuffer::SAMPLE_FMT_UNKNOWN)
+            specs_sdl2.format = SDL_AUDIO_F32;
     }
     else {
         specs_sdl2.freq = Global::shared_config.audio_frequency;
@@ -1223,6 +1045,7 @@ static int getDeviceFromStream(SDL_AudioStream *stream)
                 specs_sdl2.format = SDL_AUDIO_U8;
                 break;
             case 16:
+            default:
                 specs_sdl2.format = SDL_AUDIO_S16LE;
                 break;
         }
@@ -1235,59 +1058,46 @@ static int getDeviceFromStream(SDL_AudioStream *stream)
     if (id <= 0)
         return nullptr;
 
-    AudioSource* sdl_source = sdl_device_sources[id][0];
-    sdl_source->state = AudioSource::SOURCE_PAUSED;
-
-    if (callback) {
-        /* We are using the callback mechanism.
-         * When the buffer is depleted, we are supposed to call the
-         * callback function so that it fills the buffer again.
-         * We will use a single AudioSource and a single AudioBuffer for this.
-         * When the source plays the buffer until the end,
-         * it calls the callback function to fill the buffer again.
-         */
-
-        AudioContext& audiocontext = AudioContext::get();
-        std::lock_guard<std::mutex> lock(audiocontext.mutex);
-
-        /* TODO: buffer sample size is set by the game using the SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES hint! */
-        int sample_size = _obtained.samples;
-
-        sdl_source->source = AudioSource::SOURCE_CALLBACK_QUEUE;
-        sdl_source->callback = [callback, userdata, sdl_source, sample_size](AudioBuffer* ab){
-            /* The callback may call SDL_PutAudioStreamData() or other functions that lock
-            * the mutex */
-            AudioContext::get().mutex.unlock();
-            callback(userdata, reinterpret_cast<SDL_AudioStream*>(sdl_source), sample_size, sample_size);
-            AudioContext::get().mutex.lock();
-        };
-       
-        /* Push an empty buffer just to indicate that the source can play samples */
-        auto buffer = audiocontext.createBuffer();
-        if (!buffer) {
-            LOG(LL_WARN, LCF_SDL | LCF_SOUND, "No more audio buffers available");
-            return nullptr;
-        }
-
-        buffer->frequency = sdl_source->frequency;
-        buffer->channels = sdl_source->channels;
-        buffer->format = sdl_source->format;
-
-        buffer->update();
-        buffer->size = sample_size * buffer->alignSize;
-        buffer->update(); // Yes, a second time, to fill sampleSize based on size.
-        buffer->samples.resize(buffer->size);
-      
-        /* We simulate an empty buffer by setting the position at the end */
-        sdl_source->queueBuffer(buffer);
-        sdl_source->position = buffer->sampleSize;
-
-        /* Specify the thread that opens the audio, to optimize Lock/UnlockAudio
-         * and match its implementation */
-        audiocontext.audio_thread = ThreadManager::getThreadId();
+    /* The device of SDL_OpenAudioDeviceStream() starts paused */
+    {
+        std::lock_guard<std::mutex> lock(AudioContext::get().mutex);
+        for (auto& sdl_source : sdl_device_sources[id])
+            sdl_source->state = AudioSource::SOURCE_PAUSED;
     }
 
-    return reinterpret_cast<SDL_AudioStream*>(sdl_source);
+    /* Without a spec, the stream takes the format of the device */
+    sdl3::SDL_AudioSpec src_spec;
+    if (spec) {
+        src_spec = *spec;
+    }
+    else {
+        src_spec.format = static_cast<SDL_AudioFormat>(_obtained.format);
+        src_spec.channels = _obtained.channels;
+        src_spec.freq = _obtained.freq;
+    }
+
+    SDL_AudioStream *stream;
+    NATIVECALL(stream = ORIG_SDL3_CALL(SDL_CreateAudioStream, (&src_spec, nullptr)));
+    if (!stream) {
+        SDL_CloseAudioDevice(id);
+        return nullptr;
+    }
+
+    if (!bindStream(id, stream)) {
+        ORIG_SDL3_CALL(SDL_DestroyAudioStream, (stream));
+        SDL_CloseAudioDevice(id);
+        return nullptr;
+    }
+
+    {
+        std::lock_guard<std::recursive_mutex> lock(mutex);
+        sdl3_device_streams[stream] = id;
+    }
+
+    if (callback)
+        ORIG_SDL3_CALL(SDL_SetAudioStreamGetCallback, (stream, callback, userdata));
+
+    return stream;
 }
 
 /* Override */ void SDL_CloseAudio(void)
@@ -1300,13 +1110,28 @@ static int getDeviceFromStream(SDL_AudioStream *stream)
 {
     LOGTRACE(LCF_SDL | LCF_SOUND, "%s called with dev %d", __func__, dev);
 
-    if (dev <= 1 || dev > MAX_SDL_DEVICES)
+    if (dev <= 1 || dev >= MAX_SDL_DEVICES)
         return;
+
+    /* Closing a device unbinds its SDL3 streams. Their sources are deleted
+     * below with the other sources of the device. The two mutexes are not
+     * held together, because SDL2 callbacks lock our mutex while the audio
+     * context is locked. */
+    {
+        std::lock_guard<std::recursive_mutex> lock_streams(mutex);
+        for (auto it = sdl3_bound_streams.begin(); it != sdl3_bound_streams.end();) {
+            if (it->second.device == static_cast<int>(dev))
+                it = sdl3_bound_streams.erase(it);
+            else
+                ++it;
+        }
+    }
 
     AudioContext& audiocontext = AudioContext::get();
     std::lock_guard<std::mutex> lock(audiocontext.mutex);
 
     if (sdl_devices[dev].id != 0) {
+
         /* Remove the source from the audio context */
         for (auto& sdl_source : sdl_device_sources[dev]) {
             audiocontext.deleteSource(sdl_source->id);

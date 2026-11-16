@@ -855,7 +855,7 @@ OVERRIDE sdl3::SDL_AudioDeviceID SDL_GetAudioStreamDevice(SDL_AudioStream *strea
  * \sa SDL_SetAudioStreamFormat
  * \sa SDL_DestroyAudioStream
  */
-OVERRIDE SDL_AudioStream * SDL_CreateAudioStream(const sdl3::SDL_AudioSpec *src_spec, const sdl3::SDL_AudioSpec *dst_spec);
+// OVERRIDE SDL_AudioStream * SDL_CreateAudioStream(const sdl3::SDL_AudioSpec *src_spec, const sdl3::SDL_AudioSpec *dst_spec);
 
 /**
  * Get the properties associated with an audio stream.
@@ -886,7 +886,7 @@ OVERRIDE SDL_AudioStream * SDL_CreateAudioStream(const sdl3::SDL_AudioSpec *src_
  *
  * \sa SDL_SetAudioStreamFormat
  */
-OVERRIDE bool SDL_GetAudioStreamFormat(SDL_AudioStream *stream, sdl3::SDL_AudioSpec *src_spec, sdl3::SDL_AudioSpec *dst_spec);
+// OVERRIDE bool SDL_GetAudioStreamFormat(SDL_AudioStream *stream, sdl3::SDL_AudioSpec *src_spec, sdl3::SDL_AudioSpec *dst_spec);
 
 /**
  * Change the input and output formats of an audio stream.
@@ -939,7 +939,7 @@ OVERRIDE bool SDL_SetAudioStreamFormat(SDL_AudioStream *stream, const sdl3::SDL_
  *
  * \sa SDL_SetAudioStreamFrequencyRatio
  */
-OVERRIDE float SDL_GetAudioStreamFrequencyRatio(SDL_AudioStream *stream);
+// OVERRIDE float SDL_GetAudioStreamFrequencyRatio(SDL_AudioStream *stream);
 
 /**
  * Change the frequency ratio of an audio stream.
@@ -967,7 +967,7 @@ OVERRIDE float SDL_GetAudioStreamFrequencyRatio(SDL_AudioStream *stream);
  * \sa SDL_GetAudioStreamFrequencyRatio
  * \sa SDL_SetAudioStreamFormat
  */
-OVERRIDE bool SDL_SetAudioStreamFrequencyRatio(SDL_AudioStream *stream, float ratio);
+// OVERRIDE bool SDL_SetAudioStreamFrequencyRatio(SDL_AudioStream *stream, float ratio);
 
 /**
  * Get the gain of an audio stream.
@@ -988,7 +988,7 @@ OVERRIDE bool SDL_SetAudioStreamFrequencyRatio(SDL_AudioStream *stream, float ra
  *
  * \sa SDL_SetAudioStreamGain
  */
-OVERRIDE float SDL_GetAudioStreamGain(SDL_AudioStream *stream);
+// OVERRIDE float SDL_GetAudioStreamGain(SDL_AudioStream *stream);
 
 /**
  * Change the gain of an audio stream.
@@ -1013,7 +1013,7 @@ OVERRIDE float SDL_GetAudioStreamGain(SDL_AudioStream *stream);
  *
  * \sa SDL_GetAudioStreamGain
  */
-OVERRIDE bool SDL_SetAudioStreamGain(SDL_AudioStream *stream, float gain);
+// OVERRIDE bool SDL_SetAudioStreamGain(SDL_AudioStream *stream, float gain);
 
 /**
  * Get the current input channel map of an audio stream.
@@ -1037,7 +1037,7 @@ OVERRIDE bool SDL_SetAudioStreamGain(SDL_AudioStream *stream, float gain);
  *
  * \sa SDL_SetAudioStreamInputChannelMap
  */
-OVERRIDE int * SDL_GetAudioStreamInputChannelMap(SDL_AudioStream *stream, int *count);
+// OVERRIDE int * SDL_GetAudioStreamInputChannelMap(SDL_AudioStream *stream, int *count);
 
 /**
  * Get the current output channel map of an audio stream.
@@ -1061,7 +1061,7 @@ OVERRIDE int * SDL_GetAudioStreamInputChannelMap(SDL_AudioStream *stream, int *c
  *
  * \sa SDL_SetAudioStreamInputChannelMap
  */
-OVERRIDE int * SDL_GetAudioStreamOutputChannelMap(SDL_AudioStream *stream, int *count);
+// OVERRIDE int * SDL_GetAudioStreamOutputChannelMap(SDL_AudioStream *stream, int *count);
 
 /**
  * Set the current input channel map of an audio stream.
@@ -1121,7 +1121,7 @@ OVERRIDE int * SDL_GetAudioStreamOutputChannelMap(SDL_AudioStream *stream, int *
  *
  * \sa SDL_SetAudioStreamInputChannelMap
  */
-OVERRIDE bool SDL_SetAudioStreamInputChannelMap(SDL_AudioStream *stream, const int *chmap, int count);
+// OVERRIDE bool SDL_SetAudioStreamInputChannelMap(SDL_AudioStream *stream, const int *chmap, int count);
 
 /**
  * Set the current output channel map of an audio stream.
@@ -1179,7 +1179,7 @@ OVERRIDE bool SDL_SetAudioStreamInputChannelMap(SDL_AudioStream *stream, const i
  *
  * \sa SDL_SetAudioStreamInputChannelMap
  */
-OVERRIDE bool SDL_SetAudioStreamOutputChannelMap(SDL_AudioStream *stream, const int *chmap, int count);
+// OVERRIDE bool SDL_SetAudioStreamOutputChannelMap(SDL_AudioStream *stream, const int *chmap, int count);
 
 /**
  * Add data to the stream.
@@ -1209,7 +1209,7 @@ OVERRIDE bool SDL_SetAudioStreamOutputChannelMap(SDL_AudioStream *stream, const 
  * \sa SDL_GetAudioStreamData
  * \sa SDL_GetAudioStreamQueued
  */
-OVERRIDE bool SDL_PutAudioStreamData(SDL_AudioStream *stream, const void *buf, int len);
+// OVERRIDE bool SDL_PutAudioStreamData(SDL_AudioStream *stream, const void *buf, int len);
 
 /**
  * Get converted/resampled data from the stream.
@@ -1239,7 +1239,7 @@ OVERRIDE bool SDL_PutAudioStreamData(SDL_AudioStream *stream, const void *buf, i
  * \sa SDL_GetAudioStreamAvailable
  * \sa SDL_PutAudioStreamData
  */
-OVERRIDE int SDL_GetAudioStreamData(SDL_AudioStream *stream, void *buf, int len);
+// OVERRIDE int SDL_GetAudioStreamData(SDL_AudioStream *stream, void *buf, int len);
 
 /**
  * Get the number of converted/resampled bytes available.
@@ -1265,7 +1265,7 @@ OVERRIDE int SDL_GetAudioStreamData(SDL_AudioStream *stream, void *buf, int len)
  * \sa SDL_GetAudioStreamData
  * \sa SDL_PutAudioStreamData
  */
-OVERRIDE int SDL_GetAudioStreamAvailable(SDL_AudioStream *stream);
+// OVERRIDE int SDL_GetAudioStreamAvailable(SDL_AudioStream *stream);
 
 
 /**
@@ -1304,7 +1304,7 @@ OVERRIDE int SDL_GetAudioStreamAvailable(SDL_AudioStream *stream);
  * \sa SDL_PutAudioStreamData
  * \sa SDL_ClearAudioStream
  */
-OVERRIDE int SDL_GetAudioStreamQueued(SDL_AudioStream *stream);
+// OVERRIDE int SDL_GetAudioStreamQueued(SDL_AudioStream *stream);
 
 
 /**
@@ -1325,7 +1325,7 @@ OVERRIDE int SDL_GetAudioStreamQueued(SDL_AudioStream *stream);
  *
  * \sa SDL_PutAudioStreamData
  */
-OVERRIDE bool SDL_FlushAudioStream(SDL_AudioStream *stream);
+// OVERRIDE bool SDL_FlushAudioStream(SDL_AudioStream *stream);
 
 /**
  * Clear any pending data in the stream.
@@ -1346,7 +1346,7 @@ OVERRIDE bool SDL_FlushAudioStream(SDL_AudioStream *stream);
  * \sa SDL_GetAudioStreamQueued
  * \sa SDL_PutAudioStreamData
  */
-OVERRIDE bool SDL_ClearAudioStream(SDL_AudioStream *stream);
+// OVERRIDE bool SDL_ClearAudioStream(SDL_AudioStream *stream);
 
 /**
  * Use this function to pause audio playback on the audio device associated
@@ -1453,7 +1453,7 @@ OVERRIDE void SDL_LockAudioDevice(sdl2::SDL_AudioDeviceID dev);
  *
  * \sa SDL_UnlockAudioStream
  */
-OVERRIDE bool SDL_LockAudioStream(SDL_AudioStream *stream);
+// OVERRIDE bool SDL_LockAudioStream(SDL_AudioStream *stream);
 
 OVERRIDE void SDL_UnlockAudio(void);
 OVERRIDE void SDL_UnlockAudioDevice(sdl2::SDL_AudioDeviceID dev);
@@ -1474,7 +1474,7 @@ OVERRIDE void SDL_UnlockAudioDevice(sdl2::SDL_AudioDeviceID dev);
  *
  * \sa SDL_LockAudioStream
  */
-OVERRIDE bool SDL_UnlockAudioStream(SDL_AudioStream *stream);
+// OVERRIDE bool SDL_UnlockAudioStream(SDL_AudioStream *stream);
 
 /* @} *//* Audio lock functions */
 
@@ -1564,7 +1564,7 @@ typedef void (SDLCALL *SDL_AudioStreamCallback)(void *userdata, SDL_AudioStream 
  *
  * \sa SDL_SetAudioStreamPutCallback
  */
-OVERRIDE bool SDL_SetAudioStreamGetCallback(SDL_AudioStream *stream, SDL_AudioStreamCallback callback, void *userdata);
+// OVERRIDE bool SDL_SetAudioStreamGetCallback(SDL_AudioStream *stream, SDL_AudioStreamCallback callback, void *userdata);
 
 /**
  * Set a callback that runs when data is added to an audio stream.
@@ -1613,7 +1613,7 @@ OVERRIDE bool SDL_SetAudioStreamGetCallback(SDL_AudioStream *stream, SDL_AudioSt
  *
  * \sa SDL_SetAudioStreamGetCallback
  */
-OVERRIDE bool SDL_SetAudioStreamPutCallback(SDL_AudioStream *stream, SDL_AudioStreamCallback callback, void *userdata);
+// OVERRIDE bool SDL_SetAudioStreamPutCallback(SDL_AudioStream *stream, SDL_AudioStreamCallback callback, void *userdata);
 
 /**
  * Free an audio stream.

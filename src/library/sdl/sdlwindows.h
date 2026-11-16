@@ -720,6 +720,16 @@ void sdl2::SDL_GetWindowSize(SDL_Window * window, int *w, int *h);
 bool sdl3::SDL_GetWindowSize(SDL_Window *window, int *w, int *h);
 
 /**
+ * Get the size of a window's client area, in pixels.
+ *
+ * We return the same size as SDL_GetWindowSize(), because we don't allow
+ * high pixel density windows.
+ */
+OVERRIDE bool SDL_GetWindowSizeInPixels(std::uintptr_t p1, std::uintptr_t p2, std::uintptr_t p3);
+void sdl2::SDL_GetWindowSizeInPixels(SDL_Window *window, int *w, int *h);
+bool sdl3::SDL_GetWindowSizeInPixels(SDL_Window *window, int *w, int *h);
+
+/**
  * Set up a video mode with the specified width, height and bits-per-pixel.
  *
  * If 'bpp' is 0, it is treated as the current display bits per pixel.

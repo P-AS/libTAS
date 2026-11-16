@@ -12,6 +12,11 @@ display, libTAS built from `next` with `cmake`. Games used for testing:
 - **La-Mulana** (Steam app 230700, Nigoro, version 1.5.5.2, 32-bit ELF, its
   own SDL2, OpenAL and `libsteam_api.so` in `lib/`, OpenGL 2). Works with
   `sleep_handling=3` and `virtual_steam=true`, see [La-Mulana](#la-mulana).
+- **SRB2 Legacy** (`next` branch, migrated to SDL3 in b9672ea9, built from
+  source, 64-bit, the system SDL3 and SDL3_mixer). Works with `-nofork` and the
+  time-tracking of `SDL_GetPerformanceCounter()`, see [SDL3 games](#sdl3-games).
+- **Moon Child FE** (Linux x64 build, SDL 3.4.10 linked statically, with its
+  dynamic API, OpenGL). Works with the defaults, see [SDL3 games](#sdl3-games).
 
 ## Basics that matter for a native game
 
@@ -358,6 +363,80 @@ To compare with the regular SDL2 library without uninstalling sdl2-compat, extra
 `sdl2` package from `/var/cache/pacman/pkg` and export `LD_LIBRARY_PATH` to its
 `usr/lib` when starting libTAS. Check `/proc/<pid>/maps` of the game to be sure.
 
+## SDL3 games
+
+Checked on SRB2 Legacy (SDL3 3.5.0 from `sdl3-git`, SDL3_mixer 3.2.4) and Moon
+Child FE (SDL 3.4.10 built in, reached through `SDL_DYNAPI_entry()` like a
+system SDL3). Both run, take keyboard inputs, give the same picture over two
+runs, and the same picture after a savestate is saved and loaded (SRB2: save at
+frame 450, load at 550, same picture at 750 as a run without savestates;
+Moon Child FE: save at 600, load at 850, same at 1000). Both have audio in an
+encode.
+
+### Audio streams
+
+An SDL3 `SDL_AudioStream` only converts audio: the game puts samples in one
+format and gets them in another. libTAS returned its own `AudioSource` as the
+stream, which converted nothing, and `SDL_GetAudioStreamData()` kept returning
+the first buffer that was put, without consuming it:
+
+- Moon Child FE mixes into a stream that it only uses to convert, then puts the
+  result in the stream of the device: its audio was the first buffer, silent,
+  for the whole game (and the queue of the converter grew forever).
+- SDL3_mixer creates a stream for each track and stores data in the
+  properties of the stream: `SDL_GetAudioStreamProperties()` was not hooked,
+  so real SDL read our `AudioSource` as its own struct and crashed in
+  `MIX_CreateTrack()`. Its mixing callback is set with
+  `SDL_SetAudioStreamGetCallback()`, which was a stub, and it reads the output
+  format with `SDL_GetAudioStreamFormat()`, which did not fill `dst_spec`
+  (a random channel count crashed in `MIX_VBAP2D_Init()`).
+
+Now every stream is a real SDL stream: all the functions that only touch the
+stream (data, formats, gain, channel maps, locks, callbacks, properties) are no
+longer hooked. libTAS only emulates the devices: binding a stream to one of our
+devices creates a `SOURCE_CALLBACK` source that pulls the converted samples with
+the real `SDL_GetAudioStreamData()` when the audio is mixed at the frame
+boundary, in chunks of the SDL device size (1024 frames up to 48 kHz). Getting
+the samples calls the get-callback of the stream when it runs short, as the
+audio thread of SDL does, but at a deterministic time. The device sets the
+output format of a bound stream, and `SDL_SetAudioStreamFormat()` ignores a new
+output format for a bound stream. `SDL_OpenAudioDeviceStream()` opens a device,
+creates a real stream bound to it and sets the callback as the get-callback;
+the device starts paused, as in SDL. The streams that SDL3_mixer creates for
+its tracks are plain converters, as in SDL.
+
+The mixing callback unlocks the audio context while it calls SDL, as the
+previous SDL3 callback code did, because game callbacks may call our audio
+functions. A stream destroyed by another thread while the main thread mixes
+it would delete the source in use; no game seen does that.
+
+### Other problems
+
+- `sdl3::SDL_SetWindowFullscreen()` called `libtas::sdl3::SDL_GetPrimaryDisplay()`,
+  a weak declaration without a definition, so a null pointer, when no fake
+  screen resolution is set: SRB2 crashed in its main loop. It also returned
+  `0`, which is a failure in SDL3.
+- Fullscreen: SDL3 games get no native SDL event (`pushNativeSDLEvents()` only
+  handles SDL1 and SDL2), and SDL3 resizes a window asynchronously. Moon Child FE
+  creates a 640x480 window, switches to desktop fullscreen and only updates its
+  viewport from `SDL_EVENT_WINDOW_ENTER_FULLSCREEN`,
+  `SDL_EVENT_WINDOW_RESIZED` and `SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED`: it drew
+  640x480 in the bottom-left corner of the resized window. The hook now pushes
+  these events in our queue, and `SDL_GetWindowSizeInPixels()` returns our size
+  like `SDL_GetWindowSize()` (high pixel density windows are disabled).
+- SRB2 forks at startup (`I_Fork()`, for its crash reporter): the parent only
+  waits, and the child runs the game. A forked process runs native under libTAS,
+  so the game ran on the real clock without frame boundaries. Use `-nofork`, as
+  the SDL2 configs did.
+- SRB2 sleeps until 0.2 ms before the next frame, then spins on
+  `SDL_GetPerformanceCounter()` (`I_SleepDuration()`): it stopped at frame 142.
+  Set the time-tracking of `SDL_GetPerformanceCounter()` (100 works, like the
+  SDL2 configs, which track `clock_gettime()` monotonic), from the command line
+  with `-s main_gettimes_threshold.sdl_getperformancecounter=100`.
+- The system SDL3 (3.5.0) has more functions than `SDL3_dynapi_procs.h`
+  (`The game loaded more functions that intended`): the extra functions are not
+  hooked. Nothing used by these two games was missing.
+
 ## Regression check of the changes for La-Mulana
 
 Old build (the commit before) against new build, two runs each at normal speed
@@ -646,6 +725,17 @@ Not done:
   `-s` options in a variable reaches libTAS as one argument
   (`Unknown setting key`). Use a shell function with `"$@"`.
 - Keep the throttling of heavy games for 3D games: La-Mulana is light.
+- An encode is split into a new file (`name_1.mkv`...) when the window size
+  changes, so a game that resizes its window at startup leaves a short first
+  file. A run killed by `timeout` leaves the encode unflushed (a few seconds
+  readable): quit from Lua with `runtime.quit()` at a fixed frame. Check the
+  audio with `ffmpeg -i f.mkv -map 0:a -af volumedetect -f null -` and a
+  `showspectrumpic` picture.
+- SDL3 has a `disk` audio driver, to get the audio of a native run without
+  playing it: `SDL_AUDIO_DRIVER=disk SDL_AUDIO_DISK_OUTPUT_FILE=out.raw`.
+- `build/src/program/libtas.so` is a symlink to `../library/libtas.so`: the
+  program loads the library next to it, and a copy there does not follow the
+  rebuilds (it hid every fix of the library until `--libtas-so-path` was used).
 
 ## Open problems
 
@@ -667,3 +757,11 @@ Not done:
   makes the main thread wait 5 s at each frame (logged as `still busy`).
 - Reading an unchecked result of `createBuffer()` was a crash class in the
   audio hooks (fixed for ALSA, SDL and cubeb, see `wine.md`).
+- SDL3: no native SDL event reaches an SDL3 game (`pushNativeSDLEvents()` has no
+  SDL3 branch and the SDL3 queue is never pumped), so closing the window does
+  not send `SDL_EVENT_QUIT`, and resizes done by the window manager are not
+  seen. Only the events that libTAS generates are sent.
+- SDL3: a game that forks and runs in the child (SRB2 without `-nofork`) runs
+  native, without frame control. libTAS could follow the child when the parent
+  only waits for it.
+- SDL3: `SDL3_dynapi_procs.h` is older than SDL 3.5.0.
