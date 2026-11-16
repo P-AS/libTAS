@@ -359,6 +359,10 @@
 * SDL3: restore the window size when the game leaves fullscreen
 * SDL: fix a crash when the game opens an audio device while audio is
   disabled (SRB2 Legacy)
+* SDL3: the internal waits of SDL3 no longer advance the game time, which
+  added a non-draw frame at startup (SRB2 Legacy). Movies of SDL3 games start
+  one frame earlier
+* SDL3: hook SDL_DelayPrecise()
 
 ## [1.4.8] - 2026-05-14
 ### Added

@@ -29,6 +29,7 @@
 #include "global.h"
 #include "frame.h"
 #include "dlhook.h"
+#include "sdl/sdlversion.h" // get_sdlversion()
 
 #include <cstring>
 #include <dlfcn.h>
@@ -122,6 +123,13 @@ void transfer_sleep(const struct timespec &ts, struct timespec *rem)
     transfer_sleep(ts, NULL);
 }
 
+/* Override */ void SDL_DelayPrecise(Uint64 ns)
+{
+    /* SDL busy-waits the end of the delay on its own clock, which is not the
+     * game time. Sleeping the whole delay is the same for the game. */
+    SDL_DelayNS(ns);
+}
+
 /* Override */ int usleep(useconds_t usec)
 {
     LINK_NAMESPACE_GLOBAL(nanosleep);
@@ -154,14 +162,30 @@ void transfer_sleep(const struct timespec &ts, struct timespec *rem)
     return 0;
 }
 
+/* Return if a sleep was called from inside the SDL3 library of an SDL3 game.
+ * The delay functions of SDL are hooked, so these are only the waits of SDL
+ * itself, such as for the window manager in SDL_SyncWindow(). */
+static bool isSDL3Internal(void* caller)
+{
+    if (get_sdlversion() != 3)
+        return false;
+
+    Dl_info info;
+    if (!dladdr(caller, &info) || !info.dli_fname)
+        return false;
+    return strstr(info.dli_fname, "libSDL3") != nullptr;
+}
+
 /* The private SDL libraries of sdl2-compat and sdl12-compat sleep internally where
- * the regular SDL library doesn't, for example when creating a window. Adding these
- * to the game time would add non-draw frames and desync movies, so they must not
- * count. If the main thread keeps sleeping there, it may be waiting for a timeout,
- * so we let them count to prevent a softlock. */
+ * the regular SDL library doesn't, for example when creating a window, and so
+ * does SDL3, which waits in steps of 10 ms for the window manager where SDL2
+ * blocks on an event. Adding these to the game time would add non-draw frames
+ * and desync movies, so they must not count. If the main thread keeps sleeping
+ * there, it may be waiting for a timeout, so we let them count to prevent a
+ * softlock. */
 static bool isSDLCompatInternalSleep(void* caller)
 {
-    if (!isSDLCompatInternal(caller))
+    if (!isSDLCompatInternal(caller) && !isSDL3Internal(caller))
         return false;
 
     if (!ThreadManager::isMainThread())

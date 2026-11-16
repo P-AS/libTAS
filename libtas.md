@@ -480,6 +480,20 @@ window before fullscreen, and applies the size given by `SDL_SetWindowSize()`
 while fullscreen when leaving it: the hook now does the same, and sends the
 resize events. Checked with Alt+Enter twice in Moon Child FE (640x480 again,
 picture scaled). The SDL2 hook still does not restore the size.
+- A non-draw frame at startup in SRB2 Legacy (not in its SDL2 build): SDL3
+  waits for the window manager with 10 ms sleeps where SDL2 blocks on an X
+  event, once in `SDL_CreateRenderer()` and twice in `SDL_SyncWindow()` (called
+  by the game in `SDLSetMode()`). The 30 ms were added to the game time, more
+  than a frame at 35 fps. Sleeps called from inside `libSDL3` now only sleep,
+  like those of sdl2-compat (same limit of 100 per frame of the main thread).
+  The delay functions of SDL are hooked (`SDL_DelayPrecise()` was not), so these
+  are only the waits of SDL. Found with a backtrace of each sleep that adds
+  time on frame 0 (`printBacktrace()` in the `nanosleep()` hook). Moon Child FE
+  still has one non-draw frame: its SDL3 is linked statically, so the sleeps of
+  SDL come from the game binary.
+- SRB2 Legacy crashed at startup with `audio_disabled`: `open_audio_device()`
+  returns -1, stored in an unsigned `SDL_AudioDeviceID`, so
+  `SDL_OpenAudioDeviceStream()` indexed the devices with it (ddc01141).
 - The system SDL3 (3.5.0) has more functions than `SDL3_dynapi_procs.h`
   (`The game loaded more functions that intended`): the extra functions are not
   hooked. Nothing used by these two games was missing.
@@ -834,5 +848,7 @@ Not done:
   and maximum sizes, which are not hooked) are not synced, so SDL may keep
   stale values for them.
 - No OSD is drawn on SDL2 or SDL3 software surfaces.
+- SDL3 linked statically (Moon Child FE): the internal sleeps of SDL still add
+  to the game time, giving a non-draw frame at startup.
 - An encode is not finished when the game is stopped with Lua `runtime.quit()`.
 - SDL2: leaving fullscreen does not restore the size of the window.

@@ -74,6 +74,12 @@ OVERRIDE void SDL_Delay(Uint32 sleep);
  */
 OVERRIDE void SDL_DelayNS(Uint64 ns);
 
+/**
+ * Wait a specified number of nanoseconds before returning, more precisely
+ * than SDL_DelayNS() (SDL 3.2.0).
+ */
+OVERRIDE void SDL_DelayPrecise(Uint64 ns);
+
 
 OVERRIDE int sched_yield(void) __THROW;
 
