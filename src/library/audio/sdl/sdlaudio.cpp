@@ -161,7 +161,7 @@ static int open_audio_device(const sdl2::SDL_AudioSpec * desired, sdl2::SDL_Audi
         if (sdl_devices[id].id == 0)
             break;
 
-    if (sdl_devices[id].id != 0) {
+    if (id >= MAX_SDL_DEVICES) {
         LOG(LL_DEBUG, LCF_SDL | LCF_SOUND, "   no available device");
         return -1;
     }
@@ -441,7 +441,8 @@ static int open_audio_device(const sdl2::SDL_AudioSpec * desired, sdl2::SDL_Audi
     if (iscapture != 0)
         return 0;
 
-    sdl2::SDL_AudioDeviceID id = open_audio_device(desired, obtained, 2);
+    /* Negative on failure */
+    int id = open_audio_device(desired, obtained, 2);
     return (id > 0)? id : 0;
 }
 
@@ -483,7 +484,8 @@ static int open_audio_device(const sdl2::SDL_AudioSpec * desired, sdl2::SDL_Audi
         specs_sdl2.channels = Global::shared_config.audio_channels;
     }
 
-    sdl2::SDL_AudioDeviceID id = open_audio_device(&specs_sdl2, nullptr, devid);
+    /* Negative on failure */
+    int id = open_audio_device(&specs_sdl2, nullptr, devid);
 
     return (id > 0)? id : 0;
 }
@@ -1053,7 +1055,8 @@ static bool setStreamDevicePaused(SDL_AudioStream *stream, bool paused)
     }
 
     sdl2::SDL_AudioSpec _obtained = {};
-    sdl2::SDL_AudioDeviceID id = open_audio_device(&specs_sdl2, &_obtained, devid);
+    /* Negative on failure */
+    int id = open_audio_device(&specs_sdl2, &_obtained, devid);
 
     if (id <= 0)
         return nullptr;

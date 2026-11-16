@@ -357,6 +357,8 @@
 * SDL3: fix the window size and surface of SDL keeping their old size after the
   game resizes its window (SRB2 Classic)
 * SDL3: restore the window size when the game leaves fullscreen
+* SDL: fix a crash when the game opens an audio device while audio is
+  disabled (SRB2 Legacy)
 
 ## [1.4.8] - 2026-05-14
 ### Added
