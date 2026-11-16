@@ -17,6 +17,10 @@ display, libTAS built from `next` with `cmake`. Games used for testing:
   time-tracking of `SDL_GetPerformanceCounter()`, see [SDL3 games](#sdl3-games).
 - **Moon Child FE** (Linux x64 build, SDL 3.4.10 linked statically, with its
   dynamic API, OpenGL). Works with the defaults, see [SDL3 games](#sdl3-games).
+- **SRB2 Classic** (2.2.17 beta12 AppImage, extracted, its own SDL 3.4.0 in
+  `usr/lib`, software renderer drawing with `SDL_UpdateWindowSurface()`). Works
+  with `SRB2CLASSICWADDIR` set to `usr/share/games/srb2classic` and
+  `-s debug_state=0`, see [SDL3 games](#sdl3-games).
 
 ## Basics that matter for a native game
 
@@ -371,7 +375,8 @@ system SDL3). Both run, take keyboard inputs, give the same picture over two
 runs, and the same picture after a savestate is saved and loaded (SRB2: save at
 frame 450, load at 550, same picture at 750 as a run without savestates;
 Moon Child FE: save at 600, load at 850, same at 1000). Both have audio in an
-encode.
+encode. SRB2 Classic passes the same checks (save at 450, load at 550, same
+picture at 800).
 
 ### Audio streams
 
@@ -433,6 +438,27 @@ it would delete the source in use; no game seen does that.
   Set the time-tracking of `SDL_GetPerformanceCounter()` (100 works, like the
   SDL2 configs, which track `clock_gettime()` monotonic), from the command line
   with `-s main_gettimes_threshold.sdl_getperformancecounter=100`.
+- SRB2 Classic asks for `SDL_GetCurrentDisplayMode(0)` before creating its
+  window (no display yet). SDL returns NULL, and our hook dereferenced it.
+  `SDL_GetDesktopDisplayMode()` also kept the mode of its first call, in a
+  `static` initialized once.
+- SRB2 Classic draws with `SDL_UpdateWindowSurface()`, which only had an SDL2
+  path: its hook and `ScreenCapture_SDL2_Surface` called SDL3 through
+  `ORIG_SDL2_CALL`, that is the SDL2 indices in the SDL3 table, and crashed.
+  The hook now flags `SDL3_SURFACE` and calls SDL3, and
+  `ScreenCapture_SDL3_Surface` copies the window surface (SDL3 surfaces have a
+  different struct, a pixel format value instead of a pointer).
+- SRB2 Classic creates a 320x200 window and calls `SDL_SetWindowSize()` with the
+  size of the display. SDL3 resizes asynchronously: the X window changed, but
+  SDL only updates its size and recreates the window surface when it processes
+  the window events, which never happens under libTAS. The game kept drawing a
+  320x200 surface in a big window. The hook now calls `SDL_SyncWindow()` after
+  the resize.
+- SRB2 Classic looks for a UPnP gateway at startup (miniupnpc), and the
+  internet is allowed by default (`debug_state` bit `16`). Some runs stopped for
+  seconds at a random frame while encoding; with `-s debug_state=0` the runs kept
+  a steady speed. It writes its config and logs in `$HOME/.srb2classic`: give it
+  a scratch `HOME` (it ignores `XDG_DATA_HOME`).
 - The system SDL3 (3.5.0) has more functions than `SDL3_dynapi_procs.h`
   (`The game loaded more functions that intended`): the extra functions are not
   hooked. Nothing used by these two games was missing.
@@ -733,6 +759,11 @@ Not done:
   `showspectrumpic` picture.
 - SDL3 has a `disk` audio driver, to get the audio of a native run without
   playing it: `SDL_AUDIO_DRIVER=disk SDL_AUDIO_DISK_OUTPUT_FILE=out.raw`.
+- To see which SDL calls a game makes natively (for example a resize that libTAS
+  does not trace), run it under `gdb -batch` with breakpoints on the exported
+  SDL functions that print their arguments and continue. Without a window
+  manager, a game run natively on the test display stays there after `timeout`
+  kills gdb: check for leftovers, they slow the next runs.
 - `build/src/program/libtas.so` is a symlink to `../library/libtas.so`: the
   program loads the library next to it, and a copy there does not follow the
   rebuilds (it hid every fix of the library until `--libtas-so-path` was used).
@@ -765,3 +796,7 @@ Not done:
   native, without frame control. libTAS could follow the child when the parent
   only waits for it.
 - SDL3: `SDL3_dynapi_procs.h` is older than SDL 3.5.0.
+- SDL3: other asynchronous window changes (position, fullscreen mode, minimum
+  and maximum sizes, which are not hooked) are not synced, so SDL may keep
+  stale values for them.
+- No OSD is drawn on SDL2 or SDL3 software surfaces.

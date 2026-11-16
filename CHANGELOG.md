@@ -85,6 +85,7 @@
   the game window is unfocused, for focus following the mouse
 * Add the time-tracking thresholds to the --set command-line option, as
   main_gettimes_threshold.<function> and sec_gettimes_threshold.<function>
+* SDL3: support games drawing with SDL_UpdateWindowSurface() (SRB2 Classic)
 
 ### Changed
 
@@ -348,6 +349,11 @@
   screen resolution
 * SDL3: send the window events of a fullscreen switch, so that games scale
   their picture to the window (Moon Child FE)
+* SDL3: fix a crash when the game asks for the display mode of an invalid
+  display, such as before creating its window (SRB2 Classic)
+* SDL3: fix SDL_GetDesktopDisplayMode() returning the mode of the first call
+* SDL3: fix the window size and surface of SDL keeping their old size after the
+  game resizes its window (SRB2 Classic)
 
 ## [1.4.8] - 2026-05-14
 ### Added

@@ -803,6 +803,11 @@ bool SDL_SetWindowSize(std::uintptr_t p1, std::uintptr_t p2, std::uintptr_t p3)
         
     NATIVECALL(ORIG_SDL3_CALL(SDL_SetWindowSize, (window, w, h)));
 
+    /* SDL3 resizes windows asynchronously, and only updates the size of the
+     * window and of its surface when processing the window events, which we
+     * never do for SDL3 games. Wait for the resize to be applied. */
+    NATIVECALL(ORIG_SDL3_CALL(SDL_SyncWindow, (window)));
+
     ScreenCapture::resize(w, h);
 
     return true;
@@ -1028,35 +1033,43 @@ OVERRIDE void SDL_UpdateRects(sdl1::SDL_Surface *screen, int numrects, sdl1::SDL
     return ORIG_SDL23_CALL(SDL_GL_SetAttribute, (attr, value));
 }
 
+/* Show the window surface. SDL2 returns 0 on success, SDL3 returns true. */
+static int updateWindowSurface(SDL_Window * window)
+{
+    static RenderHUD renderHUD;
+
+    if (get_sdlversion() == 3) {
+        Global::game_info.video |= GameInfo::SDL3_SURFACE;
+        frameBoundary([&] () {NATIVECALL(ORIG_SDL3_CALL(SDL_UpdateWindowSurface, (window)));}, renderHUD);
+        return true;
+    }
+
+    Global::game_info.video |= GameInfo::SDL2_SURFACE;
+    frameBoundary([&] () {NATIVECALL(ORIG_SDL2_CALL(SDL_UpdateWindowSurface, (window)));}, renderHUD);
+    return 0;
+}
+
 /* Override */ int SDL_UpdateWindowSurface(SDL_Window * window)
 {
     if (GlobalState::isNative())
-        return ORIG_SDL2_CALL(SDL_UpdateWindowSurface, (window));
+        return ORIG_SDL23_CALL(SDL_UpdateWindowSurface, (window));
 
     LOGTRACE_SIMPLE(LCF_SDL | LCF_WINDOW);
-    Global::game_info.video |= GameInfo::SDL2_SURFACE;
 
     /* Start the frame boundary and pass the function to draw */
-    static RenderHUD renderHUD;
-    frameBoundary([&] () {NATIVECALL(ORIG_SDL2_CALL(SDL_UpdateWindowSurface, (window)));}, renderHUD);
-
-    return 0;
+    return updateWindowSurface(window);
 }
 
 /* Override */ int SDL_UpdateWindowSurfaceRects(SDL_Window * window, const sdl2::SDL_Rect * rects, int numrects)
 {
     if (GlobalState::isNative()) {
-        return ORIG_SDL2_CALL(SDL_UpdateWindowSurfaceRects,(window, rects, numrects));
+        return ORIG_SDL23_CALL(SDL_UpdateWindowSurfaceRects,(window, rects, numrects));
     }
 
     LOGTRACE_SIMPLE(LCF_SDL | LCF_WINDOW);
-    Global::game_info.video |= GameInfo::SDL2_SURFACE;
 
-    /* Start the frame boundary and pass the function to draw */
-    static RenderHUD renderHUD;
-    frameBoundary([&] () {NATIVECALL(ORIG_SDL2_CALL(SDL_UpdateWindowSurface, (window)));}, renderHUD);
-
-    return 0;
+    /* Start the frame boundary and show the whole surface */
+    return updateWindowSurface(window);
 }
 
 }

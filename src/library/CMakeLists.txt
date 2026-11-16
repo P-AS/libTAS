@@ -158,6 +158,7 @@ set(LIBTAS_LIBRARY_SOURCES
     screencapture/ScreenCapture_SDL2_Renderer.cpp
     screencapture/ScreenCapture_SDL2_Surface.cpp
     screencapture/ScreenCapture_SDL3_Renderer.cpp
+    screencapture/ScreenCapture_SDL3_Surface.cpp
     screencapture/ScreenCapture_VDPAU.cpp
     screencapture/ScreenCapture_Vulkan.cpp
     screencapture/ScreenCapture_XShm.cpp

@@ -164,7 +164,8 @@ namespace libtas {
     if (!mode)
         return mode;
 
-    static sdl3::SDL_DisplayMode new_mode = *mode;
+    static sdl3::SDL_DisplayMode new_mode;
+    new_mode = *mode;
 
     if (!GlobalState::isNative() && Global::shared_config.screen_width) {
         new_mode.format = sdl3::SDL_PIXELFORMAT_RGB24;
@@ -212,11 +213,16 @@ const sdl3::SDL_DisplayMode * sdl3::SDL_GetCurrentDisplayMode(SDL_DisplayID disp
 
     if (GlobalState::isNative() || !Global::shared_config.screen_width) {
         mode = ORIG_SDL3_CALL(SDL_GetCurrentDisplayMode, (displayID));
+        /* An invalid display, such as 0 */
+        if (!mode)
+            return nullptr;
         new_mode = *mode;
     }
     else {
         /* We must get one real display mode to have a correct data parameter */
         mode = ORIG_SDL3_CALL(SDL_GetDesktopDisplayMode, (displayID));
+        if (!mode)
+            return nullptr;
 
         new_mode = *mode;
         new_mode.format = sdl3::SDL_PIXELFORMAT_RGB24;
