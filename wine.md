@@ -627,10 +627,14 @@ and 32-bit PE code cannot call our 64-bit unix code anyway.
   `LIBTAS_STEAM_LOG_LEVEL=5` prints every call on stderr (default: warnings).
 - The dlls are built with `-D__USE_MINGW_ANSI_STDIO=1` and the logger is
   declared `format(gnu_printf)`, because the default printf of mingw is the
-  one of msvcrt, which does not know `%zu` (`3543d244`). With `-pedantic`,
-  32-bit mingw g++ warns that `thiscall` is used on non-class methods for
-  every `STEAM_CALL` function pointer: harmless, the attribute is still
-  applied, so the dlls are built with `-Wall` only.
+  one of msvcrt, which does not know `%zu` (`3543d244`). The dlls are built
+  with `-Wall -pedantic`. With `-pedantic`, 32-bit mingw g++ warns that
+  `thiscall` is used on non-class methods for every `STEAM_CALL` function,
+  but still applies it (checked in the assembly: `this` in ecx, `ret $n`), so
+  `steamtypes.h` ignores `-Wattributes` on 32-bit Windows. `__extension__`
+  also silences it, but only per declaration. xinput.c casts the results of
+  `GetProcAddress()` and the COM vtable entries through a function pointer
+  type (`vfunc_t`) instead of `void *`, which ISO C does not allow.
 - MSVC ABI differences, handled in the shared sources with macros that do
   nothing on Linux (`steamtypes.h`):
   - methods are `thiscall` on i386 (`this` in ecx, the callee pops the

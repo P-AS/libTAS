@@ -365,6 +365,7 @@
 * SDL3: hook SDL_DelayPrecise()
 * Hex viewer: fix reading past the selected bytes when showing their value
 * Steam: fix sizes and file handles printed wrong in the virtual Steam logs
+* Wine: fix compilation warnings of the xinput and steam_api dlls with -pedantic
 
 ## [1.4.8] - 2026-05-14
 ### Added

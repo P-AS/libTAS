@@ -20,6 +20,11 @@
 
 #include "wine/xinputshared.h"
 
+/* Generic function pointer type, for the results of GetProcAddress() and the
+ * entries of COM vtables. Casts between function pointer types are valid ISO
+ * C, unlike casts between function and object pointers */
+typedef void (*vfunc_t)(void);
+
 #ifndef ERROR_EMPTY
 #define ERROR_EMPTY 4306
 #endif
@@ -124,7 +129,7 @@ static const volatile struct XInputShm *shm;
 static BOOL dos_path(const char *unix_path, char *out, size_t size)
 {
     typedef WCHAR *(CDECL *wine_get_dos_file_name_t)(const char *);
-    wine_get_dos_file_name_t get_dos_file_name = (wine_get_dos_file_name_t)(void *)
+    wine_get_dos_file_name_t get_dos_file_name = (wine_get_dos_file_name_t)(vfunc_t)
         GetProcAddress(GetModuleHandleA("kernel32.dll"), "wine_get_dos_file_name");
 
     if (get_dos_file_name) {
@@ -694,10 +699,10 @@ static HRESULT WINAPI get_device_state_w(void *self, DWORD size, void *data)
     return get_device_state(TRUE, self, size, data);
 }
 
-static void patch_slot(void **vtable, int slot, void *replacement, void **orig)
+static void patch_slot(vfunc_t *vtable, int slot, vfunc_t replacement, vfunc_t *orig)
 {
     DWORD old;
-    if (!VirtualProtect(&vtable[slot], sizeof(void *), PAGE_READWRITE, &old)) {
+    if (!VirtualProtect(&vtable[slot], sizeof(vfunc_t), PAGE_READWRITE, &old)) {
         xlog(LL_ERROR, "Could not patch DirectInput (error %lu)", GetLastError());
         return;
     }
@@ -705,7 +710,7 @@ static void patch_slot(void **vtable, int slot, void *replacement, void **orig)
         *orig = vtable[slot];
         vtable[slot] = replacement;
     }
-    VirtualProtect(&vtable[slot], sizeof(void *), old, &old);
+    VirtualProtect(&vtable[slot], sizeof(vfunc_t), old, &old);
 }
 
 /* Patch EnumDevices (slot 4) of the DirectInput object, and GetDeviceState
@@ -713,7 +718,7 @@ static void patch_slot(void **vtable, int slot, void *replacement, void **orig)
 static void patch_vtable(HMODULE dinput8, BOOL wide)
 {
     typedef HRESULT (WINAPI *create_t)(HINSTANCE, DWORD, const GUID *, void **, void *);
-    create_t create = (create_t)(void *)GetProcAddress(dinput8, "DirectInput8Create");
+    create_t create = (create_t)(vfunc_t)GetProcAddress(dinput8, "DirectInput8Create");
     void *obj = NULL;
 
     if (!create || FAILED(create(GetModuleHandleW(NULL), 0x0800, wide ? &IID_IDirectInput8W_ : &IID_IDirectInput8A_, &obj, NULL)) || !obj) {
@@ -721,21 +726,21 @@ static void patch_vtable(HMODULE dinput8, BOOL wide)
         return;
     }
 
-    void **vtable = *(void ***)obj;
-    patch_slot(vtable, 4, wide ? (void *)enum_devices_w : (void *)enum_devices_a,
-               wide ? (void **)&orig_enum_w : (void **)&orig_enum_a);
+    vfunc_t *vtable = *(vfunc_t **)obj;
+    patch_slot(vtable, 4, wide ? (vfunc_t)enum_devices_w : (vfunc_t)enum_devices_a,
+               wide ? (vfunc_t *)&orig_enum_w : (vfunc_t *)&orig_enum_a);
 
     /* CreateDevice() */
     typedef HRESULT (WINAPI *create_device_t)(void *, const GUID *, void **, void *);
     void *device = NULL;
     if (SUCCEEDED(((create_device_t)vtable[3])(obj, &GUID_SysKeyboard_, &device, NULL)) && device) {
-        void **dvtable = *(void ***)device;
+        vfunc_t *dvtable = *(vfunc_t **)device;
         if (wide)
             get_info_w = (get_device_info_t)dvtable[15];
         else
             get_info_a = (get_device_info_t)dvtable[15];
-        patch_slot(dvtable, 9, wide ? (void *)get_device_state_w : (void *)get_device_state_a,
-                   wide ? (void **)&orig_get_state_w : (void **)&orig_get_state_a);
+        patch_slot(dvtable, 9, wide ? (vfunc_t)get_device_state_w : (vfunc_t)get_device_state_a,
+                   wide ? (vfunc_t *)&orig_get_state_w : (vfunc_t *)&orig_get_state_a);
         ((ULONG (WINAPI *)(void *))dvtable[2])(device);
     } else {
         xlog(LL_ERROR, "Could not create a DirectInput keyboard, keys will not be deterministic");
@@ -770,7 +775,7 @@ static void patch_dinput(HMODULE dinput8)
 static void patch_loaded_dinput(void)
 {
     typedef BOOL (WINAPI *enum_modules_t)(HANDLE, HMODULE *, DWORD, DWORD *);
-    enum_modules_t enum_modules = (enum_modules_t)(void *)GetProcAddress(GetModuleHandleA("kernel32.dll"), "K32EnumProcessModules");
+    enum_modules_t enum_modules = (enum_modules_t)(vfunc_t)GetProcAddress(GetModuleHandleA("kernel32.dll"), "K32EnumProcessModules");
     HMODULE modules[512];
     DWORD needed = 0;
 
@@ -822,7 +827,7 @@ static void hook_dinput(void)
 
     HMODULE ntdll = GetModuleHandleA("ntdll.dll");
     typedef LONG (NTAPI *register_t)(ULONG, ldr_notify_t, PVOID, PVOID *);
-    register_t reg = ntdll ? (register_t)(void *)GetProcAddress(ntdll, "LdrRegisterDllNotification") : NULL;
+    register_t reg = ntdll ? (register_t)(vfunc_t)GetProcAddress(ntdll, "LdrRegisterDllNotification") : NULL;
     PVOID cookie;
     if (reg)
         reg(0, dll_loaded, NULL, &cookie);

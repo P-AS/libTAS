@@ -16,6 +16,9 @@ namespace libtas {
  * i386, where `this` is passed in ecx and the callee pops the arguments. */
 #if defined(_WIN32) && defined(__i386__)
 #define STEAM_CALL __attribute__((thiscall))
+/* With -pedantic, g++ warns that `thiscall` is used on functions that are not
+ * class methods, but still applies it, which is what we want here */
+#pragma GCC diagnostic ignored "-Wattributes"
 #else
 #define STEAM_CALL
 #endif
