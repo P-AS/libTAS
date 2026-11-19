@@ -41,7 +41,7 @@ foreach(_arch 32 64)
         set(_dll libtas-${_version}${_suffix}.dll)
         add_custom_command(
             OUTPUT ${_xinputdll_dir}/${_dll}
-            COMMAND ${_cc} -O2 -shared -static-libgcc
+            COMMAND ${_cc} -O2 -Wall -shared -static-libgcc
                     -I${PROJECT_SOURCE_DIR}/src/library
                     ${_xinputdll_source} ${CMAKE_CURRENT_SOURCE_DIR}/${_version}.def
                     -Wl,--kill-at,--enable-stdcall-fixup -o ${_xinputdll_dir}/${_dll}

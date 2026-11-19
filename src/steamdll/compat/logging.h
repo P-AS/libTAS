@@ -30,7 +30,7 @@ namespace libtas {
 /* Print a message on stderr if the level is enabled with the
  * LIBTAS_STEAM_LOG_LEVEL environment variable (default: warnings) */
 void steamdll_log(LogLevel ll, const char* file, int line, const char* fmt, ...)
-    __attribute__((format(printf, 4, 5)));
+    __attribute__((format(gnu_printf, 4, 5)));
 
 }
 

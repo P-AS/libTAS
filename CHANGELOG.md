@@ -364,6 +364,7 @@
   one frame earlier
 * SDL3: hook SDL_DelayPrecise()
 * Hex viewer: fix reading past the selected bytes when showing their value
+* Steam: fix sizes and file handles printed wrong in the virtual Steam logs
 
 ## [1.4.8] - 2026-05-14
 ### Added

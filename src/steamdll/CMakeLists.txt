@@ -13,8 +13,10 @@ file(GLOB_RECURSE _steam_headers CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/compat/*.h)
 set(_steamdll_sources ${_steam_sources} ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp)
 
+# Use the C99 printf of mingw instead of the one of msvcrt, which lacks
+# formats such as %zu used in the logs
 set(_steamdll_flags
-    -std=c++17 -O2 -shared
+    -std=c++17 -O2 -Wall -shared -D__USE_MINGW_ANSI_STDIO=1
     -I${CMAKE_CURRENT_SOURCE_DIR}/compat
     -I${PROJECT_SOURCE_DIR}/src/library
     -static -static-libgcc -static-libstdc++)

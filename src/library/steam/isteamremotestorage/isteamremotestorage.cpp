@@ -39,7 +39,8 @@
 
 #include <unistd.h>
 #include <fcntl.h>
-#include <dirent.h> 
+#include <dirent.h>
+#include <cinttypes>
 
 /* Windows opens files in text mode by default */
 #ifndef O_BINARY
@@ -284,7 +285,7 @@ UGCFileWriteStreamHandle_t STEAM_CALL ISteamRemoteStorage_FileWriteStreamOpen( v
 
 bool STEAM_CALL ISteamRemoteStorage_FileWriteStreamWriteChunk( void* iface, UGCFileWriteStreamHandle_t writeHandle, const void *pvData, int cubData )
 {
-    LOGTRACE(LCF_STEAM, "%s called with file handke %ull and size %d", __func__, writeHandle, cubData);
+    LOGTRACE(LCF_STEAM, "%s called with file handle %" PRIu64 " and size %d", __func__, writeHandle, cubData);
     
     ssize_t ret = write(writeHandle, pvData, cubData);
     
@@ -293,7 +294,7 @@ bool STEAM_CALL ISteamRemoteStorage_FileWriteStreamWriteChunk( void* iface, UGCF
 
 bool STEAM_CALL ISteamRemoteStorage_FileWriteStreamClose( void* iface, UGCFileWriteStreamHandle_t writeHandle )
 {
-    LOGTRACE(LCF_STEAM, "%s called with file handke %ull", __func__, writeHandle);
+    LOGTRACE(LCF_STEAM, "%s called with file handle %" PRIu64, __func__, writeHandle);
 
     int ret = close(writeHandle);
 
