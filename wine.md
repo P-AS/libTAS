@@ -625,6 +625,12 @@ and 32-bit PE code cannot call our 64-bit unix code anyway.
   paths, converted with `wine_get_dos_file_name`). Remote storage files are
   then opened through `NtCreateFile`, so "Prevent writing to disk" applies.
   `LIBTAS_STEAM_LOG_LEVEL=5` prints every call on stderr (default: warnings).
+- The dlls are built with `-D__USE_MINGW_ANSI_STDIO=1` and the logger is
+  declared `format(gnu_printf)`, because the default printf of mingw is the
+  one of msvcrt, which does not know `%zu` (`3543d244`). With `-pedantic`,
+  32-bit mingw g++ warns that `thiscall` is used on non-class methods for
+  every `STEAM_CALL` function pointer: harmless, the attribute is still
+  applied, so the dlls are built with `-Wall` only.
 - MSVC ABI differences, handled in the shared sources with macros that do
   nothing on Linux (`steamtypes.h`):
   - methods are `thiscall` on i386 (`this` in ecx, the callee pops the
