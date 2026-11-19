@@ -29,6 +29,7 @@
 
 #include <QtWidgets/QVBoxLayout>
 #include <iostream>
+#include <cstring>
 
 HexViewWindow::HexViewWindow(QWidget *parent) : QDialog(parent)
 {
@@ -156,34 +157,55 @@ void HexViewWindow::positionChanged()
     qint64 selectionEnd = view->selectionEndOffset();
     qint64 selectionLength = selectionEnd - selectionStart;
     
+    if (selectionLength != 1 && selectionLength != 2 && selectionLength != 4 && selectionLength != 8)
+        return;
+
+    QByteArray selectedArray = view->selectedBytes();
+    if (selectedArray.size() < selectionLength)
+        return;
+
+    /* Copy the bytes instead of casting the pointer, which may be misaligned */
+    char bytes[8] = {};
+    memcpy(bytes, selectedArray.constData(), selectionLength);
+    auto read = [&bytes](auto& value) {
+        static_assert(sizeof(value) <= sizeof(bytes));
+        memcpy(&value, bytes, sizeof(value));
+    };
+
     switch(selectionLength) {
         case 1: {
-            QByteArray selectedArray = view->selectedBytes();
-            int8_t signedValue = *reinterpret_cast<const int8_t*>(selectedArray.constData());
-            uint8_t unsignedValue = *reinterpret_cast<const uint8_t*>(selectedArray.constData());
+            int8_t signedValue;
+            uint8_t unsignedValue;
+            read(signedValue);
+            read(unsignedValue);
             selectionLabel->setText(QString("byte: %1, unsigned byte: %2").arg((int)signedValue).arg((unsigned int)unsignedValue));
             break;
         }
         case 2: {
-            QByteArray selectedArray = view->selectedBytes();
-            int16_t signedValue = *reinterpret_cast<const int16_t*>(selectedArray.constData());
-            uint16_t unsignedValue = *reinterpret_cast<const uint16_t*>(selectedArray.constData());
+            int16_t signedValue;
+            uint16_t unsignedValue;
+            read(signedValue);
+            read(unsignedValue);
             selectionLabel->setText(QString("short: %1, unsigned short: %2").arg(signedValue).arg(unsignedValue));
             break;
         }
         case 4: {
-            QByteArray selectedArray = view->selectedBytes();
-            int32_t signedValue = *reinterpret_cast<const int32_t*>(selectedArray.constData());
-            uint32_t unsignedValue = *reinterpret_cast<const uint32_t*>(selectedArray.constData());
-            float floatValue = *reinterpret_cast<const float*>(selectedArray.constData());
+            int32_t signedValue;
+            uint32_t unsignedValue;
+            float floatValue;
+            read(signedValue);
+            read(unsignedValue);
+            read(floatValue);
             selectionLabel->setText(QString("int: %1, unsigned int: %2, float: %3").arg(signedValue).arg(unsignedValue).arg(floatValue));
             break;
         }
         case 8: {
-            QByteArray selectedArray = view->selectedBytes();
-            int64_t signedValue = *reinterpret_cast<const int64_t*>(selectedArray.constData());
-            uint64_t unsignedValue = *reinterpret_cast<const uint64_t*>(selectedArray.constData());
-            double floatValue = *reinterpret_cast<const double*>(selectedArray.constData());
+            int64_t signedValue;
+            uint64_t unsignedValue;
+            double floatValue;
+            read(signedValue);
+            read(unsignedValue);
+            read(floatValue);
             selectionLabel->setText(QString("long: %1, unsigned long: %2, double: %3").arg(signedValue).arg(unsignedValue).arg(floatValue));
             break;
         }

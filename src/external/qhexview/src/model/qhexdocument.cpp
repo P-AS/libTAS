@@ -64,7 +64,8 @@ uchar QHexDocument::at(int offset) const { return m_buffer->at(offset); }
 
 QHexDocument* QHexDocument::fromFile(QString filename, QObject* parent) {
     QFile f(filename);
-    f.open(QFile::ReadOnly);
+    if(!f.open(QFile::ReadOnly))
+        return nullptr;
     return QHexDocument::fromMemory<QMemoryBuffer>(f.readAll(), parent);
 }
 

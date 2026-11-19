@@ -363,6 +363,7 @@
   added a non-draw frame at startup (SRB2 Legacy). Movies of SDL3 games start
   one frame earlier
 * SDL3: hook SDL_DelayPrecise()
+* Hex viewer: fix reading past the selected bytes when showing their value
 
 ## [1.4.8] - 2026-05-14
 ### Added

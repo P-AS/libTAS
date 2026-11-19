@@ -678,7 +678,6 @@ void QHexView::drawDocument(QTextCursor& c) const {
     if(!m_hexdocument)
         return;
 
-    qreal y = !m_options.hasFlag(QHexFlags::NoHeader) ? this->lineHeight() : 0;
     quint64 line = static_cast<quint64>(this->verticalScrollBar()->value());
 
     QTextCharFormat addrformat;
@@ -687,7 +686,7 @@ void QHexView::drawDocument(QTextCursor& c) const {
 
     for(qint64 l = 0; m_hexdocument->isEmpty() ||
                       (line < this->lines() && l < this->visibleLines());
-        l++, line++, y += this->lineHeight()) {
+        l++, line++) {
         quint64 address = line * m_options.linelength + this->baseAddress();
         QString addrstr = QString::number(address, 16)
                               .rightJustified(this->addressWidth(), '0')
